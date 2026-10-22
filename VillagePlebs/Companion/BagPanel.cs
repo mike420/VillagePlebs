@@ -10,7 +10,7 @@ using static VillagePlebs.Shared.Translations;
 namespace VillagePlebs
 {
     /// <summary>
-    /// Its bag with your inventory: whenever your inventory is open and one of your companions is within 10 m, its bag shows below yours,
+    /// Its bag with your inventory: whenever your inventory is open and one of your companions is within 30 m (Reach), its bag shows below yours,
     /// in a copy of the game's own chest panel and grid in the game's own look (so dragging, splitting stacks and tooltips are the game's),
     /// titled with its name and weight. Drag between the two as with a chest; right-click one of its items to take it. It is not "opened"
     /// like a chest, so the companion carries on meanwhile. Where it goes: under your inventory, where a chest's panel goes; with a chest
@@ -36,15 +36,22 @@ namespace VillagePlebs
         private static InventoryGui _gui;
         private static readonly AccessTools.FieldRef<InventoryGui, int> ActiveGroup = AccessTools.FieldRefAccess<InventoryGui, int>("m_activeGroup");
         private static readonly System.Reflection.MethodInfo SetActiveGroup = AccessTools.Method(typeof(InventoryGui), "SetActiveGroup", new[] { typeof(int), typeof(bool) });
-        private static bool _warned;
+        private static bool _warned, _saidWhy, _buildWarned;
+        private const float Reach = 30f;   // how near a companion is for its bag to show (across your base: at its chest or a bench)
 
         public static void Tick(InventoryGui gui)
         {
             try
             {
                 Humanoid c = Pick(gui);
+                if (!InventoryGui.IsVisible()) _saidWhy = false;
+                else if (c == null && !_saidWhy) { _saidWhy = true; VillagePlebsPlugin.Instance?.Note("Companion bag panel not shown: " + WhyNot(gui)); }   // (once each time the inventory opens)
                 if (c == null) { Hide(); return; }
-                if (_panel == null && !Build(gui)) return;
+                if (_panel == null && !Build(gui))
+                {
+                    if (!_buildWarned) { _buildWarned = true; VillagePlebsPlugin.Instance?.Warn("Companion bag panel: the game's chest panel was not found, so it can't be made"); }
+                    return;
+                }
                 if (!_panel.gameObject.activeSelf) _panel.gameObject.SetActive(true);
                 _gui = gui;
                 Join(gui);
@@ -63,15 +70,29 @@ namespace VillagePlebs
             }
         }
 
-        /// <summary>Your nearest companion within 10 m that runs on your game (only then are changes to its bag kept), unless its bag is the chest you have open.</summary>
+        /// <summary>Your nearest companion within reach that runs on your game (only then are changes to its bag kept), unless its bag is the chest you have open.</summary>
         private static Humanoid Pick(InventoryGui gui)
         {
             Player p = Player.m_localPlayer;
             if (p == null || !InventoryGui.IsVisible()) return null;
             Container open = CurrentContainer(gui);
-            return Companion.All().Where(c => Companion.IsMine(c, p) && !c.IsDead() && c.GetComponent<ZNetView>().IsOwner() && Vector3.Distance(c.transform.position, p.transform.position) < 10f
+            return Companion.All().Where(c => Companion.IsMine(c, p) && !c.IsDead() && c.GetComponent<ZNetView>().IsOwner() && Vector3.Distance(c.transform.position, p.transform.position) < Reach
                                              && (open == null || open.gameObject != c.gameObject))
                 .OrderBy(c => Vector3.Distance(c.transform.position, p.transform.position)).FirstOrDefault();
+        }
+
+        /// <summary>For the log: why no companion's bag shows (the nearest of yours, and what keeps it out).</summary>
+        private static string WhyNot(InventoryGui gui)
+        {
+            Player p = Player.m_localPlayer;
+            if (p == null) return "no player";
+            Humanoid c = Companion.All().Where(h => Companion.IsMine(h, p)).OrderBy(h => Vector3.Distance(h.transform.position, p.transform.position)).FirstOrDefault();
+            if (c == null) return "none of your companions is loaded near you";
+            float d = Vector3.Distance(c.transform.position, p.transform.position);
+            Container open = CurrentContainer(gui);
+            string why = c.IsDead() ? "it is dead" : !c.GetComponent<ZNetView>().IsOwner() ? "another game runs it (its bag can only be changed there)"
+                       : d >= Reach ? $"it is further than {Reach:0} m" : open != null && open.gameObject == c.gameObject ? "its bag is the chest you have open" : "unknown";
+            return $"your nearest companion, {Companion.NameOf(c)}, is {d:0} m away: {why}";
         }
 
         /// <summary>A copy of the game's chest panel (background, title, weight, grid), without its buttons, wired to the game's own drag and drop.</summary>
