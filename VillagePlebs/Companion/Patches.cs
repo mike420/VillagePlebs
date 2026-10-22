@@ -82,7 +82,9 @@ namespace VillagePlebs
     internal static class Container_Load_Companion
     {
         private static readonly AccessTools.FieldRef<Container, uint> LastRevision = AccessTools.FieldRefAccess<Container, uint>("m_lastRevision");
-        private static readonly HashSet<int> Owned = new HashSet<int>(); // companions' bags this game has been running
+        // companions' bags this game has been running, and the save's owner count then: a different count means it was another game's
+        // meanwhile (handed there and back between two loads), so it is read again
+        private static readonly Dictionary<int, ushort> Owned = new Dictionary<int, ushort>();
 
         private static bool Prefix(Container __instance, ref bool __result)
         {
@@ -90,7 +92,8 @@ namespace VillagePlebs
             if (view == null || !view.IsValid() || !Companion.Is(__instance)) return true;
             int id = __instance.GetInstanceID();
             if (!view.IsOwner()) { Owned.Remove(id); return true; }        // someone else runs it: take their changes
-            if (Owned.Add(id)) return true;                                 // just took it over: load once
+            ushort owners = view.GetZDO().OwnerRevision;
+            if (!Owned.TryGetValue(id, out ushort had) || had != owners) { Owned[id] = owners; return true; }   // just took it over: load once
             LastRevision(__instance) = view.GetZDO().DataRevision;          // ours: memory is the truth
             __result = false;
             return false;
@@ -274,12 +277,9 @@ namespace VillagePlebs
     [HarmonyPatch(typeof(Minimap), "UpdatePins")]
     internal static class Minimap_UpdatePins
     {
-        private static readonly AccessTools.FieldRef<Minimap, System.Collections.Generic.List<Minimap.PinData>> Pins =
-            AccessTools.FieldRefAccess<Minimap, System.Collections.Generic.List<Minimap.PinData>>("m_pins");
-
         private static void Postfix(Minimap __instance)
         {
-            foreach (Minimap.PinData pin in Pins(__instance))
+            foreach (Minimap.PinData pin in GameFields.Pins(__instance))
             {
                 if (pin.m_iconElement == null || !Net.IsLivePin(pin)) continue;
                 pin.m_iconElement.color = Net.PinColor;

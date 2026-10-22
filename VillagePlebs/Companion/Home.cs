@@ -55,15 +55,16 @@ namespace VillagePlebs
             if (z == null) return;
             if (z.GetLong(HomeKey, 0L) == id)
             {
+                // the companion's side first: with its things open nothing changes, rather than a bed let go that it still thinks is its
+                if (!Companion.Write(c, cz => cz.Set(Keys.HasBed, false))) { VillagePlebsPlugin.Tell(T("villagepleb_menu_busy")); return; }
                 Claim(bed); z.Set(HomeKey, 0L); z.Set(HomeName, "");
-                Companion.Write(c, cz => cz.Set(Keys.HasBed, false));
                 VillagePlebsPlugin.Tell(T("villagepleb_home_no_longer_sleeps", Companion.NameOf(c)));
                 return;
             }
             long owner = z.GetLong(ZDOVars.s_owner, 0L);
             if (owner != 0L) { VillagePlebsPlugin.Tell(T("villagepleb_home_bed_players", Named(z.GetString(ZDOVars.s_ownerName, ""), "villagepleb_home_someone"), Companion.NameOf(c))); return; }
             if (z.GetLong(HomeKey, 0L) != 0L) { VillagePlebsPlugin.Tell(T("villagepleb_home_bed_others", Named(z.GetString(HomeName, ""), "villagepleb_home_another_companion"))); return; }
-            GiveBed(bed, c);
+            if (!GiveBed(bed, c)) { VillagePlebsPlugin.Tell(T("villagepleb_menu_busy")); return; }
             VillagePlebsPlugin.Tell(T("villagepleb_home_bed_now", Companion.NameOf(c)));
         }
 
@@ -72,15 +73,17 @@ namespace VillagePlebs
 
         private static bool FreeBed(Bed b) { ZDO z = Companion.Zdo(b); return z != null && z.GetLong(ZDOVars.s_owner, 0L) == 0L && z.GetLong(HomeKey, 0L) == 0L; }
 
-        private static void GiveBed(Bed bed, Humanoid c)
+        /// <summary>Its bed now (its old one let go). False, nothing changed, when its things are open (the companion's side is written first).</summary>
+        private static bool GiveBed(Bed bed, Humanoid c)
         {
+            Vector3 spot = bed.GetSpawnPoint();
+            if (!Companion.Write(c, cz => { cz.Set(Keys.HasBed, true); cz.Set(Keys.BedPos, spot); })) return false;
             long id = Companion.IdOf(c);
             foreach (Bed old in Object.FindObjectsByType<Bed>(FindObjectsSortMode.None)) if (old != bed && IdOn(old) == id) { Claim(old); Companion.Zdo(old).Set(HomeKey, 0L); Companion.Zdo(old).Set(HomeName, ""); }
             ZDO z = Companion.Zdo(bed);
             Claim(bed); z.Set(HomeKey, id); z.Set(HomeName, Companion.NameOf(c));
-            Vector3 spot = bed.GetSpawnPoint();
-            Companion.Write(c, cz => { cz.Set(Keys.HasBed, true); cz.Set(Keys.BedPos, spot); });
             VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(c)} was given the bed at {spot:F0}");
+            return true;
         }
 
         private static void GiveChest(Container chest, Humanoid c)
@@ -108,7 +111,7 @@ namespace VillagePlebs
             {
                 bed = Object.FindObjectsByType<Bed>(FindObjectsSortMode.None).Where(b => FreeBed(b) && Vector3.Distance(b.transform.position, from) < 40f)
                             .OrderBy(b => Vector3.Distance(b.transform.position, from)).FirstOrDefault();
-                if (bed != null) { GiveBed(bed, c); bedFar = Vector3.Distance(bed.transform.position, from).ToString("0"); }
+                if (bed != null && GiveBed(bed, c)) bedFar = Vector3.Distance(bed.transform.position, from).ToString("0");
             }
             else bed = BedOf(c);
             if (bed != null && Chests(c).Count == 0)
@@ -268,14 +271,16 @@ namespace VillagePlebs
             if (Time.time >= _nextSnapshot)
             {
                 _nextSnapshot = Time.time + 5f;
+                var snaps = new List<Profile>();
                 foreach (Humanoid c in Companion.All().Where(c => Companion.IsMine(c, p) && !c.IsDead() && c.GetHealth() > 0f))
                 {
                     // Not over its fall: a body that fell on another player's game still stands here (only the game running it knows it
                     // died) until it is taken away, and saving it as it looks would wipe out the fall, so it would never wake again.
                     Profile known = Profile.Find(p, Companion.IdOf(c));
                     if (known != null && known.Dead) continue;
-                    Profile.Save(p, Profile.Of(c));
+                    snaps.Add(Profile.Of(c));
                 }
+                if (snaps.Count > 0) Profile.Save(p, snaps);   // (all at once: written once)
             }
 
             // Bring back the fallen once their time is up.

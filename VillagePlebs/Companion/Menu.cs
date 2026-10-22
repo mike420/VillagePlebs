@@ -366,7 +366,7 @@ namespace VillagePlebs
                 {
                     // Away (its area not loaded here): what the world knows of it, and calling it to you.
                     ZDO z = Remote.Find(prof.Id);
-                    if (z != null) HeadingRow(prof.Name, (T("villagepleb_menu_call"), true, () => { ZDO z2 = z; _pending = () => { if (Remote.Call(z2, Player.m_localPlayer)) _note = T("villagepleb_menu_on_the_way", prof.Name); }; }));
+                    if (z != null) HeadingRow(prof.Name, (T("villagepleb_menu_call"), true, () => { ZDO z2 = z; _pending = () => { _note = Remote.Call(z2, Player.m_localPlayer, out string why) ? T("villagepleb_menu_on_the_way", prof.Name) : Words.Show(why ?? ""); }; }));
                     else Heading(prof.Name);
                     if (z != null)
                     {
@@ -549,7 +549,7 @@ namespace VillagePlebs
                         if (bar != null) GameUi.SetBar(bar, done);
                     });
                 }
-                if (stoppable && Mine) Btn(T("villagepleb_menu_stop_job"), w - Pad - 170f, 84f, 170f, 30f, () => _pending = () => Work.StopJob(Brain.Get(_shown)), size: 15f);
+                if (stoppable && Mine) Btn(T("villagepleb_menu_stop_job"), w - Pad - 170f, 84f, 170f, 30f, () => _pending = () => { BrainState bs = Brain.Claim(_shown, out string why); if (bs != null) Work.StopJob(bs); else _note = Words.Show(why); }, size: 15f);
             }
 
             // health, stamina, eitr
@@ -853,7 +853,7 @@ namespace VillagePlebs
                 for (int k = 0; k < Errands.All.Length; k++)
                 {
                     Errand pick = Errands.All[k].What;
-                    Btn(Errands.All[k].Label, _left + (k % 3) * (bw + 6f), _y, bw, 32f, () => _pending = () => _note = Errands.Run(Brain.Get(_shown), pick) ?? "", size: 16f);
+                    Btn(Errands.All[k].Label, _left + (k % 3) * (bw + 6f), _y, bw, 32f, () => _pending = () => { BrainState bs = Brain.Claim(_shown, out string why); _note = bs != null ? Errands.Run(bs, pick) ?? "" : Words.Show(why); }, size: 16f);
                     if (k % 3 == 2 || k == Errands.All.Length - 1) _y += 38f;
                 }
                 EndCard();

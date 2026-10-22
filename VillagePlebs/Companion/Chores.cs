@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using HarmonyLib;
 using UnityEngine;
@@ -14,7 +15,6 @@ namespace VillagePlebs
     /// </summary>
     internal static class Sleep
     {
-        private static readonly AccessTools.FieldRef<Character, ZSyncAnimation> Anim = AccessTools.FieldRefAccess<Character, ZSyncAnimation>("m_zanim");
 
         /// <summary>True while it is going to bed or asleep (the rest of its peaceful behaviour waits).</summary>
         public static bool Tick(BrainState st, Action<Vector3, float, bool> moveTo, Action stop)
@@ -27,8 +27,14 @@ namespace VillagePlebs
                 if (st.Asleep) Wake(st, P("villagepleb_chores_wake_morning"));
                 return false;
             }
-            Bed bed = st.SleepBed != null ? st.SleepBed : st.SleepBed = Home.BedOf(me);
-            if (bed == null) return false;
+            // its bed, looked for at most every few seconds (every bed in the scene is gone through)
+            Bed bed = st.SleepBed;
+            if (bed == null && Time.time >= st.NextBedLook) { st.NextBedLook = Time.time + 5f; bed = st.SleepBed = Home.BedOf(me); }
+            if (bed == null)
+            {
+                if (st.Asleep) Wake(st, P("villagepleb_chores_wake_bed_gone"));   // (broken under it: up, not held still in the air till morning)
+                return false;
+            }
             if (st.Asleep) { Hold(st, bed); return true; }
             Vector3 at = bed.GetSpawnPoint();
             // Close enough to get in, as a player who can reach the bed does: beside it (a bed up on chests is reached from the floor
@@ -49,7 +55,7 @@ namespace VillagePlebs
             st.BedSince = 0f;
             st.BedFrom = me.transform.position; // where it climbed in from: it got there, so it can walk away from there
             st.Asleep = true;
-            Anim(me)?.SetBool("attach_bed", true);
+            GameFields.Anim(me)?.SetBool("attach_bed", true);
             Rigidbody body = me.GetComponent<Rigidbody>();
             if (body != null) { body.linearVelocity = Vector3.zero; body.isKinematic = true; }
             st.Remember(P("villagepleb_chores_went_to_bed"));
@@ -64,7 +70,7 @@ namespace VillagePlebs
             me.transform.SetPositionAndRotation(spot.position, spot.rotation);
             Rigidbody body = me.GetComponent<Rigidbody>();
             if (body != null) { body.position = spot.position; body.rotation = spot.rotation; } // (held: a kinematic body has no velocity to clear)
-            Anim(me)?.SetBool("attach_bed", true); // kept up: anything that resets its animator must not stand it up in bed (free when already set)
+            GameFields.Anim(me)?.SetBool("attach_bed", true); // kept up: anything that resets its animator must not stand it up in bed (free when already set)
             Brain.Status(st, P("villagepleb_chores_status_sleeping"));
         }
 
@@ -74,7 +80,7 @@ namespace VillagePlebs
             Humanoid me = st.Body;
             if (!st.Asleep || me == null) return;
             st.Asleep = false;
-            Anim(me)?.SetBool("attach_bed", false);
+            GameFields.Anim(me)?.SetBool("attach_bed", false);
             Rigidbody body = me.GetComponent<Rigidbody>();
             if (body != null) body.isKinematic = false;
             // Out of bed onto the floor beside it (a bed up on chests: down to the floor, not onto the chests), else back where it climbed
@@ -183,7 +189,7 @@ namespace VillagePlebs
         {
             if (item.m_customData == null) item.m_customData = new Dictionary<string, string>();
             Vector3 p = from.transform.position;
-            item.m_customData[Tag] = $"{p.x:0.0},{p.y:0.0},{p.z:0.0}";
+            item.m_customData[Tag] = string.Format(CultureInfo.InvariantCulture, "{0:0.0},{1:0.0},{2:0.0}", p.x, p.y, p.z);   // (a point, whatever the player's language: Return splits at the commas)
         }
 
         /// <summary>At home, with food of its own (or fed): borrowed food it did not eat back to the chest it came from. How many.</summary>
@@ -200,7 +206,10 @@ namespace VillagePlebs
             foreach (ItemDrop.ItemData item in borrowed)
             {
                 string[] f = item.m_customData[Tag].Split(',');
-                if (f.Length != 3 || !float.TryParse(f[0], out float x) || !float.TryParse(f[1], out float y) || !float.TryParse(f[2], out float z)) continue;
+                // (a mark made in a language that writes "12,5": six parts, two to each number)
+                if (f.Length == 6) f = new[] { f[0] + "." + f[1], f[2] + "." + f[3], f[4] + "." + f[5] };
+                if (f.Length != 3 || !float.TryParse(f[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float x) || !float.TryParse(f[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float y)
+                    || !float.TryParse(f[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float z)) continue;
                 var spot = new Vector3(x, y, z);
                 Container chest = UnityEngine.Object.FindObjectsByType<Container>(FindObjectsSortMode.None).FirstOrDefault(c => Vector3.Distance(c.transform.position, spot) < 1f && !Containers.InUse(c));
                 if (chest == null || Vector3.Distance(chest.transform.position, me.transform.position) > 60f) continue;

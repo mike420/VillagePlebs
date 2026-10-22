@@ -178,7 +178,6 @@ namespace VillagePlebs
 
         // ---- the dodge -------------------------------------------------------------------------------------
 
-        private static readonly AccessTools.FieldRef<Character, ZSyncAnimation> Anim = AccessTools.FieldRefAccess<Character, ZSyncAnimation>("m_zanim");
         private static Player _playerPrefab;
         private static Player PlayerPrefab => _playerPrefab != null ? _playerPrefab : _playerPrefab = ZNetScene.instance?.GetPrefab("Player")?.GetComponent<Player>();
 
@@ -194,7 +193,7 @@ namespace VillagePlebs
             Humanoid me = st.Body;
             Stamina.Use(me, DodgeCost);
             me.transform.rotation = Quaternion.LookRotation(dir);
-            Anim(me)?.SetTrigger("dodge");
+            GameFields.Anim(me)?.SetTrigger("dodge");
             PlayerPrefab?.m_dodgeEffects.Create(me.transform.position, Quaternion.identity, me.transform);
             Companion.Zdo(me)?.Set(ZDOVars.s_dodgeinv, true);
             st.InvulnUntil = Time.time + 0.4f;

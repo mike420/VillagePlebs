@@ -211,20 +211,7 @@ namespace VillagePlebs
             int had = inv.NrOfItems(), worn = inv.GetAllItems().Count(Gear.InSlot);
             foreach (ItemDrop.ItemData item in inv.GetAllItems()) item.m_equipped = false; // (the game's move leaves equipped items out)
 
-            // A tombstone like a player's: its player can take everything back with one E. The game's own move (MoveInventoryToGrave) makes
-            // the tombstone as big as the bag it empties: adding items one by one only fitted the tombstone's own 4 slots, and the rest was lost.
-            GameObject scenePlayer = ZNetScene.instance.GetPrefab("Player");
-            Player playerPrefab = scenePlayer != null ? scenePlayer.GetComponent<Player>() : null;
-            GameObject tombPrefab = playerPrefab != null && playerPrefab.m_tombstone != null ? playerPrefab.m_tombstone : ZNetScene.instance.GetPrefab("CargoCrate");
-            GameObject tomb = tombPrefab != null ? Object.Instantiate(tombPrefab, c.GetCenterPoint(), c.transform.rotation) : null;
-            Container grave = tomb != null ? tomb.GetComponent<Container>() : null;
-            if (grave != null)
-            {
-                grave.GetInventory().MoveInventoryToGrave(inv);
-                tomb.GetComponent<TombStone>()?.Setup(NameOf(c), MasterId(c));
-                grave.GetComponent<ZNetView>().GetZDO().Set(Net.CrateKey, NameOf(c));
-                grave.GetComponent<ZNetView>().GetZDO().Set(Grave.OfKey, IdOf(c));
-            }
+            Container grave = Tomb(c, inv, c.GetCenterPoint(), c.transform.rotation);
 
             // Anything still in the bag (no grave could be made): on the ground beside it, never lost.
             int dropped = 0;
@@ -238,6 +225,28 @@ namespace VillagePlebs
             VillagePlebsPlugin.Instance?.Note($"{NameOf(c)} fell at {c.transform.position:F0}: {saved} of {had} item stacks in their tombstone ({worn} of them its gear)" + (dropped > 0 ? $", {dropped} dropped beside it" : ""));
             if (saved + dropped < had) VillagePlebsPlugin.Instance?.Warn($"{had - saved - dropped} item stacks of {NameOf(c)} could not be placed");
             return saved;
+        }
+
+        /// <summary>
+        /// A tombstone like a player's, at a place, with everything in inv moved into it: its player can take it all back with one E. The
+        /// game's own move (MoveInventoryToGrave) makes the tombstone as big as the bag it empties: adding items one by one only fitted the
+        /// tombstone's own 4 slots, and the rest was lost. Marked as this companion's (its name for the map, its id for fetching its things).
+        /// Null when none could be made (what was in inv stays there). Its fall, here or while you were away (CatchUp.Fall).
+        /// </summary>
+        public static Container Tomb(Humanoid c, Inventory inv, Vector3 at, Quaternion rot)
+        {
+            GameObject scenePlayer = ZNetScene.instance.GetPrefab("Player");
+            Player playerPrefab = scenePlayer != null ? scenePlayer.GetComponent<Player>() : null;
+            GameObject tombPrefab = playerPrefab != null && playerPrefab.m_tombstone != null ? playerPrefab.m_tombstone : ZNetScene.instance.GetPrefab("CargoCrate");
+            GameObject tomb = tombPrefab != null ? Object.Instantiate(tombPrefab, at, rot) : null;
+            Container grave = tomb != null ? tomb.GetComponent<Container>() : null;
+            if (grave == null) return null;
+            grave.GetInventory().MoveInventoryToGrave(inv);
+            tomb.GetComponent<TombStone>()?.Setup(NameOf(c), MasterId(c));
+            ZDO z = grave.GetComponent<ZNetView>().GetZDO();
+            z.Set(Net.CrateKey, NameOf(c));
+            z.Set(Grave.OfKey, IdOf(c));
+            return grave;
         }
 
         /// <summary>Put packed items back into a companion's bag (it wears them again by itself). How many stacks.</summary>
@@ -296,7 +305,14 @@ namespace VillagePlebs
             why = null;
             if (!Write(c, _ => { })) { why = P("villagepleb_companion_gear_open"); return false; }
             Inventory mine = p.GetInventory(), its = c.GetInventory();
-            if (!its.ContainsItem(item)) return false;
+            if (!its.ContainsItem(item))
+            {
+                // taking it over may have read its bag again from its save (Containers.Take): new copies of every item, the one asked for
+                // among them in the same cell
+                ItemDrop.ItemData now = its.GetItemAt(item.m_gridPos.x, item.m_gridPos.y);
+                if (now == null || now.m_shared.m_name != item.m_shared.m_name) return false;
+                item = now;
+            }
             if (!mine.CanAddItem(item)) { why = P("villagepleb_companion_your_inventory_full"); return false; }
             if (c.IsItemEquiped(item)) c.UnequipItem(item, false);
             item.m_equipped = false;

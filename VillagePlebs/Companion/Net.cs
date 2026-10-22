@@ -111,7 +111,7 @@ namespace VillagePlebs
                 if (f.Length < 6 || !long.TryParse(f[0], NumberStyles.Integer, CultureInfo.InvariantCulture, out long id)) continue;
                 var pos = new Vector3(P(f[3]), P(f[4]), P(f[5]));
                 seen.Add(id);
-                if (!LivePins.TryGetValue(id, out Minimap.PinData pin) || !Pins(Minimap.instance).Contains(pin))
+                if (!LivePins.TryGetValue(id, out Minimap.PinData pin) || !GameFields.Pins(Minimap.instance).Contains(pin))
                     LivePins[id] = pin = Minimap.instance.AddPin(pos, Minimap.PinType.Player, f[1], false, false, 0L);
                 pin.m_pos = pos;
             }
@@ -258,12 +258,17 @@ namespace VillagePlebs
                 "", lost ? "lost" : ""));
         }
 
+        // Falls this game has heard of (its id and where): every game sends its recent ones again to a player who joins (TellNewcomers),
+        // so the games already here heard each one again, once for each sender: marked fallen again (another 5% of its skills) and told again
+        private static readonly HashSet<string> Heard = new HashSet<string>();
+
         private static void OnFallen(long sender, string payload)
         {
             string[] f = (payload ?? "").Split('|');
             if (f.Length < 5) return;
             var pos = new Vector3(P(f[2]), P(f[3]), P(f[4]));
             AddMarker(pos, f[0]);
+            if (f.Length >= 6 && !Heard.Add(f[5] + "@" + f[2] + "," + f[3] + "," + f[4])) return;   // (heard it already: only the marker, which keeps one)
             bool lost = f.Length >= 10 && f[9] == "lost";
             if (f.Length >= 7 && long.TryParse(f[5], NumberStyles.Integer, CultureInfo.InvariantCulture, out long id) && long.TryParse(f[6], NumberStyles.Integer, CultureInfo.InvariantCulture, out long masterId)
                 && masterId != 0L && Player.m_localPlayer != null && Player.m_localPlayer.GetPlayerID() == masterId)
@@ -289,10 +294,9 @@ namespace VillagePlebs
             RemoveMarkersNear(new Vector3(P(f[0]), P(f[1]), P(f[2])), 8f);
         }
 
-        private static readonly AccessTools.FieldRef<Minimap, List<Minimap.PinData>> Pins = AccessTools.FieldRefAccess<Minimap, List<Minimap.PinData>>("m_pins");
 
         private static IEnumerable<Minimap.PinData> Markers() =>
-            Minimap.instance == null ? Enumerable.Empty<Minimap.PinData>() : Pins(Minimap.instance).Where(p => p.m_type == Minimap.PinType.Death && IsMarker(p.m_name, out _));
+            Minimap.instance == null ? Enumerable.Empty<Minimap.PinData>() : GameFields.Pins(Minimap.instance).Where(p => p.m_type == Minimap.PinType.Death && IsMarker(p.m_name, out _));
 
         /// <summary>
         /// A fallen companion's marker, and its companion's name: its words in English (older versions, and English players) or in this

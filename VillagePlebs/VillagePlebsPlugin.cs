@@ -98,6 +98,8 @@ namespace VillagePlebs
         {
             CloseMenu();
             Net.Stop();
+            VillagePlebs.Shared.ServerCheck.Stop();
+            Activity.Flush(true);
             Home.Stop();
             Portraits.Stop();
             ReleaseForReload();

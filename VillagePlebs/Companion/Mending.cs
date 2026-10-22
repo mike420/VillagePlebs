@@ -12,7 +12,6 @@ namespace VillagePlebs
     /// </summary>
     internal static class Mending
     {
-        private static readonly AccessTools.FieldRef<Character, ZSyncAnimation> Anim = AccessTools.FieldRefAccess<Character, ZSyncAnimation>("m_zanim");
         private static readonly int Pieces = LayerMask.GetMask("piece", "piece_nonsolid");
 
         public static ItemDrop.ItemData Hammer(Humanoid h) =>
@@ -54,7 +53,7 @@ namespace VillagePlebs
         /// <summary>The hammer's swing (its animation).</summary>
         public static void Swing(Humanoid me, ItemDrop.ItemData hammer)
         {
-            if (hammer?.m_shared.m_attack != null && !string.IsNullOrEmpty(hammer.m_shared.m_attack.m_attackAnimation)) Anim(me)?.SetTrigger(hammer.m_shared.m_attack.m_attackAnimation);
+            if (hammer?.m_shared.m_attack != null && !string.IsNullOrEmpty(hammer.m_shared.m_attack.m_attackAnimation)) GameFields.Anim(me)?.SetTrigger(hammer.m_shared.m_attack.m_attackAnimation);
         }
 
         /// <summary>Catching up: every damaged piece in its home repaired at once. How many.</summary>

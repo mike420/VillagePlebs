@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using BepInEx;
 using UnityEngine;
 
@@ -11,12 +12,15 @@ namespace VillagePlebs
     /// A running record of what each companion does, for finding out why it did something: every change in what it is doing, what it
     /// remembers (ate, made, gave up on), every hit it takes and what dealt it, what it said, and a snapshot of its health, stamina, food
     /// and bag every 30 seconds. Written to BepInEx/VillagePlebs/activity.log (started again when it passes 2 MB, the old one kept as
-    /// activity.old.log). On the game that runs it.
+    /// activity.old.log). On the game that runs it. Lines are gathered and written every two seconds off the game's thread: written one by
+    /// one as they came (every hit, pickup and door, from each companion's brain), the disk made the game stutter in a fight.
     /// </summary>
     internal static class Activity
     {
         private static string _file;
-        private static float _nextSizeCheck;
+        private static readonly List<string> Pending = new List<string>();
+        private static readonly object FileLock = new object();
+        private static float _nextFlush;
 
         public static void Log(Humanoid c, string text)
         {
@@ -27,6 +31,16 @@ namespace VillagePlebs
 
         private static void Write(string line)
         {
+            lock (Pending) Pending.Add(line);
+            if (Time.time >= _nextFlush) Flush(false);
+        }
+
+        /// <summary>What was gathered, to the file: off the game's thread, or (the mod unloading) now.</summary>
+        public static void Flush(bool now)
+        {
+            _nextFlush = Time.time + 2f;
+            string[] lines;
+            lock (Pending) { if (Pending.Count == 0) return; lines = Pending.ToArray(); Pending.Clear(); }
             try
             {
                 if (_file == null)
@@ -35,20 +49,29 @@ namespace VillagePlebs
                     Directory.CreateDirectory(dir);
                     _file = Path.Combine(dir, "activity.log");
                 }
-                if (Time.time >= _nextSizeCheck)
+            }
+            catch (Exception) { return; } // a log must never break the companion
+            string file = _file;
+            if (now) Append(file, lines); else ThreadPool.QueueUserWorkItem(_ => Append(file, lines));
+        }
+
+        private static void Append(string file, string[] lines)
+        {
+            lock (FileLock)   // (one write at a time: two batches can be on their way)
+            {
+                try
                 {
-                    _nextSizeCheck = Time.time + 30f;
-                    var info = new FileInfo(_file);
+                    var info = new FileInfo(file);
                     if (info.Exists && info.Length > 2_000_000)
                     {
                         string old = Path.Combine(info.DirectoryName, "activity.old.log");
                         if (File.Exists(old)) File.Delete(old);
-                        File.Move(_file, old);
+                        File.Move(file, old);
                     }
+                    File.AppendAllLines(file, lines);
                 }
-                File.AppendAllText(_file, line + Environment.NewLine);
+                catch (Exception) { } // a log must never break the companion
             }
-            catch (Exception) { } // a log must never break the companion
         }
 
         /// <summary>Its vitals in one line: "hp 12/25, st 40/75, food 2 (cooked meat 12m, raspberries 3m), bag 6/32 18kg, goal flint axe".</summary>

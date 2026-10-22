@@ -71,19 +71,7 @@ namespace VillagePlebs
             var worn = new HashSet<ItemDrop.ItemData>(inv.GetAllItems().Where(Gear.InSlot));
             foreach (ItemDrop.ItemData i in inv.GetAllItems()) i.m_equipped = worn.Contains(i); // it keeps its gear slots: the move leaves them out
             bool any = inv.NrOfItems() > worn.Count;
-            if (any)
-            {
-                GameObject scene = ZNetScene.instance.GetPrefab("Player");
-                GameObject tombPrefab = scene != null ? scene.GetComponent<Player>()?.m_tombstone : null;
-                if (tombPrefab != null)
-                {
-                    GameObject tomb = UnityEngine.Object.Instantiate(tombPrefab, at, Quaternion.identity);
-                    tomb.GetComponent<Container>().GetInventory().MoveInventoryToGrave(inv);
-                    tomb.GetComponent<TombStone>()?.Setup(Companion.NameOf(me), Companion.MasterId(me));
-                    tomb.GetComponent<ZNetView>().GetZDO().Set(Net.CrateKey, Companion.NameOf(me));
-                    tomb.GetComponent<ZNetView>().GetZDO().Set(Grave.OfKey, Companion.IdOf(me));
-                }
-            }
+            if (any) Companion.Tomb(me, inv, at, Quaternion.identity);
             foreach (ItemDrop.ItemData i in inv.GetAllItems()) i.m_equipped = false;
             Companion.SaveBag(me);
             ZDO z = Companion.Zdo(me);
@@ -121,6 +109,12 @@ namespace VillagePlebs
             yield return new WaitForSeconds(3f); // let the trees, rocks and chests around it finish loading
             Humanoid me = st.Body;
             if (me == null || me.IsDead()) yield break;
+            // another game took it over meanwhile (its player came near): what it did would go into a bag this game no longer saves, and be lost
+            if (me.GetComponent<ZNetView>() is ZNetView v && (!v.IsValid() || !v.IsOwner()))
+            {
+                VillagePlebsPlugin.Instance?.Note(Companion.NameOf(me) + "'s catch-up left to the game that runs it now");
+                yield break;
+            }
             Talk.Hush = true; // what it did goes into one report, not a chat line for each thing
             try { Day(st, seconds, away); }
             catch (Exception e) { VillagePlebsPlugin.Instance?.Warn($"Companion catch-up (at {Stage}): " + e); }
@@ -568,6 +562,38 @@ namespace VillagePlebs
         private static int Free(Humanoid me) => me.GetInventory().GetEmptySlots() + Home.Chests(me).Sum(c => c.GetInventory().GetEmptySlots())
                                                 + (Work.Stows(me) ? Work.YourChests(me, Work.Center(me), Work.RadiusOf(me) + 20f).Sum(c => c.GetInventory().GetEmptySlots()) : 0);
 
+        /// <summary>
+        /// As many as fit, up to amount, stack by stack: the game's AddItem(prefab, amount) puts in one stack at most and drops the rest
+        /// (300 wood brought back filled one chest stack and lost 250). Returns how many went in.
+        /// </summary>
+        private static int AddUpTo(Inventory inv, GameObject prefab, int amount)
+        {
+            ItemDrop drop = prefab.GetComponent<ItemDrop>();
+            string name = drop.m_itemData.m_shared.m_name;
+            int max = Mathf.Max(1, drop.m_itemData.m_shared.m_maxStackSize), total = 0;
+            while (amount > 0)
+            {
+                int before = inv.CountItems(name);
+                inv.AddItem(prefab, Mathf.Min(amount, max));
+                int added = inv.CountItems(name) - before;
+                if (added <= 0) break;   // full
+                amount -= added; total += added;
+            }
+            return total;
+        }
+
+        /// <summary>What there was no room for anywhere, on the ground at its feet (in stacks).</summary>
+        private static void DropAt(Humanoid me, GameObject prefab, int amount)
+        {
+            int max = Mathf.Max(1, prefab.GetComponent<ItemDrop>().m_itemData.m_shared.m_maxStackSize);
+            for (; amount > 0; amount -= max)
+            {
+                GameObject go = UnityEngine.Object.Instantiate(prefab, me.transform.position + Vector3.up * 0.5f + UnityEngine.Random.insideUnitSphere * 0.3f, Quaternion.identity);
+                go.GetComponent<ItemDrop>().SetStack(Mathf.Min(amount, max));
+            }
+            VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(me)} had no room for all it brought back: the rest is on the ground beside it");
+        }
+
         /// <summary>Into its chests first (stacking onto what is there), then its bag. Returns how many went into chests. The items' $tokens in the report.</summary>
         private static int Store(Humanoid me, Dictionary<string, int> got)
         {
@@ -593,9 +619,7 @@ namespace VillagePlebs
                     {
                         if (toLarder <= 0) break;
                         if (!Containers.Take(chest)) continue; // (taken over and loaded fresh before anything goes in)
-                        int had = chest.GetInventory().CountItems(drop.m_itemData.m_shared.m_name);
-                        chest.GetInventory().AddItem(prefab, toLarder);
-                        int put = chest.GetInventory().CountItems(drop.m_itemData.m_shared.m_name) - had;
+                        int put = AddUpTo(chest.GetInventory(), prefab, toLarder);
                         toLarder -= put; left -= put; stored += put;
                     }
                 }
@@ -603,12 +627,11 @@ namespace VillagePlebs
                 {
                     if (left <= 0) break;
                     if (!Containers.Take(chest)) continue; // (taken over and loaded fresh before anything goes in)
-                    int before = chest.GetInventory().CountItems(drop.m_itemData.m_shared.m_name);
-                    chest.GetInventory().AddItem(prefab, left);
-                    int added = chest.GetInventory().CountItems(drop.m_itemData.m_shared.m_name) - before;
+                    int added = AddUpTo(chest.GetInventory(), prefab, left);
                     left -= added; stored += added;
                 }
-                if (left > 0) me.GetInventory().AddItem(prefab, left);
+                if (left > 0) left -= AddUpTo(me.GetInventory(), prefab, left);
+                if (left > 0) DropAt(me, prefab, left);   // (no room anywhere: on the ground at its feet, never lost)
                 named[drop.m_itemData.m_shared.m_name] = kv.Value;   // (by $token: the report is made into words where it is read)
             }
             got.Clear();

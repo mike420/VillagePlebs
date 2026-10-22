@@ -71,11 +71,20 @@ namespace VillagePlebs
 
         public static Profile Find(Player p, long id) => Here(p).FirstOrDefault(x => x.Id == id);
 
-        public static void Save(Player p, Profile profile)
+        public static void Save(Player p, Profile profile) => Save(p, new[] { profile });
+
+        /// <summary>
+        /// Several at once, written once (a snapshot of every companion near you: Home.Tick did the whole list over for each one). Each in
+        /// its place, so nothing changed writes the same words, and isn't written at all.
+        /// </summary>
+        public static void Save(Player p, IEnumerable<Profile> profiles)
         {
             List<Profile> all = All(p);
-            all.RemoveAll(x => x.Id == profile.Id);
-            all.Add(profile);
+            foreach (Profile profile in profiles)
+            {
+                int at = all.FindIndex(x => x.Id == profile.Id);
+                if (at >= 0) all[at] = profile; else all.Add(profile);
+            }
             Write(p, all);
         }
 
@@ -88,6 +97,7 @@ namespace VillagePlebs
         private static void Write(Player p, List<Profile> all)
         {
             string json = new JArray(all.Select(x => (JToken)x.ToJson())).ToString(Newtonsoft.Json.Formatting.None);
+            if (p.m_customData.TryGetValue(Key, out string had) && had == json) return;   // (nothing changed)
             p.m_customData[Key] = json;
             _readJson = json;   // (what was just written is what All reads next: no need to read it back)
             _read = all.Select(x => (Profile)x.MemberwiseClone()).ToList();

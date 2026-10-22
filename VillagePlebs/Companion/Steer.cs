@@ -20,7 +20,7 @@ namespace VillagePlebs
         private class Hazard { public Collider Col; public Vector3 Center; public float Radius; }
         private class State { public float NextScan, NextJump, NextMoveCheck, Side, SideUntil, PressedSince = -1f; public bool AvoidWater; public Vector3 LastPos; public readonly List<Hazard> Near = new List<Hazard>(); }
 
-        private static readonly Dictionary<Humanoid, State> States = new Dictionary<Humanoid, State>();
+        private static readonly Dictionary<Humanoid, State> States = Cleanup.Track(new Dictionary<Humanoid, State>());
         private static readonly AccessTools.FieldRef<Aoe, Character> Owner = AccessTools.FieldRefAccess<Aoe, Character>("m_owner");
         private static readonly int Solid = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "terrain", "vehicle");
         private static readonly float[] Angles = { 30f, 60f, 90f, 120f, 150f };

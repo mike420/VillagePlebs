@@ -163,9 +163,13 @@ namespace VillagePlebs
         /// <summary>
         /// Call it to you: its save goes beside you, and it comes along (it appears there in a moment, as its area loads around you).
         /// </summary>
-        public static bool Call(ZDO z, Player p)
+        public static bool Call(ZDO z, Player p, out string why)
         {
+            why = null;
             if (z == null || p == null) return false;
+            // not while someone has its gear open: the game showing it would no longer run it, so what they take out would stay in its
+            // saved bag as well (as through a portal, Player_TeleportTo)
+            if (z.GetInt(ZDOVars.s_inUse, 0) == 1) { why = Words.P("villagepleb_companion_gear_open"); return false; }
             if (!z.IsOwner()) z.SetOwner(ZDOMan.GetSessionID());
             Vector3 spot = p.transform.position - p.transform.forward * 2f + Vector3.up * 0.3f;
             z.SetPosition(spot);

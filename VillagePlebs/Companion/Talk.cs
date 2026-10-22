@@ -82,7 +82,9 @@ namespace VillagePlebs
             if (intent == null || match.id == null) { Say(c, Words.P("villagepleb_talk_dont_follow")); return; }
             if (intent.StartsWith("e:") && Enum.TryParse(intent.Substring(2), out Errand errand))
             {
-                string result = Errands.Run(Brain.Get(c), errand); // (it says what it does, or why not)
+                BrainState st = Brain.Claim(c, out string why);   // (the errand goes into its brain on this game: Brain.Claim)
+                if (st == null) { VillagePlebsPlugin.Tell(why); return; }
+                string result = Errands.Run(st, errand); // (it says what it does, or why not)
                 Brain.Get(c)?.Remember(Words.P("villagepleb_talk_you_said", said, errand));
                 VillagePlebsPlugin.Instance?.Note($"{me.GetPlayerName()} told {Companion.NameOf(c)} \"{said}\" -> errand {errand}: {result}");
                 return;
@@ -105,7 +107,9 @@ namespace VillagePlebs
                 case "auto": ok = Companion.Write(c, z => z.Set(Keys.Style, (int)Style.Auto)); break;
                 case "grave":
                     if (!Grave.Has(c)) { Say(c, Words.P("villagepleb_talk_no_grave")); return; }
-                    Grave.Fetch(Brain.Get(c), null);
+                    BrainState gst = Brain.Claim(c, out string gwhy);
+                    if (gst == null) { VillagePlebsPlugin.Tell(gwhy); return; }
+                    Grave.Fetch(gst, null);
                     break;
             }
             if (!ok) { Say(c, Words.P("villagepleb_talk_busy")); return; }

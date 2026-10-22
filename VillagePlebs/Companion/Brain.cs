@@ -90,6 +90,9 @@ namespace VillagePlebs
         public Vector3 WorkSpot;
         public float NextWorkLook, NextDoorLook, NextUpgradeLook, YieldUntil;
         public float NextApartLook;          // when it next looks for another companion standing in it (Brain.Apart)
+        public float NextBedLook;            // when it next looks for its bed (Sleep.Tick)
+        public int RanFrame; public float RanAt;   // when its brain last ran on this game (a gap: this game just took it over, TookOver)
+        public bool MadeAsOwner;                   // made on the game running it (summoned, woken, remade here): not stale, kept by TookOver
         public Humanoid ApartFrom;           // the one it is stepping away from, until they are apart
         public Vector3 YieldTo;
         public Player YieldFrom;
@@ -183,7 +186,7 @@ namespace VillagePlebs
     /// </summary>
     internal static class Brain
     {
-        private static readonly Dictionary<Humanoid, BrainState> States = new Dictionary<Humanoid, BrainState>();
+        private static readonly Dictionary<Humanoid, BrainState> States = Cleanup.Track(new Dictionary<Humanoid, BrainState>());
 
         private static readonly Func<BaseAI, float, Vector3, float, bool, bool> MoveToRaw = AccessTools.MethodDelegate<Func<BaseAI, float, Vector3, float, bool, bool>>(AccessTools.Method(typeof(BaseAI), "MoveTo"));
         private static readonly Func<BaseAI, Vector3, bool> HavePath = AccessTools.MethodDelegate<Func<BaseAI, Vector3, bool>>(AccessTools.Method(typeof(BaseAI), "HavePath"));
@@ -369,17 +372,66 @@ namespace VillagePlebs
             if (!States.TryGetValue(h, out BrainState st))
             {
                 foreach (Humanoid gone in States.Keys.Where(k => k == null).ToList()) States.Remove(gone);
-                States[h] = st = new BrainState { Body = h, Ai = h.GetComponent<MonsterAI>() };
-                if (h.GetComponent<ZNetView>() is ZNetView v && v.IsValid() && v.IsOwner())
-                {
-                    Work.RestoreArea(st); // (its job, kept through a reload)
-                    // a fresh brain for a body that was held still (in bed when an older copy unloaded) and isn't riding: free it
-                    if (h.GetComponent<Rigidbody>() is Rigidbody body && body.isKinematic && h.GetComponentInParent<Ship>() == null && !h.IsAttached())
-                    { body.isKinematic = false; body.detectCollisions = true; }
-                    // a cart it is still hitched to (the older copy knew it was pulling it)
-                    st.Cart = UnityEngine.Object.FindObjectsByType<Vagon>(FindObjectsSortMode.None).FirstOrDefault(cart => cart != null && cart.IsAttached(h));
-                }
+                States[h] = st = new BrainState { Body = h, Ai = h.GetComponent<MonsterAI>(), MadeAsOwner = h.GetComponent<ZNetView>() is ZNetView v && v.IsValid() && v.IsOwner() };
             }
+            return st;
+        }
+
+        /// <summary>
+        /// For an order given on this game (pointing, an errand, Stop): the brain that will carry it out. An order goes into the brain on
+        /// the game giving it, so that game must be the one running the companion: it is taken over (as a changed setting is,
+        /// Companion.Write), and its brain made fresh here first, so the order isn't wiped when this game's brain starts on it. Before,
+        /// an order to a companion another game ran went into a brain that never ran: "on it", and nothing. Null (why: what to tell the
+        /// player) when it can't be: someone has its gear open, or its own player is beside it (their game takes it back at once).
+        /// </summary>
+        public static BrainState Claim(Humanoid c, out string why)
+        {
+            why = null;
+            ZNetView v = c != null ? c.GetComponent<ZNetView>() : null;
+            if (v == null || !v.IsValid()) return null;
+            if (!v.IsOwner())
+            {
+                Player me = Player.m_localPlayer;
+                long master = Companion.MasterId(c);
+                Player near = me != null && master != me.GetPlayerID()
+                    ? Player.GetAllPlayers().FirstOrDefault(p => p != null && p.GetPlayerID() == master && Vector3.Distance(p.transform.position, c.transform.position) < 64f) : null;
+                if (near != null) { why = P("villagepleb_brain_with_its_player", Companion.NameOf(c), near.GetPlayerName()); return null; }   // (Companion.KeepOwnership)
+                if (!Companion.Write(c, _ => { })) { why = P("villagepleb_companion_gear_open"); return null; }
+            }
+            BrainState st = Get(c);
+            if (Time.frameCount - st.RanFrame > 30 && Time.time - st.RanAt > 1f) st = TookOver(c);
+            st.RanFrame = Time.frameCount; st.RanAt = Time.time;
+            return st;
+        }
+
+        /// <summary>
+        /// This game has just started running it (it appeared here, or another game ran it until now): what this game knew of it is stale
+        /// (a brain made earlier for its menu or a hit, its meals, stamina and eitr from then, a bag it ran before), so all of that is made
+        /// again from its save, the one place every game writes to. Each piece used to be fixed up on its own, and some never were: its
+        /// work patch forgotten, burned-out meals back, a roll's "can't be hit" left on for good.
+        /// </summary>
+        private static BrainState TookOver(Humanoid h)
+        {
+            // (a brain this game made as its owner a moment ago, that hasn't run yet, is not stale: summoned, hired or woken here, with
+            // what that set on it, such as being careful for a while after waking)
+            bool fresh = States.TryGetValue(h, out BrainState had) && had.RanFrame == 0 && had.MadeAsOwner;
+            if (!fresh)
+            {
+                Forget(h);
+                Food.Reload(h);
+                Stamina.Reload(h);
+                Eitr.Reload(h);
+            }
+            BrainState st = Get(h);
+            Work.RestoreArea(st); // (its job, kept through a reload or another game)
+            // a body held still (in bed or seated when another copy or game had it) that isn't riding: free it
+            if (h.GetComponent<Rigidbody>() is Rigidbody body && body.isKinematic && h.GetComponentInParent<Ship>() == null && !h.IsAttached())
+            { body.isKinematic = false; body.detectCollisions = true; }
+            // a cart it is still hitched to (the older copy knew it was pulling it)
+            st.Cart = UnityEngine.Object.FindObjectsByType<Vagon>(FindObjectsSortMode.None).FirstOrDefault(cart => cart != null && cart.IsAttached(h));
+            // a roll's "can't be hit" for the other games, left on by a brain that stopped mid-roll (only the brain that sets it clears it)
+            if (Companion.Zdo(h) is ZDO z && z.GetBool(ZDOVars.s_dodgeinv, false)) z.Set(ZDOVars.s_dodgeinv, false);
+            if (h.GetComponent<Container>() is Container gear) Container_Load_Companion.Fresh(gear);   // its bag read from its save
             return st;
         }
 
@@ -390,6 +442,11 @@ namespace VillagePlebs
             if (view == null || !view.IsValid() || !view.IsOwner()) return false;
             Humanoid body = ai.GetComponent<Humanoid>();
             if (StarLevels.RemoveStray(body)) return true; // a copy another mod made of a companion: no player, no name
+            // a gap since its brain last ran here (more than a moment, not one long frame): this game just took it over
+            BrainState ran = Get(body);
+            if (Time.frameCount - ran.RanFrame > 30 && Time.time - ran.RanAt > 1f) ran = TookOver(body);
+            ran.RanFrame = Time.frameCount; ran.RanAt = Time.time;
+            Cleanup.Tick();
             StarLevels.Exempt(body);           // (one StarLevelSystem touched before: it leaves it alone from now on)
             TimeSinceHurt(ai) += dt;           // (no free healing: food heals it, as it heals a player)
             Stamina.Tick(body, dt);

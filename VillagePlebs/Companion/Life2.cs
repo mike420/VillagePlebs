@@ -261,8 +261,7 @@ namespace VillagePlebs
 
         internal class Spot { public Vector3 Pos; public float At; public HashSet<int> Before = new HashSet<int>(); }
 
-        private static readonly AccessTools.FieldRef<List<ItemDrop>> Instances = AccessTools.StaticFieldRefAccess<List<ItemDrop>>(AccessTools.Field(typeof(ItemDrop), "s_instances"));
-        private static IEnumerable<ItemDrop> Drops() => Instances() ?? new List<ItemDrop>();
+        private static IEnumerable<ItemDrop> Drops() => GameFields.ItemDrops() ?? new List<ItemDrop>();
 
         /// <summary>The world just dropped this (a rock broke, a tree fell, a bush was picked): companions this game runs near it will pick it up.</summary>
         public static void Fresh(ItemDrop drop)
@@ -337,7 +336,7 @@ namespace VillagePlebs
             if (!next.CanPickup(false)) { next.RequestOwn(); return true; }
             string token = next.m_itemData.m_shared.m_name;
             int n = next.m_itemData.m_stack;
-            if (me.Pickup(next.gameObject, false, false)) { st.Remember(P("villagepleb_life2_remember_picked_up", n, token)); st.Gathered[token] = (st.Gathered.TryGetValue(token, out int had) ? had : 0) + n; }
+            if (me.GetInventory().CanAddItem(next.m_itemData) && me.Pickup(next.gameObject, false, false)) { st.Remember(P("villagepleb_life2_remember_picked_up", n, token)); st.Gathered[token] = (st.Gathered.TryGetValue(token, out int had) ? had : 0) + n; }
             st.LootDrops.RemoveAll(kv => kv.Key == next);
             return true;
         }
@@ -522,7 +521,7 @@ namespace VillagePlebs
     internal static class Rest
     {
         public const float Duration = 480f, Mult = 1.5f;
-        private static readonly Dictionary<Humanoid, float> Sheltered = new Dictionary<Humanoid, float>(), Until = new Dictionary<Humanoid, float>();
+        private static readonly Dictionary<Humanoid, float> Sheltered = Cleanup.Track(new Dictionary<Humanoid, float>()), Until = Cleanup.Track(new Dictionary<Humanoid, float>());
 
         public static bool IsRested(Humanoid c) => Until.TryGetValue(c, out float u) && Time.time < u;
         public static float Left(Humanoid c) => Until.TryGetValue(c, out float u) ? Mathf.Max(0f, u - Time.time) : 0f;
@@ -553,15 +552,18 @@ namespace VillagePlebs
     internal static class Eitr
     {
         private class Pool { public float Value, LastUse = -99f; }
-        private static readonly Dictionary<Character, Pool> Pools = new Dictionary<Character, Pool>();
+        private static readonly Dictionary<Character, Pool> Pools = Cleanup.Track(new Dictionary<Character, Pool>());
 
         public static float Max(Character c) => c is Humanoid h ? Food.MaxEitr(h) : 0f;
 
         private static Pool Of(Character c)
         {
-            if (!Pools.TryGetValue(c, out Pool p)) Pools[c] = p = new Pool { Value = 0f };
+            if (!Pools.TryGetValue(c, out Pool p)) Pools[c] = p = new Pool { Value = Max(c) };   // (not kept in its save: a game that takes it over starts it full, not empty)
             return p;
         }
+
+        /// <summary>Made again next time (this game just took it over: Brain.TookOver).</summary>
+        public static void Reload(Character c) => Pools.Remove(c);
 
         public static float Get(Character c) => Mathf.Min(Max(c), Of(c).Value);
         public static void Use(Character c, float v) { Pool p = Of(c); p.Value = Mathf.Max(0f, p.Value - v); p.LastUse = Time.time; }

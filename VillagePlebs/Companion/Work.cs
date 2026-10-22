@@ -79,7 +79,6 @@ namespace VillagePlebs
             }
             return _cookable != null && _cookable.Contains(i.m_shared.m_name);
         }
-        private static readonly Func<BaseAI, Vector3, bool> HavePath = AccessTools.MethodDelegate<Func<BaseAI, Vector3, bool>>(AccessTools.Method(typeof(BaseAI), "HavePath"));
 
         /// <summary>What it gathers toward: its gear goal.</summary>
         internal static Goal Aim(BrainState st) => st.Goal;
@@ -535,6 +534,9 @@ namespace VillagePlebs
                     if (!drop.CanPickup(false)) { drop.RequestOwn(); break; }
                     string name = drop.m_itemData.m_shared.m_name;   // (counted by its m_name: the menu names it in each player's language)
                     int n = drop.m_itemData.m_stack;
+                    // (all of it fits, or none is taken: the game's pickup puts part of a stack onto ones in the bag and then fails, while the
+                    // stack on the ground still counts it all, so that part was had twice)
+                    if (!me.GetInventory().CanAddItem(drop.m_itemData)) { Skip(st, drop, P("villagepleb_work_skip_no_room")); st.Task = null; break; }
                     if (me.Pickup(drop.gameObject, false, false)) { st.Gathered[name] = (st.Gathered.TryGetValue(name, out int had) ? had : 0) + n; }
                     else Skip(st, drop, P("villagepleb_work_skip_no_room"));
                     st.Task = null;
@@ -1297,8 +1299,7 @@ namespace VillagePlebs
 
         internal static bool IsOre(DropTable drops) => drops?.m_drops != null && drops.m_drops.Any(d => d.m_item != null && OreWords.Any(w => d.m_item.name.Contains(w)));
 
-        private static readonly AccessTools.FieldRef<List<ItemDrop>> Instances = AccessTools.StaticFieldRefAccess<List<ItemDrop>>(AccessTools.Field(typeof(ItemDrop), "s_instances"));
-        private static IEnumerable<ItemDrop> ItemDrops() => Instances() ?? new List<ItemDrop>();
+        private static IEnumerable<ItemDrop> ItemDrops() => GameFields.ItemDrops() ?? new List<ItemDrop>();
 
         // ---- your food, when it is starving ---------------------------------------------------------------------
 
@@ -1335,7 +1336,8 @@ namespace VillagePlebs
         /// </summary>
         private static bool AddApart(Inventory bag, ItemDrop.ItemData item)
         {
-            for (int y = 0; y < bag.GetHeight(); y++)
+            int rows = Gear.IsCompanion(bag) ? Mathf.Min(bag.GetHeight(), Gear.BagRows) : bag.GetHeight();   // (not into its gear rows)
+            for (int y = 0; y < rows; y++)
                 for (int x = 0; x < bag.GetWidth(); x++)
                 {
                     if (bag.GetItemAt(x, y) != null) continue;
@@ -1586,10 +1588,9 @@ namespace VillagePlebs
     /// </summary>
     internal static class Upgrades
     {
-        private static readonly AccessTools.FieldRef<List<CraftingStation>> Stations = AccessTools.StaticFieldRefAccess<List<CraftingStation>>(AccessTools.Field(typeof(CraftingStation), "m_allStations"));
 
         public static List<CraftingStation> StationsNear(Vector3 center, float range) =>
-            (Stations() ?? new List<CraftingStation>()).Where(s => s != null && !s.m_upgrader && Vector3.Distance(s.transform.position, center) < range).ToList();
+            (GameFields.Stations() ?? new List<CraftingStation>()).Where(s => s != null && !s.m_upgrader && Vector3.Distance(s.transform.position, center) < range).ToList();
 
         /// <summary>
         /// What a recipe needs at an ordinary station (workbench, forge...), as the game counts it (Player.HaveRequirementItems): items marked

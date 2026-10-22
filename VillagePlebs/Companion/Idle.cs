@@ -23,7 +23,6 @@ namespace VillagePlebs
     /// </summary>
     internal static class Idle
     {
-        private static readonly AccessTools.FieldRef<Character, ZSyncAnimation> Anim = AccessTools.FieldRefAccess<Character, ZSyncAnimation>("m_zanim");
         private static readonly Dictionary<Chair, Humanoid> Seats = new Dictionary<Chair, Humanoid>();
         private static readonly int Roof = LayerMask.GetMask("Default", "static_solid", "piece");
         private static readonly List<Piece> Near = new List<Piece>();
@@ -54,10 +53,11 @@ namespace VillagePlebs
             {
                 // A pose saved from before (its area reloaded while it sat or slept): up.
                 st.IdleReady = true;
-                ZSyncAnimation z = Anim(me);
+                ZSyncAnimation z = GameFields.Anim(me);
                 z?.SetBool("emote_sit", false); z?.SetBool("attach_chair", false); z?.SetBool("attach_bed", false);
             }
-            if ((st.Sitting || st.SitChair != null) && (Time.time > st.SitKeep || st.Enemies.Count > 0 || me.GetMoveDir().sqrMagnitude > 0.01f)) Stand(st); // (on its way somewhere: up at once)
+            // (a chair that was broken under it is Unity's null but still set: up from it too)
+            if ((st.Sitting || !ReferenceEquals(st.SitChair, null)) && (st.SitChair == null && !st.Sitting || Time.time > st.SitKeep || st.Enemies.Count > 0 || me.GetMoveDir().sqrMagnitude > 0.01f)) Stand(st); // (on its way somewhere: up at once)
             if (me.GetVelocity().sqrMagnitude > 0.1f) st.StillSince = Time.time;
             Greet(st, master);
             Mirror(st, master);
@@ -72,7 +72,7 @@ namespace VillagePlebs
             if (me == null || st.Asleep || st.Riding != null || st.InCombat || me.InAttack() || me.IsAttached() || !me.IsOnGround() || me.InWater()) return false;
             Stand(st);
             st.Ai.StopMoving();
-            Anim(me)?.SetTrigger("emote_" + emote);
+            GameFields.Anim(me)?.SetTrigger("emote_" + emote);
             st.EmoteUntil = Time.time + 2.2f;
             Activity.Log(me, "emote: " + emote);
             return true;
@@ -159,7 +159,7 @@ namespace VillagePlebs
             Humanoid me = st.Body;
             if (!me.IsOnGround() || me.InWater() || me.InAttack() || me.IsAttached()) return;
             st.Ai.StopMoving();
-            Anim(me)?.SetBool("emote_sit", true);
+            GameFields.Anim(me)?.SetBool("emote_sit", true);
             st.Sitting = true;
         }
 
@@ -176,7 +176,7 @@ namespace VillagePlebs
             Seats[chair] = me;
             st.SitChair = chair;
             st.Ai.StopMoving();
-            Anim(me)?.SetBool(chair.m_attachAnimation, true);
+            GameFields.Anim(me)?.SetBool(chair.m_attachAnimation, true);
             Rigidbody body = me.GetComponent<Rigidbody>();
             if (body != null) { body.linearVelocity = Vector3.zero; body.isKinematic = true; }
             HoldChair(st);
@@ -192,7 +192,7 @@ namespace VillagePlebs
             st.Body.transform.SetPositionAndRotation(at.position, at.rotation);
             Rigidbody body = st.Body.GetComponent<Rigidbody>();
             if (body != null) { body.position = at.position; body.rotation = at.rotation; } // (kinematic: no velocity to clear)
-            Anim(st.Body)?.SetBool(chair.m_attachAnimation, true); // kept up (free when already set)
+            GameFields.Anim(st.Body)?.SetBool(chair.m_attachAnimation, true); // kept up (free when already set)
         }
 
         /// <summary>Up (from the ground or out of its chair).</summary>
@@ -200,9 +200,9 @@ namespace VillagePlebs
         {
             Humanoid me = st?.Body;
             if (me == null) return;
-            ZSyncAnimation z = Anim(me);
+            ZSyncAnimation z = GameFields.Anim(me);
             if (st.Sitting) { z?.SetBool("emote_sit", false); z?.SetTrigger("emote_stop"); st.Sitting = false; }
-            if (st.SitChair != null || Seats.Values.Contains(me))
+            if (!ReferenceEquals(st.SitChair, null) || Seats.Values.Contains(me))
             {
                 Chair chair = st.SitChair;
                 st.SitChair = null;

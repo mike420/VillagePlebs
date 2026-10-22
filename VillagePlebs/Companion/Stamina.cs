@@ -20,7 +20,7 @@ namespace VillagePlebs
         private const float RunDrain = 10f, Regen = 8f, RegenDelay = 1f;
 
         private class Pool { public float Value, LastUse = -99f, LastSave = -99f, Saved = -1f; public bool Winded; }
-        private static readonly Dictionary<Character, Pool> Pools = new Dictionary<Character, Pool>();
+        private static readonly Dictionary<Character, Pool> Pools = Cleanup.Track(new Dictionary<Character, Pool>());
 
         public static float Max(Character c) => Food.MaxStamina(c);
 
@@ -33,6 +33,9 @@ namespace VillagePlebs
             }
             return p;
         }
+
+        /// <summary>Read again from its save next time (this game just took it over: Brain.TookOver).</summary>
+        public static void Reload(Character c) => Pools.Remove(c);
 
         /// <summary>The current value: from the pool on the game that runs it, from its ZDO elsewhere.</summary>
         public static float Get(Character c)

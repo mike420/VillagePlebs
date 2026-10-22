@@ -20,7 +20,7 @@ namespace VillagePlebs
 
         internal class Meal { public ItemDrop.ItemData Item; public float Time; public float Fraction => Mathf.Clamp01(Time / Mathf.Max(1f, Item.m_shared.m_foodBurnTime)); }
         private class State { public List<Meal> Meals = new List<Meal>(); public float NextTick, NextRegen, NextEat, NextSave; public string Saved; }
-        private static readonly Dictionary<Humanoid, State> States = new Dictionary<Humanoid, State>();
+        private static readonly Dictionary<Humanoid, State> States = Cleanup.Track(new Dictionary<Humanoid, State>());
 
         public static bool IsFood(ItemDrop.ItemData i) => i.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Consumable && i.m_shared.m_foodBurnTime > 0f && (i.m_shared.m_food > 0f || i.m_shared.m_foodStamina > 0f);
 
@@ -38,6 +38,9 @@ namespace VillagePlebs
             }
             return s;
         }
+
+        /// <summary>Read again from its save next time (this game just took it over: Brain.TookOver).</summary>
+        public static void Reload(Humanoid c) => States.Remove(c);
 
         /// <summary>Its meals right now (on the game that runs it; empty elsewhere).</summary>
         public static List<Meal> Meals(Humanoid c) => Of(c).Meals;
@@ -157,7 +160,7 @@ namespace VillagePlebs
     {
         public const string Key = "vp_skills";
         private class Level { public float Value, Progress; }
-        private static readonly Dictionary<Humanoid, Dictionary<Skills.SkillType, Level>> Levels = new Dictionary<Humanoid, Dictionary<Skills.SkillType, Level>>();
+        private static readonly Dictionary<Humanoid, Dictionary<Skills.SkillType, Level>> Levels = Cleanup.Track(new Dictionary<Humanoid, Dictionary<Skills.SkillType, Level>>());
         private static Dictionary<Skills.SkillType, Skills.SkillDef> _defs;
 
         private static Skills.SkillDef Def(Skills.SkillType type)
@@ -187,7 +190,7 @@ namespace VillagePlebs
         }
 
         /// <summary>Each companion's skills as this game last read or wrote them in its save.</summary>
-        private static readonly Dictionary<Humanoid, string> Seen = new Dictionary<Humanoid, string>();
+        private static readonly Dictionary<Humanoid, string> Seen = Cleanup.Track(new Dictionary<Humanoid, string>());
 
         private static Dictionary<Skills.SkillType, Level> Parse(string text)
         {
@@ -231,7 +234,7 @@ namespace VillagePlebs
         /// <summary>Its skills as saved ("type:level:progress,..."), as they are now.</summary>
         public static string Text(Humanoid c) => Write(Of(c));
 
-        private static readonly Dictionary<Humanoid, float> NextSave = new Dictionary<Humanoid, float>();
+        private static readonly Dictionary<Humanoid, float> NextSave = Cleanup.Track(new Dictionary<Humanoid, float>());
 
         public static void Raise(Humanoid c, Skills.SkillType type, float factor)
         {
@@ -267,7 +270,7 @@ namespace VillagePlebs
             return Write(map);
         }
 
-        private static readonly Dictionary<Humanoid, Dictionary<Skills.SkillType, float>> Timers = new Dictionary<Humanoid, Dictionary<Skills.SkillType, float>>();
+        private static readonly Dictionary<Humanoid, Dictionary<Skills.SkillType, float>> Timers = Cleanup.Track(new Dictionary<Humanoid, Dictionary<Skills.SkillType, float>>());
 
         /// <summary>
         /// Doing something that trains a skill as long as it lasts (running, swimming, sneaking): every second of it raises the skill by
@@ -293,7 +296,7 @@ namespace VillagePlebs
     /// </summary>
     internal static class Weather
     {
-        private static readonly Dictionary<Humanoid, float> Next = new Dictionary<Humanoid, float>();
+        private static readonly Dictionary<Humanoid, float> Next = Cleanup.Track(new Dictionary<Humanoid, float>());
 
         public static void Tick(Humanoid c)
         {
@@ -330,7 +333,6 @@ namespace VillagePlebs
     /// </summary>
     internal static class Repair
     {
-        private static readonly AccessTools.FieldRef<List<CraftingStation>> Stations = AccessTools.StaticFieldRefAccess<List<CraftingStation>>(AccessTools.Field(typeof(CraftingStation), "m_allStations"));
 
         private static bool Worn(ItemDrop.ItemData i) => i.m_shared.m_useDurability && i.m_shared.m_canBeReparied && i.GetMaxDurability() > 0f && i.m_durability < i.GetMaxDurability() * 0.5f;
 
@@ -361,7 +363,7 @@ namespace VillagePlebs
             going = false;
             var worn = me.GetInventory().GetAllItems().Where(Scuffed).ToList();
             if (worn.Count == 0) return Words.P("villagepleb_life_gear_fine");
-            CraftingStation station = (Stations() ?? new List<CraftingStation>()).Where(s => s != null && Vector3.Distance(s.transform.position, me.transform.position) < 60f && worn.Any(i => CanRepairAt(i, s)))
+            CraftingStation station = (GameFields.Stations() ?? new List<CraftingStation>()).Where(s => s != null && Vector3.Distance(s.transform.position, me.transform.position) < 60f && worn.Any(i => CanRepairAt(i, s)))
                                           .OrderBy(s => Vector3.Distance(s.transform.position, me.transform.position)).FirstOrDefault();
             if (station == null) return Words.P("villagepleb_life_no_station");
             st.RepairAt = station;
@@ -381,7 +383,7 @@ namespace VillagePlebs
                 st.NextRepairLook = Time.time + 5f;
                 var worn = me.GetInventory().GetAllItems().Where(Worn).Where(i => me.IsItemEquiped(i) || Work.IsTool(i)).ToList();
                 if (worn.Count == 0) return false;
-                List<CraftingStation> all = Stations() ?? new List<CraftingStation>();
+                List<CraftingStation> all = GameFields.Stations() ?? new List<CraftingStation>();
                 st.RepairAt = all.Where(s => s != null && Vector3.Distance(s.transform.position, me.transform.position) < 30f && worn.Any(i => CanRepairAt(i, s)))
                                  .OrderBy(s => Vector3.Distance(s.transform.position, me.transform.position)).FirstOrDefault();
                 if (st.RepairAt == null) return false;
@@ -422,7 +424,6 @@ namespace VillagePlebs
     /// </summary>
     internal static class Ride
     {
-        private static readonly AccessTools.FieldRef<Character, ZSyncAnimation> Anim = AccessTools.FieldRefAccess<Character, ZSyncAnimation>("m_zanim");
         private static readonly Dictionary<Chair, Humanoid> Taken = new Dictionary<Chair, Humanoid>();
 
         public static Ship ShipOf(Player p) => p == null ? null : p.GetStandingOnShip() ?? p.GetControlledShip() ?? (p == Player.m_localPlayer ? Ship.GetLocalShip() : null);
@@ -434,13 +435,13 @@ namespace VillagePlebs
             Ship ship = Companion.OrderOf(me) == Order.Follow ? ShipOf(master) : null;
             if (ship == null)
             {
-                if (st.Riding == null)
+                if (ReferenceEquals(st.Riding, null))   // (never on one: not Unity's null, which a ship that sank also is)
                 {
                     Rigidbody b = me.GetComponent<Rigidbody>();
                     if (b != null && !b.detectCollisions) b.detectCollisions = true; // (left riding by a reload: solid again)
                     return false;
                 }
-                if (Time.time - st.RideLastSeen < 1.5f) { Hold(st); return true; } // a moment's grace (stepping about on deck)
+                if (st.Riding != null && Time.time - st.RideLastSeen < 1.5f) { Hold(st); return true; } // a moment's grace (stepping about on deck); its ship gone (sunk, broken): off at once
                 Off(st, master);
                 return false;
             }
@@ -459,7 +460,7 @@ namespace VillagePlebs
             st.Riding = ship;
             st.Seat = seat;
             st.DeckSpot = ship.transform.InverseTransformPoint(master.transform.position) + new Vector3(-0.8f, 0f, -0.8f);
-            if (seat != null) { Taken[seat] = me; Anim(me)?.SetBool(seat.m_attachAnimation, true); }
+            if (seat != null) { Taken[seat] = me; GameFields.Anim(me)?.SetBool(seat.m_attachAnimation, true); }
             Rigidbody body = me.GetComponent<Rigidbody>();
             if (body != null) { body.linearVelocity = Vector3.zero; body.isKinematic = true; body.detectCollisions = false; } // a passenger, not a weight pushing on the deck
             st.Ai.StopMoving();
@@ -477,14 +478,14 @@ namespace VillagePlebs
             me.transform.SetPositionAndRotation(pos, rot);
             Rigidbody body = me.GetComponent<Rigidbody>();
             if (body != null) { body.position = pos; body.rotation = rot; } // (kinematic: no velocity to clear)
-            if (st.Seat != null) Anim(me)?.SetBool(st.Seat.m_attachAnimation, true); // kept up (free when already set)
+            if (st.Seat != null) GameFields.Anim(me)?.SetBool(st.Seat.m_attachAnimation, true); // kept up (free when already set)
             Brain.Status(st, Words.P("villagepleb_life_status_riding"));
         }
 
         private static void Off(BrainState st, Player master)
         {
             Humanoid me = st.Body;
-            if (st.Seat != null) { Anim(me)?.SetBool(st.Seat.m_attachAnimation, false); Taken.Remove(st.Seat); }
+            if (!ReferenceEquals(st.Seat, null)) { GameFields.Anim(me)?.SetBool(st.Seat.m_attachAnimation, false); Taken.Remove(st.Seat); }   // (a seat on a ship that went too)
             Rigidbody body = me.GetComponent<Rigidbody>();
             if (body != null) { body.isKinematic = false; body.detectCollisions = true; }
             st.Riding = null;

@@ -26,6 +26,10 @@ namespace VillagePlebs
             // Yours, however far (any the game has loaded: one far off in a part of the world nobody is near is not running anywhere).
             var mine = Companion.All().Where(c => Companion.CanCommand(c, p) && !c.IsDead()).ToList();
             if (mine.Count == 0) { VillagePlebsPlugin.Tell(P("villagepleb_pointing_none_near")); return; }
+            // (the order goes into their brains on this game: only the ones this game can run hear it, Brain.Claim)
+            string refused = null;
+            mine = mine.Where(c => { if (Brain.Claim(c, out string why) != null) return true; refused = refused ?? why; return false; }).ToList();
+            if (mine.Count == 0) { VillagePlebsPlugin.Tell(refused ?? P("villagepleb_pointing_none_near")); return; }
             Transform eye = GameCamera.instance != null ? GameCamera.instance.transform : p.transform;
             RaycastHit[] hits = Physics.RaycastAll(eye.position, eye.forward, Reach, Mask, QueryTriggerInteraction.Ignore).OrderBy(h => h.distance).ToArray();
             foreach (RaycastHit hit in hits)

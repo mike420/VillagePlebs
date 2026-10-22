@@ -102,8 +102,11 @@ namespace VillagePlebs
                 Gear.Slot slot = Gear.All.First(s => Gear.Fits(s, pick) && Kinds.Contains(s.Kind) && (s.Kind != GearKind.Weapon || !Gear.IsTool(pick)));
                 ItemDrop.ItemData old = Gear.In(me, slot); // (what it replaces: back to your chest, unless it moves to its spare slot)
                 pick.m_equipped = false;
+                // (moved when its count of it went up: arrows and the like join a stack already in its bag, and then that stack, not this
+                // copy, is what it has)
+                int had = mine.CountItems(pick.m_shared.m_name);
                 mine.MoveItemToThis(its, pick);
-                if (!mine.ContainsItem(pick)) continue;
+                if (mine.CountItems(pick.m_shared.m_name) <= had) continue;
                 Gear.Arrange(me); // into its slot; the old one into its bag
                 string name = NameOf(pick);
                 if (old != null && mine.ContainsItem(old) && !Gear.InSlot(old))
