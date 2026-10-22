@@ -29,6 +29,7 @@ Thank you for your support, and happy gaming! ⚔️  ...... (A Paypal account i
   * **Gear slots of its own**, and its bag shows beside your inventory: drag items between you.
   * **A journal** of its life, small talk that fits the moment, and a menu with its status, stats, orders, home, gear, looks and companions.
   * **EpicMMO System:** it earns experience and levels from what it kills and gathers.
+  * **StarLevelSystem:** it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.
   * **Languages:** English, Russian, German, Chinese, Portuguese (Brazil), Spanish, French, Polish and Turkish, following the game's language setting.
 <br>
 
@@ -48,7 +49,9 @@ Settings are in `BepInEx/config/MagicMike.VillagePlebs.cfg`. Change them in game
 |---|---|---|---|
 | General | Menu Key | J | Tap: your companion's menu (or the summon panel). Hold: your companions near you come with you, or go home. |
 | | Command Key | H | Point at something and press it to give an order. |
-| Companion | Max Companions | 3 | How many companions each player can have (synced). |
+| Companion | Max Companions | 1 | How many companions each player can have for free, summoned from the menu (synced). |
+| | Max Bought Companions | 2 | How many more each player can buy from any trader (Haldor, Hildir, the Bog Witch), 0 to 6. Buying one lets you name them; the coins are taken when they join you (synced). |
+| | Companion Price | 500 | What a trader asks for a companion, in coins (synced). |
 | | While Away | Mild | What a companion at home does while nobody is near: `Mild`, `Real` or `Off` (synced). |
 | | Fight Range | 12 | It fights enemies that come this close (in metres) to it or to you. |
 | | Show Decisions | true | Shows what it decides in a fight above its head. |

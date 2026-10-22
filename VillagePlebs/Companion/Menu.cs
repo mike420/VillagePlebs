@@ -42,13 +42,13 @@ namespace VillagePlebs
         internal static bool MenuOpen;
         internal static float MenuClosedAt = -1f;   // (the E that closes it must not open it again at once: Container_Interact)
         private Humanoid _shown;          // null: your companions and the summon panel
-        private long _rebind;             // a companion being remade (new body): show it again when it is back
-        private float _rebindUntil;
         private Tab _tab = Tab.Status;
         private bool _renaming, _focusField, _menuWarned;
         private Action _pending;          // button actions run in Update, never while the window is being built or clicked
         private string _nameField = "", _note = "";
         private long _forgetArmed;        // "Forget" pressed once (a second press forgets)
+        private int _hirePrice = -1;      // bought at a trader (Trading): what it costs, paid when it's hired; below 0: not hiring
+        private string _hireCoin;         // the coin item that trader takes
         private LooksPanel _looks;        // the Looks tab's editor, kept while the window is made again (DrawLooks)
 
         private const float WindowW = 720f, Pad = 26f, CardPad = 14f, CardGap = 10f;
@@ -65,13 +65,19 @@ namespace VillagePlebs
         private Transform _in;
         private float _y, _left, _width, _listY, _cardW;
 
-        internal void OpenMenuFor(Player player, Humanoid companion)
+        /// <summary>A companion bought at a trader: the hire card (its name), first in your companions' list. Nothing is paid until it's hired.</summary>
+        internal void OpenHire(Player player, int price, string coin) => OpenMenuFor(player, null, price, coin);
+
+        internal void OpenMenuFor(Player player, Humanoid companion, int hirePrice = -1, string hireCoin = null)
         {
             if (!GameUi.Ready()) return;   // (the window is made from the inventory screen's parts: not there outside a world)
             if (InventoryGui.IsVisible()) InventoryGui.instance.Hide();
             if (!MenuOpen) _openedAt = Time.unscaledTime;
             _shown = companion;
-            _nameField = companion != null ? Companion.NameOf(companion) : (player.m_customData.TryGetValue("vp_name", out string n) ? n : "Rádvar");
+            _hirePrice = companion == null ? hirePrice : -1;
+            _hireCoin = hireCoin;
+            _nameField = companion != null ? Companion.NameOf(companion) : _hirePrice >= 0 ? Trading.FreeName(player)   // (a name none of theirs has)
+                : (player.m_customData.TryGetValue("vp_name", out string n) ? n : "Rádvar");
             _note = companion == null ? "" : (Companion.IsMine(companion, player) ? "" : T("villagepleb_menu_others", Companion.Zdo(companion).GetString(Keys.MasterName, "") is string m && m.Length > 0 ? m : T("villagepleb_menu_someone")));
             _renaming = false;
             MenuOpen = true;
@@ -96,6 +102,8 @@ namespace VillagePlebs
             _shown = null;
             _pending = null;
             _renaming = false;
+            if (was && _hirePrice >= 0) Note("Hiring a companion cancelled: nothing paid");
+            _hirePrice = -1;
             if (_window != null) Object.Destroy(_window.gameObject);
             _window = _list = _card = null;
             _field = null;
@@ -114,13 +122,7 @@ namespace VillagePlebs
             run?.Invoke();
             if (!MenuOpen) return;
             if (_window == null) { CloseMenu(); return; }   // the game rebuilt its interface (a world change)
-            if (_rebind != 0L && _shown == null)
-            {
-                Humanoid back = Companion.All().FirstOrDefault(h => Companion.IdOf(h) == _rebind);
-                if (back != null) { _shown = back; _rebind = 0L; }
-                else if (Time.time > _rebindUntil) _rebind = 0L;
-            }
-            else if (_shown != null && (_shown.IsDead() || Vector3.Distance(_shown.transform.position, player.transform.position) > 100f)) { CloseMenu(); return; }
+            if (_shown != null && (_shown.IsDead() || Vector3.Distance(_shown.transform.position, player.transform.position) > 100f)) { CloseMenu(); return; }
             else if (global::Menu.IsVisible() || InventoryGui.IsVisible()) { CloseMenu(); return; }
             // E closes it again, as it does a chest (not the E that opened it, nor one typed into a name)
             if (!GameUi.Typing && Time.unscaledTime > _openedAt + 0.2f && ZInput.GetButtonDown("Use")) { CloseMenu(); return; }
@@ -178,13 +180,13 @@ namespace VillagePlebs
         {
             _make = make;
             _sig.Length = 0;
-            if (_tab == Tab.Companions && MaxCompanions.Value <= 1) _tab = Tab.Status;
+            if (_tab == Tab.Companions && Trading.MostCompanions <= 1) _tab = Tab.Status;
             Humanoid c = _shown;   // (Unity's null: a companion just remade or unloaded shows your companions instead)
             bool companion = c != null;
             Vector2 screen = GameUi.ScreenSize;
             float w = Mathf.Min(WindowW, screen.x - 20f), h = Mathf.Min(companion ? 900f : 680f, screen.y - 40f);
             string key = (companion ? Companion.IdOf(c).ToString() : "list") + "/" + _tab;
-            _sig.Append(key).Append('|').Append((int)w).Append('x').Append((int)h).Append('|').Append(!companion && _rebind != 0L);
+            _sig.Append(key).Append('|').Append((int)w).Append('x').Append((int)h);
             float scrolled = 0f;
             if (make)
             {
@@ -199,11 +201,6 @@ namespace VillagePlebs
             }
             _in = _window; _left = Pad; _width = w - Pad * 2f;
 
-            if (!companion && _rebind != 0L)
-            {
-                Title(T("villagepleb_menu_changing_body"), w);
-                return;
-            }
             float top = companion ? Header(c, w) : ListHeader(w);
             Vector2 area = new Vector2(w - Pad * 2f + 12f, h - top - Pad + 8f);
             bool looks = companion && _tab == Tab.Looks;   // (its look editor fills the area itself: LooksPanel)
@@ -265,6 +262,8 @@ namespace VillagePlebs
         {
             Player me = Player.m_localPlayer;
             List<Profile> mine = me != null ? Profile.Here(me) : new List<Profile>();
+            bool hiring = _hirePrice >= 0;
+            if (hiring) HireCard(mine);   // (first: it's what the trader's Buy opened the window for)
 
             foreach (Profile prof in mine)
             {
@@ -345,10 +344,13 @@ namespace VillagePlebs
                 EndCard();
             }
 
+            if (hiring) return;
             BeginCard();
             if (mine.Count >= MaxCompanions.Value)
             {
-                Note(T("villagepleb_menu_most_allowed", mine.Count), GameUi.Dim);
+                // the free ones all summoned: more from any trader (Trading), while there's room
+                if (mine.Count < Trading.MostCompanions) Note(T("villagepleb_menu_buy_more", MaxCompanions.Value, CompanionPrice.Value, Trading.MostCompanions - mine.Count), GameUi.Dim);
+                else Note(T("villagepleb_menu_most_allowed", mine.Count), GameUi.Dim);
                 EndCard();
                 return;
             }
@@ -367,6 +369,39 @@ namespace VillagePlebs
                     Player p = Player.m_localPlayer;
                     Humanoid c = p != null ? Companion.Summon(p, (_nameField ?? "").Trim()) : null;
                     if (c == null) return;
+                    _tab = Tab.Looks;
+                    OpenMenuFor(p, c);
+                    string took = Home.SetUp(c);
+                    Talk.Tell(c, took != null ? Words.P("villagepleb_menu_hello_took", took) : Words.P("villagepleb_menu_hello"));
+                }, 38f);
+            EndCard();
+        }
+
+        /// <summary>
+        /// Hiring one bought at a trader (Trading): its name, then Hire. The coins are taken when it comes (Trading.Hire), so closing the
+        /// window costs nothing; then its Looks tab opens, as after a free summon.
+        /// </summary>
+        private void HireCard(List<Profile> mine)
+        {
+            _sig.Append("|hire").Append(_hirePrice);
+            BeginCard();
+            Heading(T("villagepleb_menu_hire_title"));
+            Note(T("villagepleb_menu_summon_about"), GameUi.Dim);
+            _y += 4f;
+            NameField(null);
+            int free = MaxCompanions.Value - mine.Count;
+            if (free > 0) Note(T("villagepleb_trade_free_left", free), GameUi.Warn);
+            WideBtn(T("villagepleb_menu_hire", _hirePrice), true, () =>
+                _pending = () =>
+                {
+                    string wanted = string.IsNullOrEmpty(_nameField?.Trim()) ? "Rádvar" : _nameField.Trim();
+                    Profile same = Profile.Here(Player.m_localPlayer).FirstOrDefault(pr => string.Equals(pr.Name, wanted, StringComparison.OrdinalIgnoreCase));
+                    if (same != null) { _note = T("villagepleb_menu_same_name", same.Name); return; }
+                    Player p = Player.m_localPlayer;
+                    string why = null;
+                    Humanoid c = p != null ? Trading.Hire(p, wanted, _hireCoin, _hirePrice, out why) : null;
+                    if (c == null) { _note = why ?? ""; return; }   // (it stays open, saying why: coins dropped meanwhile, or no room)
+                    _hirePrice = -1;
                     _tab = Tab.Looks;
                     OpenMenuFor(p, c);
                     string took = Home.SetUp(c);
@@ -485,7 +520,7 @@ namespace VillagePlebs
 
             // the tabs, and the braid under them
             _y += 4f;
-            var tabs = ((Tab[])Enum.GetValues(typeof(Tab))).Where(t => t != Tab.Companions || MaxCompanions.Value > 1).ToArray();
+            var tabs = ((Tab[])Enum.GetValues(typeof(Tab))).Where(t => t != Tab.Companions || Trading.MostCompanions > 1).ToArray();
             float tw = (_width - 6f * (tabs.Length - 1)) / tabs.Length;
             for (int i = 0; i < tabs.Length; i++)
             {
@@ -1134,13 +1169,14 @@ namespace VillagePlebs
 
         // ==== Looks ========================================================================================
 
-        private void Rebind(Humanoid c) { _rebind = Companion.IdOf(c); _rebindUntil = Time.time + 5f; }
-
-        private void LooksChange(Action<Humanoid> change)
+        // False: not changed (the note says why)
+        private bool LooksChange(Action<Humanoid> change)
         {
-            if (!Mine) { _note = T("villagepleb_menu_owner_looks"); return; }
+            if (!Mine) { _note = T("villagepleb_menu_owner_looks"); return false; }
             Humanoid c = _shown;
-            if (!Companion.Write(c, _ => change(c))) _note = T("villagepleb_menu_busy");
+            if (Companion.Write(c, _ => change(c))) return true;
+            _note = T("villagepleb_menu_busy");
+            return false;
         }
 
         /// <summary>
@@ -1161,8 +1197,8 @@ namespace VillagePlebs
             Humanoid c = _shown;
             if (_looks == null || c == null || _looks.Id != Companion.IdOf(c)) return;
             Looks.Look look = _looks.Current;
-            if (Mine && look.Model != Looks.Model(c)) Rebind(c);   // (a different body makes it again: shown again once it is back)
-            LooksChange(h => Looks.Set(h, look));
+            // done with: the window closes (and a different body, which makes it again, needs no showing again); not done, it stays, saying why
+            if (LooksChange(h => Looks.Set(h, look))) CloseMenu();
         }
 
         /// <summary>Each frame: the look editor's preview while its tab shows; let go of it when the tab or the companion changes.</summary>

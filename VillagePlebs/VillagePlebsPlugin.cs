@@ -25,9 +25,10 @@ namespace VillagePlebs
         internal static ConfigEntry<float> EngageRange, RespawnSeconds, BaseHealth, BaseStamina, StartingSkill, EatBelow, MmoExp;
         internal static ConfigEntry<KeyboardShortcut> MenuKey, CommandKey;
         internal static ConfigEntry<AwayMode> WhileAway;
-        internal static ConfigEntry<int> MaxCompanions;
+        internal static ConfigEntry<int> MaxCompanions, MaxBought, CompanionPrice;
 
         private Harmony _harmony;
+        internal Harmony Harmony => _harmony;   // (patches on other mods' code, made once they are known: StarLevels)
 
         /// <summary>Save a setting changed in the menu.</summary>
         internal void SaveSettings() => Config.Save();
@@ -39,7 +40,9 @@ namespace VillagePlebs
             ConfigFile cfg = Config;
             MenuKey = cfg.BindConfigInOrder("General", "Menu Key", defaultValue: new KeyboardShortcut(KeyCode.J), "Tap: your companion's menu (or the summon panel). Hold: all your companions near you come with you, or go home. E on a companion opens its menu too.", sectionOrder: true, settingOrder: true);
             CommandKey = cfg.BindConfigInOrder("General", "Command Key", defaultValue: new KeyboardShortcut(KeyCode.H), "Point at something and press it: an enemy (they attack it), a tree, rock or plant (it works it), your chest (it puts its things in), its tombstone, a free bed (its bed), the ground (it waits there), or the sky (it comes back).", sectionOrder: true, settingOrder: true);
-            MaxCompanions = cfg.BindConfigInOrder("Companion", "Max Companions", defaultValue: 3, "How many companions each player can have. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<int>(1, 10));
+            MaxCompanions = cfg.BindConfigInOrder("Companion", "Max Companions", defaultValue: 1, "How many companions each player can have for free (summoned from the menu). More are bought from traders: Max Bought Companions. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<int>(1, 10));
+            MaxBought = cfg.BindConfigInOrder("Companion", "Max Bought Companions", defaultValue: 2, "How many more companions each player can buy from any trader (Haldor, Hildir, the Bog Witch) on top of their free ones (Max Companions). Buying one lets you name them; the coins are taken when they join you. 0: none for sale. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<int>(0, 6));
+            CompanionPrice = cfg.BindConfigInOrder("Companion", "Companion Price", defaultValue: 500, "What a trader asks for a companion, in coins. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<int>(0, 10000));
             WhileAway = cfg.BindConfigInOrder("Companion", "While Away", defaultValue: AwayMode.Mild, "What a companion living at home does while nobody is near. It always catches up on its work when you come back. Mild: it also fights off a few creatures and keeps their drops, and never falls. Real: those fights can go badly and it can fall. Off: work only. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true);
             EngageRange = cfg.BindConfigInOrder("Companion", "Fight Range", defaultValue: 12f, "It fights enemies that come this close (in metres) to it or to you. Also in its menu: Orders.", sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<float>(4f, 50f));
             ShowDecisions = cfg.BindConfigInOrder("Companion", "Show Decisions", defaultValue: true, "Show what it decides in a fight above its head. Also in its menu: Brain.", sectionOrder: true, settingOrder: true);
@@ -60,7 +63,7 @@ namespace VillagePlebs
 
             _harmony = new Harmony(PluginGUID);
             _harmony.PatchAll();
-            if (ZNetScene.instance != null) Prefab.Register(ZNetScene.instance); // hot reload while in a world
+            if (ZNetScene.instance != null) { Prefab.Register(ZNetScene.instance); StarLevels.Hook(); } // hot reload while in a world
             Net.Start();
 
             Logger.LogInfo($"{PluginName} {PluginVersion} loaded (menu: {MenuKey.Value}, commands: {CommandKey.Value})");

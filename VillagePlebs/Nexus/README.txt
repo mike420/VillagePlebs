@@ -27,6 +27,7 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [*][b]Gear slots of its own[/b], and its bag shows beside your inventory: drag items between you.
 [*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status, stats, orders, home, gear, looks and companions.
 [*][b]EpicMMO System:[/b] it earns experience and levels from what it kills and gathers.
+[*][b]StarLevelSystem:[/b] it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.
 [*][b]Languages:[/b] English, Russian, German, Chinese, Portuguese (Brazil), Spanish, French, Polish and Turkish, following the game's language setting.
 [/list]
 
@@ -50,7 +51,9 @@ Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in
 
 [b]Companion[/b]
 [list]
-[*][b]Max Companions[/b] (default 3)
+[*][b]Max Companions[/b] (default 1)
+[*][b]Max Bought Companions[/b] (default 2)
+[*][b]Companion Price[/b] (default 500)
 [*][b]While Away[/b] (default Mild)
 [*][b]Fight Range[/b] (default 12)
 [*][b]Show Decisions[/b] (default true)

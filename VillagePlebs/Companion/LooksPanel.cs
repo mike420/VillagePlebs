@@ -56,8 +56,18 @@ namespace VillagePlebs
         // colour, solid, so the box blends in
         private static readonly Color PreviewSolid = new Color(Theme.Field.r, Theme.Field.g, Theme.Field.b, 1f);
 
+        // The armour, weapons and shield the companion has on (it puts on the best in its bag), on the preview too: read from its world
+        // data, so it is right on any game, and checked each frame so the preview follows a change in its bag
+        private readonly Humanoid _companion;
+        private int _worn;
+
+        // The armour shown (the tick box over the preview): off, a helmet doesn't hide the hair being chosen. Kept until the game closes.
+        private static bool _showArmour = true;
+        private RectTransform _armourBox;      // (a click on it doesn't turn the model)
+
         public LooksPanel(Humanoid c)
         {
+            _companion = c;
             Id = Companion.IdOf(c);
             Current = Looks.Of(c);
             if (string.IsNullOrEmpty(Current.BrLook)) Current.BrLook = BodyReplacerLook.DefaultLook();
@@ -288,6 +298,12 @@ namespace VillagePlebs
             TMP_Text hint = Widgets.Label(col, T("villagepleb_looks_preview_hint"), 14f, Theme.Muted, TextAlignmentOptions.Center);
             hint.textWrappingMode = TextWrappingModes.Normal;
             Widgets.Place(hint.gameObject, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(6f, 4f), new Vector2(-6f, 42f));
+            // Show armour, in its top left corner
+            const float tick = 22f;
+            _armourBox = Widgets.Place(Widgets.Child(col, "ShowArmour"), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(8f, -8f - tick), new Vector2(-8f, -8f));
+            GameUi.Check(_armourBox, Vector2.zero, tick, _showArmour, on => { _showArmour = on; ApplyToClone(); });
+            TMP_Text armourLabel = Widgets.Label(_armourBox, T("villagepleb_looks_show_armour"), 16f, Theme.Text, TextAlignmentOptions.MidlineLeft);
+            Widgets.Place(armourLabel.gameObject, Vector2.zero, Vector2.one, new Vector2(tick + 8f, 0f), Vector2.zero);
             if (_cam == null)
             {
                 var camGO = new GameObject("VP_LooksPreviewCam");
@@ -314,8 +330,9 @@ namespace VillagePlebs
         public void UpdatePerFrame()
         {
             if (_previewImg == null || !_previewImg.gameObject.activeInHierarchy || _cam == null) return;
+            if (_clone != null && WornHash() != _worn) ApplyToClone();
             bool over = RectTransformUtility.RectangleContainsScreenPoint(_previewImg.rectTransform, Input.mousePosition, null);
-            if (!_dragging && Input.GetMouseButtonDown(0) && over)
+            if (!_dragging && Input.GetMouseButtonDown(0) && over && !RectTransformUtility.RectangleContainsScreenPoint(_armourBox, Input.mousePosition, null))
             {
                 _dragging = true;
                 _lastMouse = Input.mousePosition;
@@ -488,11 +505,42 @@ namespace VillagePlebs
             vis.SetBeardItem(Current.Model == 0 ? Current.Beard : 0);
             vis.SetSkinColor(Looks.SkinColor(Current.Skin));
             vis.SetHairColor(Looks.HairColor(Current.HairTone, Current.HairShade));
+            ZDO z = Companion.Zdo(_companion);
+            ZDO armour = _showArmour ? z : null;   // (none: every slot empty)
+            vis.SetHelmetItem(Worn(armour, ZDOVars.s_helmetItem));
+            vis.SetChestItem(Worn(armour, ZDOVars.s_chestItem));
+            vis.SetLegItem(Worn(armour, ZDOVars.s_legItem));
+            vis.SetShoulderItem(Worn(armour, ZDOVars.s_shoulderItem), Worn(armour, ZDOVars.s_shoulderItemVariant), Worn(armour, ZDOVars.s_shoulderItemQuality));
+            vis.SetUtilityItem(Worn(armour, ZDOVars.s_utilityItem));
+            // its weapon or tool and shield, in its hands or on its back as it has them
+            vis.SetRightItem(Worn(z, ZDOVars.s_rightItem), Worn(z, ZDOVars.s_rightItemQuality));
+            vis.SetLeftItem(Worn(z, ZDOVars.s_leftItem), Worn(z, ZDOVars.s_leftItemVariant), Worn(z, ZDOVars.s_leftItemQuality));
+            vis.SetRightBackItem(Worn(z, ZDOVars.s_rightBackItem), Worn(z, ZDOVars.s_rightBackItemQuality));
+            vis.SetLeftBackItem(Worn(z, ZDOVars.s_leftBackItem), Worn(z, ZDOVars.s_leftBackItemVariant), Worn(z, ZDOVars.s_leftBackItemQuality));
+            _worn = WornHash();
             UpdateVisuals?.Invoke(vis, null);
             Animator anim = _clone.GetComponentInChildren<Animator>(true);
             if (anim != null) { anim.Update(0f); anim.speed = 0f; }
             int layer = LayerMask.NameToLayer("character");
             foreach (Transform t in _clone.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer < 0 ? 9 : layer;
+        }
+
+        // One of the companion's slots: the item's hash (0: nothing there), or an item's variant or quality
+        private static int Worn(ZDO z, int key) => z?.GetInt(key, 0) ?? 0;
+
+        private static readonly int[] WornKeys =
+        {
+            ZDOVars.s_helmetItem, ZDOVars.s_chestItem, ZDOVars.s_legItem, ZDOVars.s_shoulderItem, ZDOVars.s_shoulderItemVariant, ZDOVars.s_shoulderItemQuality,
+            ZDOVars.s_utilityItem, ZDOVars.s_rightItem, ZDOVars.s_rightItemQuality, ZDOVars.s_leftItem, ZDOVars.s_leftItemVariant, ZDOVars.s_leftItemQuality,
+            ZDOVars.s_rightBackItem, ZDOVars.s_rightBackItemQuality, ZDOVars.s_leftBackItem, ZDOVars.s_leftBackItemVariant, ZDOVars.s_leftBackItemQuality,
+        };
+
+        private int WornHash()
+        {
+            ZDO z = Companion.Zdo(_companion);
+            int h = 17;
+            foreach (int key in WornKeys) h = h * 31 + Worn(z, key);
+            return h;
         }
 
         // ---- changing what is chosen ----------------------------------------------------------------------------

@@ -52,6 +52,10 @@
       <LogicalName>translations/English.json</LogicalName>
     </EmbeddedResource>
     <None Include="Assets\Translations\**\VillagePlebs.json" />
+    <!-- Traders' lists: the icon of a companion for sale (Companion\Trading.cs) -->
+    <EmbeddedResource Include="Assets\gift_box.png">
+      <LogicalName>gift_box.png</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <None Include="Nexus\README.txt" />
