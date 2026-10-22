@@ -26,7 +26,7 @@ namespace VillagePlebs
     ///   Stats  - all its numbers: health, stamina, healing, carry weight, armour, block, weapon damage, resistances, record, every skill;
     ///   Orders - come with me or go home (and stay, guard, come here), errands, how it fights, its habits, sending it away;
     ///   Home   - its bed and chests, missions, living at home, home duties (in order), its food, jobs, what it gathered, while you are away;
-    ///   Gear   - what it wears, its bag, giving it things, and what it picks up off the ground;
+    ///   Gear   - shown as "Inventory": what it wears, its bag, giving it things, and what it picks up off the ground;
     ///   Looks  - gender, skin, hair, beard and hair colour, chosen on a preview and given with Apply (LooksPanel);
     ///   Journal - its life so far: days with you, kills, parries, bosses, deaths, gear made, and the moments worth remembering.
     /// With no companion of yours nearby it shows your companions (also those far away) and the summon panel.

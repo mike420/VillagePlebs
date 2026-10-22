@@ -12,9 +12,9 @@ namespace VillagePlebs
     /// Its gear in a place of its own: two rows of named slots under its bag (weapon, spare weapon, shield, bow,
     /// arrows, axe, pickaxe, hammer; helmet, chest, legs, cape, belt). They are cells of its real inventory (the game only lets it wear
     /// and wield what is in its inventory), kept apart: what it picks up, loots and gathers only ever goes into its bag (the four rows above),
-    /// and its menu shows them apart (Gear tab). What is in its gear slots it keeps when it falls; the rest goes into its tombstone. It moves
+    /// and its menu shows them apart (Inventory tab). What is in its gear slots it keeps when it falls; the rest goes into its tombstone. It moves
     /// the best of what it has into the slots by itself (a better axe it made, armour you gave it); you give and take its gear and what is
-    /// in its bag from its menu (Gear tab).
+    /// in its bag from its menu (Inventory tab).
     /// </summary>
     internal static class Gear
     {

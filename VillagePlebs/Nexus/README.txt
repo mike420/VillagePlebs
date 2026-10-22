@@ -25,7 +25,7 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [*][b]Home life:[/b] it takes a free bed and empty chests, works towards better gear (gathering, smelting, crafting and upgrading at your stations), hunts, cooks, keeps its fires burning and repairs its gear and your base. While you are away it catches up on all of it.
 [*][b]Needs like a player:[/b] food, stamina, skills that rise, carry weight, weather and rest.
 [*][b]Gear slots of its own[/b]: give and take its gear and what is in its bag from its menu.
-[*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status, stats, orders, home, gear, looks and companions.
+[*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status, stats, orders, home, inventory, looks and companions.
 [*][b]EpicMMO System:[/b] it earns experience and levels from what it kills and gathers.
 [*][b]StarLevelSystem:[/b] it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.
 [*][b]Languages:[/b] English, Russian, German, Chinese, Portuguese (Brazil), Spanish, French, Polish and Turkish, following the game's language setting.
