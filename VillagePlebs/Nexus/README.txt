@@ -32,13 +32,6 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [/list]
 
 
-[size=5][b]Multiplayer[/b][/size]
-
-Everyone in the world needs the mod, [b]the host too[/b]: without it the game deletes saved companions. Each companion belongs to whoever summoned it. The host decides how many companions each player can have, what they do while you're away, respawn time, base health and stamina, when they eat, starting skill and EpicMMO experience.
-
-Restart the game after installing or updating so the companion registers cleanly.
-
-
 [size=5][b]Configuration[/b][/size]
 
 Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in game in the [b]Mod Settings[/b] panel ([b]F7[/b]), or in r2modman/Gale/[url=https://thunderstore.io/c/valheim/p/Azumatt/Official_BepInEx_ConfigurationManager/]Configuration Manager[/url]. Fight Range and Show Decisions are also in the companion's menu. The settings marked synced are the server's in multiplayer.
@@ -70,6 +63,47 @@ Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in
 [/list]
 
 
-[size=5][b]Made with AI[/b][/size]
+[size=5][b]Multiplayer[/b][/size]
 
-Made with the help of Claude (Anthropic), with Claude Code.
+Everyone in the world needs the mod, [b]the host too[/b]: without it the game deletes saved companions. Each companion belongs to whoever summoned it. The host decides how many companions each player can have, what they do while you're away, respawn time, base health and stamina, when they eat, starting skill and EpicMMO experience.
+
+Restart the game after installing or updating so the companion registers cleanly.
+
+
+[size=5][b]Requirements[/b][/size]
+
+[list]
+[*][url=https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/]BepInExPack Valheim[/url]
+[*][url=https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/]Jötunn[/url]
+[/list]
+
+
+[size=5][b]Installation[/b][/size]
+
+[b]Automatic Install[/b]
+
+Plugin is created to be installed with r2modman or Gale.
+For Nexus downloads you will need to install manually.
+
+[b]Manual Install[/b]
+
+[list]
+[*]Un-zip and drag the [b]config[/b] and [b]plugins[/b] folder into your [b]BepInEx[/b] folder.
+[/list]
+
+
+[size=5][b]Plugins Created by Magic Mike[/b][/size]
+
+[list]
+[*][url=https://thunderstore.io/c/valheim/p/MagicMike/CoreWoodExtras/]Corewood Extras[/url]
+[*][url=https://thunderstore.io/c/valheim/p/MagicMike/CorewoodFortified/]Corewood Fortified[/url]
+[*][url=https://thunderstore.io/c/valheim/p/MagicMike/CorewoodAdditions/]Corewood Additions[/url]
+[*][url=https://thunderstore.io/c/valheim/p/MagicMike/MyDirtyHoe/]My Dirty Hoe[/url]
+[*][url=https://thunderstore.io/c/valheim/p/MagicMike/ChestPreview/]Chest Preview[/url]
+[*][url=https://thunderstore.io/c/valheim/p/MagicMike/YabbaDabbaDoo/]YabbaDabbaDoo[/url]
+[/list]
+
+
+[size=5][b]Comments/Suggestions/Help[/b][/size]
+
+[url=https://www.nexusmods.com/profile/MagicMikeMods/mods?gameId=3667]Nexus[/url], [url=https://discord.gg/mnr36G6J4x]Discord[/url]
