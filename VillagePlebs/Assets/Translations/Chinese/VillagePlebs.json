@@ -775,6 +775,7 @@
   "villagepleb_looks_eyeliner_strength": "眼线强度",
   "villagepleb_looks_muscle": "肌肉",
   "villagepleb_looks_apply": "应用",
+  "villagepleb_looks_preview_hint": "拖动以旋转和移动 · 滚轮缩放",
   "villagepleb_looks_about": "更改{0}的外观。预览会随时显示效果；点“应用”保存，离开此标签页则{0}保持原样。",
   "villagepleb_mending_repaired_base": "修理了你的基地",
   "villagepleb_remote_right_here": "就在这里",

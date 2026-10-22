@@ -775,6 +775,7 @@
   "villagepleb_looks_eyeliner_strength": "Eyeliner Strength",
   "villagepleb_looks_muscle": "Muscle",
   "villagepleb_looks_apply": "Apply",
+  "villagepleb_looks_preview_hint": "Drag to turn and move · Scroll to zoom",
   "villagepleb_looks_about": "Change how {0} looks. The preview shows it as you go; Apply keeps it, and leaving this tab leaves {0} as they were.",
   "villagepleb_mending_repaired_base": "repaired your base",
   "villagepleb_remote_right_here": "right here",

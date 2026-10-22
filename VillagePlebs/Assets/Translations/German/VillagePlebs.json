@@ -775,6 +775,7 @@
   "villagepleb_looks_eyeliner_strength": "Eyeliner-Stärke",
   "villagepleb_looks_muscle": "Muskeln",
   "villagepleb_looks_apply": "Übernehmen",
+  "villagepleb_looks_preview_hint": "Ziehen zum Drehen und Verschieben · Scrollen zum Zoomen",
   "villagepleb_looks_about": "Ändere, wie {0} aussieht. Die Vorschau zeigt es sofort; Übernehmen behält es, und wenn du diesen Reiter verlässt, bleibt {0} wie bisher.",
   "villagepleb_mending_repaired_base": "reparierte deine Basis",
   "villagepleb_remote_right_here": "genau hier",

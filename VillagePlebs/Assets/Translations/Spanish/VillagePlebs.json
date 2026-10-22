@@ -775,6 +775,7 @@
   "villagepleb_looks_eyeliner_strength": "Intensidad del delineador",
   "villagepleb_looks_muscle": "Musculatura",
   "villagepleb_looks_apply": "Aplicar",
+  "villagepleb_looks_preview_hint": "Arrastra para girar y mover · Rueda para acercar",
   "villagepleb_looks_about": "Cambia el aspecto de {0}. La vista previa lo muestra sobre la marcha; Aplicar lo guarda, y salir de esta pestaña deja a {0} como estaba.",
   "villagepleb_mending_repaired_base": "reparó tu base",
   "villagepleb_remote_right_here": "aquí mismo",

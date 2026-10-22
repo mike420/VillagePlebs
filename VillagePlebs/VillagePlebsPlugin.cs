@@ -53,7 +53,7 @@ namespace VillagePlebs
 
         private void Awake()
         {
-            VillagePlebs.Shared.Translations.Load(this);   // translations/*.json: its words in the player's language (Words.cs)
+            VillagePlebs.Shared.Translations.Load(this);   // BepInEx/config/VillagePlebs/Translations/<Language>/VillagePlebs.json: its words in the player's language (Words.cs)
             Instance = this;
             BindConfig();
             MagicMike.ModSettings.ModSettings.Init(this);
@@ -127,6 +127,7 @@ namespace VillagePlebs
 
         private void Update()
         {
+            VillagePlebs.Shared.Translations.Tick();   // (a translation file changed: read again)
             VillagePlebs.Shared.ServerCheck.Tick();
             Player player = Player.m_localPlayer;
             Net.Update(player);

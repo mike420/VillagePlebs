@@ -775,6 +775,7 @@
   "villagepleb_looks_eyeliner_strength": "Intensywność eyelinera",
   "villagepleb_looks_muscle": "Mięśnie",
   "villagepleb_looks_apply": "Zastosuj",
+  "villagepleb_looks_preview_hint": "Przeciągnij, by obrócić i przesunąć · Kółko, by przybliżyć",
   "villagepleb_looks_about": "Zmień wygląd postaci {0}. Podgląd pokazuje zmiany na bieżąco; Zastosuj je zachowuje, a wyjście z tej karty zostawia postać bez zmian.",
   "villagepleb_mending_repaired_base": "naprawił twoją bazę",
   "villagepleb_remote_right_here": "tutaj",

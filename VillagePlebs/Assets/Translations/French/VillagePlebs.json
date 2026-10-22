@@ -775,6 +775,7 @@
   "villagepleb_looks_eyeliner_strength": "Intensité de l'eye-liner",
   "villagepleb_looks_muscle": "Musculature",
   "villagepleb_looks_apply": "Appliquer",
+  "villagepleb_looks_preview_hint": "Glisser pour tourner et déplacer · Molette pour zoomer",
   "villagepleb_looks_about": "Changez l'apparence de {0}. L'aperçu la montre au fur et à mesure ; Appliquer la garde, et quitter cet onglet laisse {0} tel quel.",
   "villagepleb_mending_repaired_base": "a réparé votre base",
   "villagepleb_remote_right_here": "ici même",

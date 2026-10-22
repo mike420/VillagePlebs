@@ -563,16 +563,24 @@ namespace VillagePlebs
         /// in. Set the content's height to what you put in it (content.sizeDelta = new Vector2(content.sizeDelta.x, height)); the mouse
         /// wheel scrolls it (with the patch below).
         /// </summary>
+        /// <summary>
+        /// How far a scrolling area moves per notch of the mouse wheel: the crafting screen's recipe list's (the game's mouse wheel moves a
+        /// ScrollRect only a little per notch, so a guessed sensitivity scrolls far too slowly). Give every ScrollRect of yours this.
+        /// </summary>
+        internal static float ScrollSpeed
+        {
+            get
+            {
+                InventoryGui gui = InventoryGui.instance;
+                ScrollRect like = gui != null ? gui.GetComponentsInChildren<ScrollRect>(true).FirstOrDefault(s => s.content == gui.m_recipeListRoot) : null;
+                return like != null && like.scrollSensitivity > 0f ? like.scrollSensitivity : 300f;
+            }
+        }
+
         internal static RectTransform Scroll(RectTransform box, float inset)
         {
-            // the crafting screen's recipe list's scroll speed (the game's mouse wheel moves a ScrollRect only a little per notch, so a guessed
-            // sensitivity scrolls far too slowly)
-            InventoryGui gui = InventoryGui.instance;
-            ScrollRect like = gui != null ? gui.GetComponentsInChildren<ScrollRect>(true).FirstOrDefault(s => s.content == gui.m_recipeListRoot) : null;
-            const float barW = 12f;
-
             RectTransform view = Rect(box, "View", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(inset, -inset),
-                                      box.sizeDelta - new Vector2(inset * 2f + barW + 4f, inset * 2f));
+                                      box.sizeDelta - new Vector2(inset * 2f + BarWidth + 4f, inset * 2f));
             view.gameObject.AddComponent<RectMask2D>();
             var hit = view.gameObject.AddComponent<Image>();   // (clear: catches the mouse wheel over the gaps between things)
             hit.color = Color.clear;
@@ -582,13 +590,25 @@ namespace VillagePlebs
             scroll.viewport = view;
             scroll.horizontal = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = like != null && like.scrollSensitivity > 0f ? like.scrollSensitivity : 300f;
+            scroll.scrollSensitivity = ScrollSpeed;
             scroll.inertia = false;
+            AddScrollbar(scroll, box, inset);
+            return content;
+        }
 
-            Image track = Widgets.Box(box, "Scrollbar", MagicMike.ModSettings.Theme.Track);
+        /// <summary>How wide a scrollbar is: leave this much (and a little more) free on the right of what scrolls.</summary>
+        internal const float BarWidth = 12f;
+
+        /// <summary>
+        /// The Mod Settings panel's scrollbar, down the right edge of <paramref name="parent"/> (inset from its edges), for
+        /// <paramref name="scroll"/>: shown only when there's more than fits.
+        /// </summary>
+        internal static Scrollbar AddScrollbar(ScrollRect scroll, RectTransform parent, float inset)
+        {
+            Image track = Widgets.Box(parent, "Scrollbar", MagicMike.ModSettings.Theme.Track);
             var br = (RectTransform)track.transform;
             br.anchorMin = new Vector2(1f, 0f); br.anchorMax = new Vector2(1f, 1f); br.pivot = new Vector2(1f, 0.5f);
-            br.sizeDelta = new Vector2(barW, -inset * 2f);
+            br.sizeDelta = new Vector2(BarWidth, -inset * 2f);
             br.anchoredPosition = new Vector2(-inset * 0.5f, 0f);
             Scrollbar sb = track.gameObject.AddComponent<Scrollbar>();
             GameObject area = Widgets.Child(track.transform, "Sliding Area");
@@ -602,7 +622,7 @@ namespace VillagePlebs
             sb.colors = MagicMike.ModSettings.Theme.Colors(MagicMike.ModSettings.Theme.ScrollHandle, MagicMike.ModSettings.Theme.Accent, MagicMike.ModSettings.Theme.AccentBright, MagicMike.ModSettings.Theme.Muted);
             scroll.verticalScrollbar = sb;
             scroll.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHide;   // only when there's more than fits
-            return content;
+            return sb;
         }
     }
 

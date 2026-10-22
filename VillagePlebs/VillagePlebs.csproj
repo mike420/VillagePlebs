@@ -45,10 +45,13 @@
     <StartWorkingDirectory>$(VALHEIM_INSTALL)</StartWorkingDirectory>
   </PropertyGroup>
   <ItemGroup>
-    <!-- The companions' words in each language, read by Core\Translations.cs as "translations/<Language>.json" -->
-    <EmbeddedResource Include="Translations\*.json">
-      <LogicalName>translations/%(Filename)%(Extension)</LogicalName>
+    <!-- The companions' words: one file per language in Assets\Translations\<Language>\VillagePlebs.json, put in
+         BepInEx\config\VillagePlebs\Translations\<Language>\ (CopyOutputAssets; the package's config folder) and read from there by
+         Core\Translations.cs. English is also built in, for any key the files lack. -->
+    <EmbeddedResource Include="Assets\Translations\English\VillagePlebs.json">
+      <LogicalName>translations/English.json</LogicalName>
     </EmbeddedResource>
+    <None Include="Assets\Translations\**\VillagePlebs.json" />
   </ItemGroup>
   <ItemGroup>
     <None Include="Nexus\README.txt" />
@@ -112,6 +115,13 @@
     <Error Text="DLL not found in target directory." Condition="!Exists('$(TargetDir)$(AssemblyName).dll')" />
     <Copy SourceFiles="$(TargetDir)$(AssemblyName).dll" DestinationFolder="$(MOD_DEPLOYPATH)\VillagePlebs" OverwriteReadOnlyFiles="true" />
   </Target>
+  <Target Name="CopyOutputAssets" AfterTargets="CopyOutputDLL">
+    <Error Text="Assets directory not found." Condition="!Exists('$(AssetsDir)')" />
+    <ItemGroup>
+      <LanguageFiles Include="$(AssetsDir)\Translations\**\VillagePlebs.json" />
+    </ItemGroup>
+    <Copy SourceFiles="@(LanguageFiles)" DestinationFiles="@(LanguageFiles->'$(MOD_CONFIGPATH)\VillagePlebs\Translations\%(RecursiveDir)%(Filename)%(Extension)')" OverwriteReadOnlyFiles="true" />
+  </Target>
   <UsingTask TaskName="WriteManifestFile" TaskFactory="CodeTaskFactory" AssemblyFile="$(MSBuildToolsPath)\Microsoft.Build.Tasks.v4.0.dll">
     <ParameterGroup>
       <ManifestFile ParameterType="System.String" Required="true" />
@@ -136,7 +146,7 @@ System.IO.File.WriteAllText(ManifestFile, content);
 ]]></Code>
     </Task>
   </UsingTask>
-  <Target Name="UpdateManifestVersion" AfterTargets="CopyOutputDLL" Condition=" ('$(Configuration)|$(Platform)' == 'Release|AnyCPU') And ('$(OS)' == 'Windows_NT') ">
+  <Target Name="UpdateManifestVersion" AfterTargets="CopyOutputAssets" Condition=" ('$(Configuration)|$(Platform)' == 'Release|AnyCPU') And ('$(OS)' == 'Windows_NT') ">
     <WriteManifestFile ManifestFile="$(ProjectDir)Package\manifest.json" AssemblyName="$(AssemblyName)" />
     <ItemGroup>
       <ManifestFile Include="$(ProjectDir)Package\manifest.json" />
@@ -153,6 +163,7 @@ System.IO.File.WriteAllText(ManifestFile, content);
     <Error Text="manifest.json not found in Package directory." Condition="!Exists('$(ProjectDir)Package\manifest.json')" />
     <Error Text="icon.png not found in Package directory. Please note that Thunderstore requires this image to be 256x256 in dimension" Condition="!Exists('$(ProjectDir)Package\icon.png')" />
     <ItemGroup>
+      <LanguageFiles Include="$(AssetsDir)\Translations\**\VillagePlebs.json" />
       <PluginFiles Include="$(TargetDir)$(AssemblyName).dll" Condition="Exists('$(TargetDir)$(AssemblyName).dll')" />
       <PackageFiles Include="$(ProjectDir)Package\CHANGELOG.md" Condition="Exists('$(ProjectDir)Package\CHANGELOG.md')" />
       <PackageFiles Include="$(ProjectDir)Package\README.md" Condition="Exists('$(ProjectDir)Package\README.md')" />
@@ -160,6 +171,7 @@ System.IO.File.WriteAllText(ManifestFile, content);
       <PackageFiles Include="$(ProjectDir)Package\icon.png" Condition="Exists('$(ProjectDir)Package\icon.png')" />
     </ItemGroup>
     <MakeDir Directories="$(ThunderPackage)" />
+    <Copy SourceFiles="@(LanguageFiles)" DestinationFiles="@(LanguageFiles->'$(ThunderPackage)\config\VillagePlebs\Translations\%(RecursiveDir)%(Filename)%(Extension)')" />
     <Copy SourceFiles="@(PluginFiles)" DestinationFolder="$(ThunderPackage)\plugins" />
     <Copy SourceFiles="@(PackageFiles)" DestinationFolder="$(ThunderPackage)" />
     <ZipDirectory SourceDirectory="$(ThunderPackage)" DestinationFile="$(ProjectDir)ThunderStore\$(PackageName).zip" Overwrite="true" />

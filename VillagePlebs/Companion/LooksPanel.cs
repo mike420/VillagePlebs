@@ -34,8 +34,12 @@ namespace VillagePlebs
         private RenderTexture _rt;
         private Camera _cam;
         private GameObject _clone, _lightRig;
-        private float _rotation, _lastMouseX;
+        private float _rotation, _pan, _zoom, _zoomTarget, _zoomSpeed;
+        private Vector2 _lastMouse;
         private bool _dragging;
+        private Light _faceLight;              // lights the face as the view zooms in on it
+        private SkinnedMeshRenderer _eyes;     // BodyReplacer's eyes, when its body is drawn (looked for again when the look changes)
+        private const float PanPerPixel = 0.004f, LowestPan = -1.4f, HighestPan = 0.4f;
 
         // the columns (made again with the window)
         private GameObject _beardGroup, _vanillaLook, _valkyrLook, _muscleSection, _bodyShapeGroup, _eyelinerGroup;
@@ -91,8 +95,7 @@ namespace VillagePlebs
             // clipped with a RectMask2D, as the settings panel's list is (a stencil Mask doesn't clip Valheim's flat images and text)
             GameObject view = new GameObject("Scroll", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
             view.transform.SetParent(col, false);
-            RectTransform viewRect = (RectTransform)view.transform;
-            Widgets.Fill(view);
+            RectTransform viewRect = Widgets.Place(view, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-(GameUi.BarWidth + 4f), 0f));   // (room for its scrollbar)
             view.GetComponent<Image>().color = Color.clear;
             GameObject content = Widgets.Child(view.transform, "Content");
             _lookContent = (RectTransform)content.transform;
@@ -101,7 +104,7 @@ namespace VillagePlebs
             _lookContent.pivot = new Vector2(0.5f, 1f);
             _lookContent.anchoredPosition = Vector2.zero;
             _lookContent.sizeDelta = Vector2.zero;
-            Stack(content, SectionGap, new RectOffset(8, 12, 6, 10));
+            Stack(content, SectionGap, new RectOffset(8, 4, 6, 10));
             content.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
             ScrollRect scroll = view.AddComponent<ScrollRect>();
             scroll.content = _lookContent;
@@ -109,7 +112,9 @@ namespace VillagePlebs
             scroll.vertical = true;
             scroll.horizontal = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = 40f;
+            scroll.scrollSensitivity = GameUi.ScrollSpeed;   // (as the menu's lists: the game's wheel moves a ScrollRect only a little per notch)
+            scroll.inertia = false;
+            GameUi.AddScrollbar(scroll, col, 6f);
             Transform list = content.transform;
 
             Transform genderRow = Row(Section(list, T("villagepleb_looks_gender"), "Gender"), ButtonRowHeight);
@@ -239,10 +244,30 @@ namespace VillagePlebs
             applyBtn.interactable = mine;
             applyBtn.onClick.AddListener(() => apply());
 
-            TMP_Text text = Widgets.Label(col, about, 17f, Theme.Text, TextAlignmentOptions.TopLeft);
+            // the words, between the buttons: scrolling, with a scrollbar when they don't fit (a long language, a small window)
+            RectTransform area = Widgets.Place(Widgets.Child(col, "About"), Vector2.zero, Vector2.one, new Vector2(12f, btnH + 16f), new Vector2(-4f, -24f - btnH * 2f));
+            GameObject view = new GameObject("View", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
+            view.transform.SetParent(area, false);
+            RectTransform viewRect = Widgets.Place(view, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-(GameUi.BarWidth + 6f), 0f));
+            view.GetComponent<Image>().color = Color.clear;   // (catches the mouse wheel)
+            TMP_Text text = Widgets.Label(view.transform, about, 17f, Theme.Text, TextAlignmentOptions.TopLeft);
             text.textWrappingMode = TextWrappingModes.Normal;
-            text.overflowMode = TextOverflowModes.Ellipsis;
-            Widgets.Place(text.gameObject, Vector2.zero, Vector2.one, new Vector2(12f, btnH + 16f), new Vector2(-12f, -24f - btnH * 2f));
+            text.overflowMode = TextOverflowModes.Overflow;
+            RectTransform textRect = text.rectTransform;
+            textRect.anchorMin = new Vector2(0f, 1f);
+            textRect.anchorMax = new Vector2(1f, 1f);
+            textRect.pivot = new Vector2(0.5f, 1f);
+            textRect.anchoredPosition = Vector2.zero;
+            textRect.sizeDelta = Vector2.zero;
+            text.gameObject.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            ScrollRect scroll = view.AddComponent<ScrollRect>();
+            scroll.content = textRect;
+            scroll.viewport = viewRect;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = GameUi.ScrollSpeed;
+            scroll.inertia = false;
+            GameUi.AddScrollbar(scroll, area, 0f);
         }
 
         // ---- the preview ----------------------------------------------------------------------------------------
@@ -259,6 +284,10 @@ namespace VillagePlebs
             if (_rt != null && (_rt.width != width || _rt.height != height)) { _rt.Release(); UnityEngine.Object.Destroy(_rt); _rt = null; }   // (the window changed size)
             if (_rt == null) _rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4, filterMode = FilterMode.Trilinear };
             _previewImg.texture = _rt;
+            // how to move it, faintly along its bottom
+            TMP_Text hint = Widgets.Label(col, T("villagepleb_looks_preview_hint"), 14f, Theme.Muted, TextAlignmentOptions.Center);
+            hint.textWrappingMode = TextWrappingModes.Normal;
+            Widgets.Place(hint.gameObject, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(6f, 4f), new Vector2(-6f, 42f));
             if (_cam == null)
             {
                 var camGO = new GameObject("VP_LooksPreviewCam");
@@ -277,29 +306,51 @@ namespace VillagePlebs
             if (_clone == null) MakeClone();
         }
 
-        /// <summary>Each frame while the tab shows: turning by dragging, and drawing the preview (in its own light).</summary>
+        /// <summary>
+        /// Each frame while the tab shows: turning and moving it by dragging, zooming with the mouse wheel, and drawing the preview (in its own
+        /// light). As BodyReplacer's character creator does it: the wheel sets how far in (a quarter a notch), the view eases there, and all the
+        /// way in it looks at the face (the eyes), lit by a soft light in front of it.
+        /// </summary>
         public void UpdatePerFrame()
         {
             if (_previewImg == null || !_previewImg.gameObject.activeInHierarchy || _cam == null) return;
-            if (!_dragging && Input.GetMouseButtonDown(0) && RectTransformUtility.RectangleContainsScreenPoint(_previewImg.rectTransform, Input.mousePosition, null))
+            bool over = RectTransformUtility.RectangleContainsScreenPoint(_previewImg.rectTransform, Input.mousePosition, null);
+            if (!_dragging && Input.GetMouseButtonDown(0) && over)
             {
                 _dragging = true;
-                _lastMouseX = Input.mousePosition.x;
+                _lastMouse = Input.mousePosition;
             }
-            // turned only by dragging it with the left mouse button; left alone it stays where it was put
+            // dragging it with the left mouse button: across turns it, up and down moves along its body; left alone it stays where it was put
             if (_dragging)
             {
                 if (Input.GetMouseButton(0))
                 {
-                    _rotation = (_rotation + (Input.mousePosition.x - _lastMouseX) * DragSensitivity) % 360f;
-                    _lastMouseX = Input.mousePosition.x;
+                    Vector2 delta = (Vector2)Input.mousePosition - _lastMouse;
+                    _rotation = (_rotation + delta.x * DragSensitivity) % 360f;
+                    _pan = Mathf.Clamp(_pan - delta.y * PanPerPixel, LowestPan, HighestPan);
+                    _lastMouse = Input.mousePosition;
                 }
                 else _dragging = false;
             }
-            Vector3 target = PreviewPos + Vector3.up * 0.9f;
-            float a = _rotation * Mathf.Deg2Rad;
-            _cam.transform.position = target + new Vector3(Mathf.Sin(a), 0.3f, Mathf.Cos(a)) * 5f;
+            // (the game's own wheel is held off while the menu is open, GameUi_ScrollWheel: Unity's is read here)
+            float wheel = over ? Input.mouseScrollDelta.y : 0f;
+            if (wheel != 0f) _zoomTarget = Mathf.Clamp01(_zoomTarget + Mathf.Clamp(wheel, -1f, 1f) * 0.25f);
+            _zoom = Mathf.SmoothDamp(_zoom, _zoomTarget, ref _zoomSpeed, 0.12f, float.PositiveInfinity, Time.unscaledDeltaTime);
+            if (_zoomTarget <= 0f && _zoom < 0.002f) _zoom = _zoomSpeed = 0f;
+            float t = _zoom * _zoom * (3f - 2f * _zoom);   // (eased at both ends)
+
+            Vector3 face = t > 0f ? EyeCentre() : Vector3.zero;
+            Vector3 target = Vector3.Lerp(PreviewPos + Vector3.up * 0.9f, face, t) + Vector3.up * _pan;
+            float a = _rotation * Mathf.Deg2Rad, distance = Mathf.Lerp(5f, 1.1f, t);
+            var round = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
+            _cam.transform.position = target + (round + Vector3.up * Mathf.Lerp(0.3f, 0.05f, t)) * distance;
             _cam.transform.LookAt(target);
+            if (_faceLight != null)
+            {
+                _faceLight.enabled = t > 0.02f;
+                _faceLight.intensity = 1.1f * t;
+                _faceLight.transform.position = face + round * 0.55f + Vector3.up * (0.18f + _pan);
+            }
 
             Color ambient = RenderSettings.ambientLight;
             float intensity = RenderSettings.ambientIntensity;
@@ -329,6 +380,8 @@ namespace VillagePlebs
             if (_cam != null) UnityEngine.Object.Destroy(_cam.gameObject);
             if (_rt != null) { _rt.Release(); UnityEngine.Object.Destroy(_rt); }
             _lightRig = _clone = null;
+            _faceLight = null;
+            _eyes = null;
             _cam = null;
             _rt = null;
             _previewImg = null;
@@ -365,10 +418,29 @@ namespace VillagePlebs
             AddLight("Fill", new Vector3(-2.5f, 1.5f, 3f), 1.2f, new Color(0.9f, 0.92f, 1f), 15f, mask);
             AddLight("Rim", new Vector3(0f, 3f, -2.5f), 1.2f, new Color(0.95f, 0.88f, 0.78f), 15f, mask);
             AddLight("Bottom", new Vector3(0f, -0.5f, 3f), 0.5f, new Color(0.85f, 0.82f, 0.78f), 10f, mask);
+            _faceLight = AddLight("Face", Vector3.zero, 0f, new Color(1f, 0.95f, 0.88f), 1.6f, mask);   // (placed and lit by UpdatePerFrame)
+            _faceLight.enabled = false;
             ApplyToClone();
         }
 
-        private void AddLight(string name, Vector3 pos, float intensity, Color color, float range, int mask)
+        /// <summary>
+        /// Where the view zooms in to: the middle of the eyes. BodyReplacer's body has eyes of their own (its renderers' names end in
+        /// "_EYES"); the game's own body has its eye point.
+        /// </summary>
+        private Vector3 EyeCentre()
+        {
+            if (_eyes == null || !_eyes.gameObject.activeInHierarchy)
+            {
+                _eyes = null;
+                foreach (SkinnedMeshRenderer r in _clone.GetComponentsInChildren<SkinnedMeshRenderer>())
+                    if (r.name.EndsWith("_EYES", StringComparison.Ordinal)) { _eyes = r; break; }
+            }
+            if (_eyes != null) return _eyes.bounds.center;
+            Transform eye = Utils.FindChild(_clone.transform, "EyePos");
+            return eye != null ? eye.position : PreviewPos + Vector3.up * 1.65f;
+        }
+
+        private Light AddLight(string name, Vector3 pos, float intensity, Color color, float range, int mask)
         {
             var go = new GameObject(name);
             go.transform.SetParent(_lightRig.transform, false);
@@ -380,6 +452,7 @@ namespace VillagePlebs
             light.range = range;
             light.shadows = LightShadows.None;
             light.cullingMask = mask;
+            return light;
         }
 
         // Standing, not sitting or lying (the Player prefab's animator starts in whatever state), then held still
@@ -407,6 +480,7 @@ namespace VillagePlebs
         {
             VisEquipment vis = _clone != null ? _clone.GetComponent<VisEquipment>() : null;
             if (vis == null) return;
+            _eyes = null;   // (another body may be drawn now: EyeCentre looks again)
             BodyReplacerLook.Apply(_clone, Current.BrLook, Current.BrMuscle);
             CurrentModelIndex?.SetValue(vis, -1);   // (the body is made again: a copy that is never drawn by the game breaks no mesh)
             vis.SetModel(Current.Model);

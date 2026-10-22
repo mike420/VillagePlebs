@@ -775,6 +775,7 @@
   "villagepleb_looks_eyeliner_strength": "Göz kalemi yoğunluğu",
   "villagepleb_looks_muscle": "Kas",
   "villagepleb_looks_apply": "Uygula",
+  "villagepleb_looks_preview_hint": "Döndürmek ve kaydırmak için sürükle · Yakınlaştırmak için kaydır",
   "villagepleb_looks_about": "{0} adlı yoldaşın görünüşünü değiştir. Önizleme değişiklikleri anında gösterir; Uygula bunları kaydeder, bu sekmeden çıkarsan her şey olduğu gibi kalır.",
   "villagepleb_mending_repaired_base": "üssünü onardı",
   "villagepleb_remote_right_here": "tam burada",
