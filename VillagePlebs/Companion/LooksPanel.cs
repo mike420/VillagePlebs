@@ -34,6 +34,7 @@ namespace VillagePlebs
         private RenderTexture _rt;
         private Camera _cam;
         private GameObject _clone, _lightRig;
+        private int _cloneModel = -1;          // the body the preview copy was made with (another one: a new copy, ApplyToClone)
         private float _rotation, _pan, _zoom, _zoomTarget, _zoomSpeed;
         private Vector2 _lastMouse;
         private bool _dragging;
@@ -397,6 +398,7 @@ namespace VillagePlebs
             if (_cam != null) UnityEngine.Object.Destroy(_cam.gameObject);
             if (_rt != null) { _rt.Release(); UnityEngine.Object.Destroy(_rt); }
             _lightRig = _clone = null;
+            _cloneModel = -1;
             _faceLight = null;
             _eyes = null;
             _cam = null;
@@ -415,18 +417,7 @@ namespace VillagePlebs
         /// <summary>A still copy of the player model, out of the world: only its looks do anything.</summary>
         private void MakeClone()
         {
-            GameObject prefab = ZNetScene.instance?.GetPrefab("Player");
-            if (prefab == null) { VillagePlebsPlugin.Instance?.Warn("Looks preview: the Player prefab was not found"); return; }
-            ZNetView.m_forceDisableInit = true;
-            try { _clone = UnityEngine.Object.Instantiate(prefab, PreviewPos, Quaternion.identity); }
-            finally { ZNetView.m_forceDisableInit = false; }
-            // built from the Player prefab: BodyReplacer draws it as it draws companions (its Creatures As Valkyr setting), not as a player
-            BodyReplacerLook.TreatAsCreature(_clone);
-            Rigidbody body = _clone.GetComponent<Rigidbody>();
-            if (body != null) UnityEngine.Object.Destroy(body);
-            foreach (MonoBehaviour b in _clone.GetComponentsInChildren<MonoBehaviour>(true)) if (!(b is VisEquipment)) b.enabled = false;
-            foreach (Renderer r in _clone.GetComponentsInChildren<Renderer>(true)) r.enabled = true;
-            foreach (Animator anim in _clone.GetComponentsInChildren<Animator>()) StandStill(anim);
+            if (!NewBody()) return;
             _lightRig = new GameObject("VP_LooksPreviewLights");
             UnityEngine.Object.DontDestroyOnLoad(_lightRig);
             _lightRig.transform.position = PreviewPos;
@@ -438,6 +429,25 @@ namespace VillagePlebs
             _faceLight = AddLight("Face", Vector3.zero, 0f, new Color(1f, 0.95f, 0.88f), 1.6f, mask);   // (placed and lit by UpdatePerFrame)
             _faceLight.enabled = false;
             ApplyToClone();
+        }
+
+        /// <summary>The copy itself, for the body chosen now (made again for another body: ApplyToClone). False when it can't be made.</summary>
+        private bool NewBody()
+        {
+            GameObject prefab = ZNetScene.instance?.GetPrefab("Player");
+            if (prefab == null) { VillagePlebsPlugin.Instance?.Warn("Looks preview: the Player prefab was not found"); return false; }
+            ZNetView.m_forceDisableInit = true;
+            try { _clone = UnityEngine.Object.Instantiate(prefab, PreviewPos, Quaternion.identity); }
+            finally { ZNetView.m_forceDisableInit = false; }
+            // built from the Player prefab: BodyReplacer draws it as it draws companions (its Creatures As Valkyr setting), not as a player
+            BodyReplacerLook.TreatAsCreature(_clone);
+            Rigidbody body = _clone.GetComponent<Rigidbody>();
+            if (body != null) UnityEngine.Object.Destroy(body);
+            foreach (MonoBehaviour b in _clone.GetComponentsInChildren<MonoBehaviour>(true)) if (!(b is VisEquipment)) b.enabled = false;
+            foreach (Renderer r in _clone.GetComponentsInChildren<Renderer>(true)) r.enabled = true;
+            foreach (Animator anim in _clone.GetComponentsInChildren<Animator>()) StandStill(anim);
+            _cloneModel = Current.Model;
+            return true;
         }
 
         /// <summary>
@@ -497,9 +507,20 @@ namespace VillagePlebs
         {
             VisEquipment vis = _clone != null ? _clone.GetComponent<VisEquipment>() : null;
             if (vis == null) return;
+            // Another body: the preview has drawn this copy, and swapping a drawn body's mesh breaks it (Unity stops drawing it: "mesh data
+            // size and vertex stride"), so a new copy is made for it, as Looks.SetModel makes the companion again
+            if (_cloneModel != Current.Model)
+            {
+                _clone.SetActive(false);   // (gone this frame: Destroy waits for the end of it)
+                UnityEngine.Object.Destroy(_clone);
+                _clone = null;
+                if (!NewBody()) return;
+                vis = _clone.GetComponent<VisEquipment>();
+                if (vis == null) return;
+            }
             _eyes = null;   // (another body may be drawn now: EyeCentre looks again)
             BodyReplacerLook.Apply(_clone, Current.BrLook, Current.BrMuscle);
-            CurrentModelIndex?.SetValue(vis, -1);   // (the body is made again: a copy that is never drawn by the game breaks no mesh)
+            CurrentModelIndex?.SetValue(vis, -1);   // (its body set again, with BodyReplacer's look: the same mesh, so nothing breaks)
             vis.SetModel(Current.Model);
             vis.SetHairItem(Current.Hair);
             vis.SetBeardItem(Current.Model == 0 ? Current.Beard : 0);
