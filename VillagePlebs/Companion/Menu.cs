@@ -236,6 +236,9 @@ namespace VillagePlebs
             }
             if (make)
             {
+                // (its buttons shown in their colours at once: the tabs' and greyed-out ones', set after making them, would fade there
+                // from the colour before, and every click builds the window again)
+                MagicMike.ModSettings.Widgets.SnapAll(_window);
                 if (_focusField && _field != null) { _field.Select(); _field.ActivateInputField(); }
                 _focusField = false;
             }
