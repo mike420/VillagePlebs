@@ -89,7 +89,7 @@ namespace VillagePlebs
         // ---- the choices --------------------------------------------------------------------------------------
 
         // Stacked by a layout, so the groups that don't apply (the beard on the second body; the vanilla hair, or BodyReplacer's look, see
-        // RefreshGroups) leave no gap. Gender and skin tone apply to both: BodyReplacer copies the vanilla skin colour.
+        // Refresh) leave no gap. Gender and skin tone apply to both: BodyReplacer copies the vanilla skin colour.
         private void BuildChoices(RectTransform col)
         {
             // clipped with a RectMask2D, as the settings panel's list is (a stencil Mask doesn't clip Valheim's flat images and text)
