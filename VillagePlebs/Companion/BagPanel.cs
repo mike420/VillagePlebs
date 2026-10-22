@@ -45,7 +45,12 @@ namespace VillagePlebs
             {
                 Humanoid c = Pick(gui);
                 if (!InventoryGui.IsVisible()) _saidWhy = false;
-                else if (c == null && !_saidWhy) { _saidWhy = true; VillagePlebsPlugin.Instance?.Note("Companion bag panel not shown: " + WhyNot(gui)); }   // (once each time the inventory opens)
+                else if (c == null && !_saidWhy)   // (once each time the inventory opens, and only with one of yours about: not in everyday play)
+                {
+                    _saidWhy = true;
+                    string why = WhyNot(gui);
+                    if (why != null) VillagePlebsPlugin.Instance?.Note("Companion bag panel not shown: " + why);
+                }
                 if (c == null) { Hide(); return; }
                 if (_panel == null && !Build(gui))
                 {
@@ -81,14 +86,17 @@ namespace VillagePlebs
                 .OrderBy(c => Vector3.Distance(c.transform.position, p.transform.position)).FirstOrDefault();
         }
 
-        /// <summary>For the log: why no companion's bag shows (the nearest of yours, and what keeps it out).</summary>
+        /// <summary>
+        /// For the log: why no companion's bag shows (the nearest of yours, and what keeps it out). Null when none of yours is within 100 m:
+        /// nothing worth saying (you are out and about without one).
+        /// </summary>
         private static string WhyNot(InventoryGui gui)
         {
             Player p = Player.m_localPlayer;
-            if (p == null) return "no player";
+            if (p == null) return null;
             Humanoid c = Companion.All().Where(h => Companion.IsMine(h, p)).OrderBy(h => Vector3.Distance(h.transform.position, p.transform.position)).FirstOrDefault();
-            if (c == null) return "none of your companions is loaded near you";
-            float d = Vector3.Distance(c.transform.position, p.transform.position);
+            float d = c != null ? Vector3.Distance(c.transform.position, p.transform.position) : float.MaxValue;
+            if (d > 100f) return null;
             Container open = CurrentContainer(gui);
             string why = c.IsDead() ? "it is dead" : !c.GetComponent<ZNetView>().IsOwner() ? "another game runs it (its bag can only be changed there)"
                        : d >= Reach ? $"it is further than {Reach:0} m" : open != null && open.gameObject == c.gameObject ? "its bag is the chest you have open" : "unknown";

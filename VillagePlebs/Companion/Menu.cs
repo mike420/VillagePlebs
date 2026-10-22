@@ -290,7 +290,7 @@ namespace VillagePlebs
             float textH = t.GetPreferredValues(message, w - padX * 2f, 0f).y;
             ((RectTransform)t.transform).sizeDelta = new Vector2(w - padX * 2f, textH);
             float panelH = textH + padY * 2f;
-            h = Mathf.Min(h, screenH - 40f - panelH - gap);
+            h = Mathf.Max(Mathf.Min(h, screenH - 40f - panelH - gap), Mathf.Min(h, 360f));   // (a long message never squeezes the window to nothing)
             _window.sizeDelta = new Vector2(w, h);
             _window.anchoredPosition = new Vector2(0f, (panelH + gap) / 2f);   // (the two together centred)
             r.anchoredPosition = new Vector2(0f, -h - gap);
