@@ -57,6 +57,8 @@ namespace VillagePlebs
         private RectTransform _window, _list, _card;
         private TMP_InputField _field;
         private string _drawn = "", _scrollKey = "";
+        private readonly Dictionary<string, float> _scrolls = new Dictionary<string, float>();   // where each list was scrolled to (RestoreScrolls)
+        private bool _restoreAgain;
         private float _nextCheck, _nextLive, _openedAt;
         private readonly List<Action> _live = new List<Action>();   // things changed in place
         // while drawing: making the window (true) or only writing its signature (false), where things go and the next free line there
@@ -126,6 +128,7 @@ namespace VillagePlebs
             else if (global::Menu.IsVisible() || InventoryGui.IsVisible()) { CloseMenu(); return; }
             // E closes it again, as it does a chest (not the E that opened it, nor one typed into a name)
             if (!GameUi.Typing && Time.unscaledTime > _openedAt + 0.2f && ZInput.GetButtonDown("Use")) { CloseMenu(); return; }
+            if (_restoreAgain) { _restoreAgain = false; RestoreScrolls(); }   // (the frame after a rebuild: see RestoreScrolls)
             TickMenu();
             TickLooks();
         }
@@ -187,10 +190,15 @@ namespace VillagePlebs
             float w = Mathf.Min(WindowW, screen.x - 20f), h = Mathf.Min(companion ? 900f : 680f, screen.y - 40f);
             string key = (companion ? Companion.IdOf(c).ToString() : "list") + "/" + _tab;
             _sig.Append(key).Append('|').Append((int)w).Append('x').Append((int)h);
-            float scrolled = 0f;
+            string message = string.IsNullOrEmpty(_note) ? "" : Words.Show(_note);
+            _sig.Append("|N").Append(message);
             if (make)
             {
-                if (_list != null && key == _scrollKey) scrolled = _list.anchoredPosition.y;   // (kept, unless the tab or companion changed)
+                // where every list in it is scrolled to: kept, unless the tab or companion changed
+                _scrolls.Clear();
+                if (_window != null && key == _scrollKey)
+                    foreach (ScrollRect s in _window.GetComponentsInChildren<ScrollRect>(true))
+                        if (s.content != null) _scrolls[PathIn(_window, s.transform)] = s.content.anchoredPosition.y;
                 _scrollKey = key;
                 if (_window != null) Object.Destroy(_window.gameObject);
                 UITooltip.HideTooltip();
@@ -198,6 +206,7 @@ namespace VillagePlebs
                 _field = null;
                 _list = _card = null;
                 _window = GameUi.Window("VillagePlebsMenu", new Vector2(w, h));
+                if (message.Length > 0) h = MessagePanel(message, w, h, screen.y);
             }
             _in = _window; _left = Pad; _width = w - Pad * 2f;
 
@@ -228,9 +237,8 @@ namespace VillagePlebs
             {
                 float content = Mathf.Max(0f, _listY - CardGap);   // (no gap after the last card: it would scroll for nothing)
                 _list.sizeDelta = new Vector2(_list.sizeDelta.x, content);
-                float view = ((RectTransform)_list.parent).sizeDelta.y;
-                _list.anchoredPosition = new Vector2(0f, Mathf.Clamp(scrolled, 0f, Mathf.Max(0f, content - view)));
             }
+            if (make) { RestoreScrolls(); _restoreAgain = true; }
             if (make)
             {
                 // (its buttons shown in their colours at once: the tabs' and greyed-out ones', set after making them, would fade there
@@ -239,6 +247,55 @@ namespace VillagePlebs
                 if (_focusField && _field != null) { _field.Select(); _field.ActivateInputField(); }
                 _focusField = false;
             }
+        }
+
+        /// <summary>
+        /// Every list back where it was scrolled to before the window was built again (its tab's list, the Looks tab's choices and words).
+        /// Laid out first: a list that Unity hasn't laid out yet puts itself back at the top as it does (its new scrollbar starts there), so
+        /// it is also done once more the next frame (UpdateMenu).
+        /// </summary>
+        private void RestoreScrolls()
+        {
+            if (_window == null || _scrolls.Count == 0) return;
+            Canvas.ForceUpdateCanvases();
+            foreach (ScrollRect s in _window.GetComponentsInChildren<ScrollRect>(true))
+            {
+                if (s.content == null || !_scrolls.TryGetValue(PathIn(_window, s.transform), out float y)) continue;
+                RectTransform view = s.viewport != null ? s.viewport : (RectTransform)s.transform;
+                float room = Mathf.Max(0f, s.content.rect.height - view.rect.height);
+                s.StopMovement();
+                s.content.anchoredPosition = new Vector2(s.content.anchoredPosition.x, Mathf.Clamp(y, 0f, room));
+            }
+        }
+
+        /// <summary>Where something is in the window, the same each time it is built (names and places among siblings).</summary>
+        private static string PathIn(Transform root, Transform t)
+        {
+            var path = new StringBuilder();
+            for (; t != null && t != root; t = t.parent) path.Insert(0, "/" + t.GetSiblingIndex() + t.name);
+            return path.ToString();
+        }
+
+        /// <summary>
+        /// What it says to you (a warning, why something didn't happen) in a panel of its own under the window, in the window's look. The
+        /// window gives up height for it when the screen is short, and both are centred together. Returns the window's height now.
+        /// </summary>
+        private float MessagePanel(string message, float w, float h, float screenH)
+        {
+            const float gap = 8f, padX = 18f, padY = 12f;
+            Image panel = MagicMike.ModSettings.Widgets.Box(_window, "Messages", MagicMike.ModSettings.Theme.Panel, MagicMike.ModSettings.Theme.PanelOutline, 2f);
+            var r = (RectTransform)panel.transform;
+            r.anchorMin = r.anchorMax = r.pivot = new Vector2(0f, 1f);
+            TMP_Text t = GameUi.Label(r, message, new Vector2(padX, -padY), new Vector2(w - padX * 2f, 24f), 17f, GameUi.Warn);
+            float textH = t.GetPreferredValues(message, w - padX * 2f, 0f).y;
+            ((RectTransform)t.transform).sizeDelta = new Vector2(w - padX * 2f, textH);
+            float panelH = textH + padY * 2f;
+            h = Mathf.Min(h, screenH - 40f - panelH - gap);
+            _window.sizeDelta = new Vector2(w, h);
+            _window.anchoredPosition = new Vector2(0f, (panelH + gap) / 2f);   // (the two together centred)
+            r.anchoredPosition = new Vector2(0f, -h - gap);
+            r.sizeDelta = new Vector2(w, panelH);
+            return h;
         }
 
         private void Title(string text, float w)
@@ -254,7 +311,6 @@ namespace VillagePlebs
         {
             Title(T("villagepleb_menu_companions"), w);
             _y = 70f;
-            if (!string.IsNullOrEmpty(_note)) Note(_note, GameUi.Warn);
             return _y + 6f;
         }
 
@@ -503,7 +559,6 @@ namespace VillagePlebs
             bool eitr = Eitr.Max(c) > 0f;
             _sig.Append(eitr);
             if (eitr) LiveBar(() => Eitr.Get(c) / Mathf.Max(1f, Eitr.Max(c)), () => $"{Loc("$se_eitr")}  {Eitr.Get(c):0} / {Eitr.Max(c):0}", EitrPurple);
-            if (!string.IsNullOrEmpty(_note)) Note(_note, GameUi.Warn);
 
             // your other companions near you
             var yours = Companion.All().Where(h => Companion.IsMine(h, pl) && Vector3.Distance(h.transform.position, pl.transform.position) < 100f).ToList();
