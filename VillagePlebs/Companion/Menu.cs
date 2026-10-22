@@ -1101,11 +1101,18 @@ namespace VillagePlebs
             for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
                 {
-                    ItemDrop.ItemData item = its.GetItemAt(x, y);   // (look only: its bag is changed beside it)
+                    ItemDrop.ItemData item = its.GetItemAt(x, y);
                     AppendItem(item);
                     if (!_make) continue;
                     var pos = new Vector2(_left + x * space, -_y - y * space);
-                    if (item == null) GameUi.EmptyCell(_in, pos); else GameUi.Cell(_in, pos, item, null, false, null);
+                    int cx = x, cy = y;
+                    if (item == null) GameUi.EmptyCell(_in, pos);
+                    else GameUi.Cell(_in, pos, item, null, false, mine ? () =>
+                    {
+                        // (what is in the cell when clicked, as for its gear slots)
+                        _pending = () => { ItemDrop.ItemData now = _shown != null ? _shown.GetInventory().GetItemAt(cx, cy) : null; if (now != null && !Companion.Take(_shown, Player.m_localPlayer, now, out string why) && why != null) _note = Words.Show(why); };
+                        _nextCheck = 0f;
+                    } : (Action)null);
                 }
             _y += height * space + 4f;
             Note(T("villagepleb_menu_bag_about"), GameUi.Dim);
@@ -1113,7 +1120,7 @@ namespace VillagePlebs
 
             if (mine && p != null)
             {
-                var giveable = p.GetInventory().GetAllItems().Where(i => !p.IsItemEquiped(i) && !i.m_equipped && Gear.IsGear(i)).ToList();
+                var giveable = p.GetInventory().GetAllItems().Where(i => !p.IsItemEquiped(i) && !i.m_equipped).ToList();   // (gear goes into its slot, the rest into its bag: Companion.Give)
                 BeginCard(T("villagepleb_menu_give_gear"));
                 if (giveable.Count == 0) Note(T("villagepleb_menu_give_gear_none"), GameUi.Dim);
                 else

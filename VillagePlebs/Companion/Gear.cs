@@ -12,9 +12,9 @@ namespace VillagePlebs
     /// Its gear in a place of its own: two rows of named slots under its bag (weapon, spare weapon, shield, bow,
     /// arrows, axe, pickaxe, hammer; helmet, chest, legs, cape, belt). They are cells of its real inventory (the game only lets it wear
     /// and wield what is in its inventory), kept apart: what it picks up, loots and gathers only ever goes into its bag (the four rows above),
-    /// and its bag below your inventory shows only the bag. What is in its gear slots it keeps when it falls; the rest goes into its
-    /// tombstone. It moves the best of what it has into the slots by itself (a better axe it made, armour you gave it); you change its gear
-    /// from its menu (Gear tab), from anywhere. Its bag only by hand, beside it.
+    /// and its menu shows them apart (Gear tab). What is in its gear slots it keeps when it falls; the rest goes into its tombstone. It moves
+    /// the best of what it has into the slots by itself (a better axe it made, armour you gave it); you give and take its gear and what is
+    /// in its bag from its menu (Gear tab).
     /// </summary>
     internal static class Gear
     {
@@ -340,57 +340,6 @@ namespace VillagePlebs
             int stackSpace = (int)FreeStack.Invoke(__instance, new object[] { item.m_shared.m_name, item.m_worldLevel });
             __result = stackSpace + freeCells * item.m_shared.m_maxStackSize >= stack;
         }
-    }
-
-    /// <summary>
-    /// Its bag and gear below your inventory: the two gear rows a little apart under the bag, each slot labelled,
-    /// the unused cells hidden.
-    /// </summary>
-    [HarmonyPatch(typeof(InventoryGrid), "UpdateGui")]
-    internal static class InventoryGrid_UpdateGui_Bag
-    {
-        private static readonly AccessTools.FieldRef<InventoryGrid, List<InventoryElement>> Elements = AccessTools.FieldRefAccess<InventoryGrid, List<InventoryElement>>("m_elements");
-        public const float Gap = 14f;
-        private static readonly HashSet<int> Shifted = new HashSet<int>();
-
-        private static void Postfix(InventoryGrid __instance)
-        {
-            if (!BagPanel.IsBagGrid(__instance) || !Gear.IsCompanion(__instance.GetInventory())) return;
-            foreach (InventoryElement e in Elements(__instance))
-            {
-                if (e == null || e.Position.y < Gear.BagRows) continue;
-                Gear.Slot slot = Gear.At(e.Position.x, e.Position.y);
-                if (slot == null) { if (e.gameObject.activeSelf) e.gameObject.SetActive(false); continue; }
-                if (Shifted.Add(e.GetInstanceID())) (e.transform as RectTransform).anchoredPosition += new Vector2(0f, -Gap);
-                bool empty = __instance.GetInventory().GetItemAt(slot.X, slot.Y) == null;
-                TMPro.TMP_Text label = Label(e);
-                if (label != null) { label.text = Words.Show(slot.Label); label.enabled = empty; }
-            }
-        }
-
-        /// <summary>The slot's name written faintly at the bottom of the cell (made once per cell).</summary>
-        private static TMPro.TMP_Text Label(InventoryElement e)
-        {
-            Transform have = e.transform.Find("CompanionSlotLabel");
-            if (have != null) return have.GetComponent<TMPro.TMP_Text>();
-            TMPro.TMP_Text font = e.m_amount;
-            if (font == null) return null;
-            var go = new GameObject("CompanionSlotLabel", typeof(RectTransform));
-            go.transform.SetParent(e.transform, false);
-            var t = go.AddComponent<TMPro.TextMeshProUGUI>();
-            t.font = font.font;
-            t.fontSharedMaterial = font.fontSharedMaterial;
-            t.fontSize = 11f;
-            t.color = new Color(1f, 1f, 1f, 0.4f);
-            t.alignment = TMPro.TextAlignmentOptions.Bottom;
-            t.raycastTarget = false;
-            t.textWrappingMode = TMPro.TextWrappingModes.NoWrap;
-            var rt = t.rectTransform;
-            rt.anchorMin = Vector2.zero; rt.anchorMax = Vector2.one; rt.offsetMin = new Vector2(0f, 4f); rt.offsetMax = Vector2.zero;
-            return t;
-        }
-
-        public static void Forget() => Shifted.Clear();
     }
 
     /// <summary>Into one of its gear slots only what belongs there (a helmet in the helmet slot...).</summary>
