@@ -394,6 +394,7 @@ namespace VillagePlebs
             Tactics.Tick(Get(body)); // its roll's moment
             Eitr.Tick(body, dt);
             Weather.Tick(body);
+            Apart(body, dt);
 
             Humanoid me = ai.GetComponent<Humanoid>();
             BrainState st = Get(me);
@@ -562,7 +563,7 @@ namespace VillagePlebs
         /// <param name="how">The key of what it did, "... {0}" ({0}: the player's name), for its "Recently" and the log.</param>
         internal static void TeleportBehind(Humanoid me, Player master, string how = "villagepleb_brain_caught_up_with")
         {
-            Vector3 pos = FreeSpotNear(master);
+            Vector3 pos = FreeSpotNear(master, me);
             me.transform.position = pos;
             Rigidbody body = me.GetComponent<Rigidbody>();
             if (body != null) { body.position = pos; body.linearVelocity = Vector3.zero; }
@@ -573,7 +574,32 @@ namespace VillagePlebs
 
         private static readonly int Solid = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "vehicle");
 
-        private static Vector3 FreeSpotNear(Player master)
+        /// <summary>
+        /// Companions pass through each other (their body is the player's, and players do): two put on one spot walked on as one, the same
+        /// path to the same place, for good. One standing in another steps out sideways, each its own way, until they are apart.
+        /// </summary>
+        private static void Apart(Humanoid me, float dt)
+        {
+            if (me.IsAttached() || !me.IsOnGround()) return;
+            foreach (Humanoid other in Companion.All())
+            {
+                if (other == me || other.IsDead()) continue;
+                Vector3 away = me.transform.position - other.transform.position;
+                if (Mathf.Abs(away.y) > 1.5f) continue;
+                away.y = 0f;
+                if (away.sqrMagnitude > Room * Room) continue;
+                if (away.sqrMagnitude < 0.0001f) away = me.transform.right * (Companion.IdOf(me) < Companion.IdOf(other) ? 1f : -1f);   // (right on top: opposite ways)
+                Vector3 to = me.transform.position + away.normalized * (1.5f * dt);
+                if (!Steer.Safe(to, me)) return;   // (never onto the stakes)
+                Rigidbody body = me.GetComponent<Rigidbody>();
+                if (body != null) body.position = to; else me.transform.position = to;
+                return;
+            }
+        }
+
+        private const float Room = 0.8f;   // how close two companions may stand
+
+        private static Vector3 FreeSpotNear(Player master, Humanoid me)
         {
             Transform t = master.transform;
             Vector3[] offsets = { -t.forward * 1.8f, -t.right * 1.6f, t.right * 1.6f, (-t.forward - t.right).normalized * 2f, (-t.forward + t.right).normalized * 2f, t.forward * 1.8f };
@@ -589,6 +615,7 @@ namespace VillagePlebs
                 else p.y = t.position.y;
                 if (Physics.CheckCapsule(p + Vector3.up * 0.6f, p + Vector3.up * 1.6f, 0.35f, Solid)) continue; // something in the way
                 if (!Steer.Safe(p, null)) continue;                                                                // never onto the stakes
+                if (Companion.All().Any(o => o != me && Vector3.Distance(o.transform.position, p) < Room + 0.4f)) continue;   // another companion there
                 return p;
             }
             return t.position - t.forward * 0.8f;

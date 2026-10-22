@@ -296,7 +296,8 @@ namespace VillagePlebs
         {
             if (!__result || __instance != Player.m_localPlayer) return;
             bool dungeon = !distantTeleport && pos.y > 3000f; // a crypt or cave entrance: the dungeon is built high above the world
-            foreach (Humanoid c in Companion.All())
+            int n = 0;   // (each its own spot, side by side behind the player: they pass through each other, and would walk on as one)
+            foreach (Humanoid c in Companion.All().ToList())
             {
                 if (!Companion.IsMine(c, __instance) || Companion.OrderOf(c) != Order.Follow) continue;
                 if (Vector3.Distance(c.transform.position, __instance.transform.position) > 25f) continue;
@@ -305,7 +306,8 @@ namespace VillagePlebs
                 Container gear = c.GetComponent<Container>();
                 if (gear != null && !Containers.Take(gear)) { VillagePlebsPlugin.Tell(Words.P("villagepleb_patches_portal_gear_open", Companion.NameOf(c))); continue; } // (its bag loaded fresh as it is taken over)
                 if (!view.IsOwner()) view.ClaimOwnership();
-                Vector3 to = pos - rot * Vector3.forward * 2f;
+                Vector3 to = pos - rot * Vector3.forward * 2f + rot * Vector3.right * ((n % 2 == 0 ? 1f : -1f) * ((n + 1) / 2) * 1.2f);
+                n++;
                 c.transform.position = to;
                 Rigidbody body = c.GetComponent<Rigidbody>();
                 if (body != null) { body.position = to; body.linearVelocity = Vector3.zero; }
