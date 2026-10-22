@@ -256,7 +256,7 @@
   "villagepleb_menu_gear_point": "Ne olduğunu görmek için bir parçanın üzerine gel.",
   "villagepleb_menu_its_bag": "Çantası  ({0}/{1} yuva, ağırlık {2}/{3})",
   "villagepleb_menu_too_heavy": "Fazla ağır: bir şeyler bırakana kadar koşamaz.",
-  "villagepleb_menu_bag_about": "Taşıdıkları, yere serildiğinde mezarına gider. Çantasına bir şey koymak ya da almak için yanındayken envanterini aç (Tab): çantası seninkinin yanında görünür.",
+  "villagepleb_menu_bag_about": "Taşıdıkları, yere serildiğinde mezarına gider. Çantasına bir şey koymak ya da almak için yanındayken envanterini aç (Tab): çantası seninkinin altında görünür.",
   "villagepleb_menu_give_gear": "Envanterinden ona teçhizat ver",
   "villagepleb_menu_give_gear_none": "Kuşanmadığın silahlar, kalkanlar, yaylar, oklar, baltalar, kazmalar, çekiçler ve zırhlar burada görünür.",
   "villagepleb_menu_click_to_give": "Vermek için tıkla: teçhizat yuvasına gider (oradaki çantasına geçer).",

@@ -256,7 +256,7 @@
   "villagepleb_menu_gear_point": "Wskaż element, by zobaczyć, co to jest.",
   "villagepleb_menu_its_bag": "Jego torba  ({0} z {1} miejsc, ciężar {2} z {3})",
   "villagepleb_menu_too_heavy": "Za ciężko: nie może biegać, dopóki czegoś nie odłoży.",
-  "villagepleb_menu_bag_about": "To, co niesie, trafia do jego grobu, gdy polegnie. Aby dać mu coś do torby lub coś z niej wziąć, otwórz ekwipunek (Tab) obok niego: jego torba pojawi się obok twojej.",
+  "villagepleb_menu_bag_about": "To, co niesie, trafia do jego grobu, gdy polegnie. Aby dać mu coś do torby lub coś z niej wziąć, otwórz ekwipunek (Tab) obok niego: jego torba pojawi się pod twoją.",
   "villagepleb_menu_give_gear": "Daj mu sprzęt ze swojego ekwipunku",
   "villagepleb_menu_give_gear_none": "Tu pojawiają się bronie, tarcze, łuki, strzały, topory, kilofy, młoty i pancerze, których nie masz na sobie.",
   "villagepleb_menu_click_to_give": "Kliknij, by dać: trafi do jego miejsca na sprzęt (to, co tam było, trafi do jego torby).",

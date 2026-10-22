@@ -256,7 +256,7 @@
   "villagepleb_menu_gear_point": "Aponte para uma peça para ver o que é.",
   "villagepleb_menu_its_bag": "Bolsa dele  ({0} de {1} espaços, peso {2} de {3})",
   "villagepleb_menu_too_heavy": "Pesado demais: não consegue correr até largar alguma coisa.",
-  "villagepleb_menu_bag_about": "O que carrega vai para o túmulo quando cai. Para dar ou tirar coisas da bolsa dele, abra seu inventário (Tab) perto dele: a bolsa dele aparece ao lado da sua.",
+  "villagepleb_menu_bag_about": "O que carrega vai para o túmulo quando cai. Para dar ou tirar coisas da bolsa dele, abra seu inventário (Tab) perto dele: a bolsa dele aparece abaixo da sua.",
   "villagepleb_menu_give_gear": "Dar equipamento do seu inventário",
   "villagepleb_menu_give_gear_none": "Armas, escudos, arcos, flechas, machados, picaretas, martelos e armaduras que você não está usando aparecem aqui.",
   "villagepleb_menu_click_to_give": "Clique para dar: vai para o espaço de equipamento dele (o que estava lá vai para a bolsa).",

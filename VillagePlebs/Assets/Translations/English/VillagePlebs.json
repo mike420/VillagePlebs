@@ -256,7 +256,7 @@
   "villagepleb_menu_gear_point": "Point at a piece to see what it is.",
   "villagepleb_menu_its_bag": "Its bag  ({0} of {1} slots, weight {2} of {3})",
   "villagepleb_menu_too_heavy": "Too heavy: it cannot run until it puts something down.",
-  "villagepleb_menu_bag_about": "What it carries goes into its tombstone when it falls. To give or take from its bag, open your inventory (Tab) next to it: its bag shows beside yours.",
+  "villagepleb_menu_bag_about": "What it carries goes into its tombstone when it falls. To give or take from its bag, open your inventory (Tab) next to it: its bag shows below yours.",
   "villagepleb_menu_give_gear": "Give it gear from your inventory",
   "villagepleb_menu_give_gear_none": "Weapons, shields, bows, arrows, axes, pickaxes, hammers and armour you are not wearing show here.",
   "villagepleb_menu_click_to_give": "Click to give: it goes into its gear slot (what was there goes into its bag).",

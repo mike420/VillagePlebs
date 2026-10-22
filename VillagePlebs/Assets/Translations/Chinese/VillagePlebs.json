@@ -256,7 +256,7 @@
   "villagepleb_menu_gear_point": "将鼠标指向物品可查看其信息。",
   "villagepleb_menu_its_bag": "背包（{0}/{1}格，重量{2}/{3}）",
   "villagepleb_menu_too_heavy": "太重了：放下一些东西之前无法奔跑。",
-  "villagepleb_menu_bag_about": "倒下时，携带的东西会进入墓碑。要往背包里放或取东西，请在同伴旁边打开你的物品栏（Tab）：其背包会显示在你的旁边。",
+  "villagepleb_menu_bag_about": "倒下时，携带的东西会进入墓碑。要往背包里放或取东西，请在同伴旁边打开你的物品栏（Tab）：其背包会显示在你的物品栏下方。",
   "villagepleb_menu_give_gear": "从你的物品栏给予装备",
   "villagepleb_menu_give_gear_none": "你没穿戴的武器、盾、弓、箭、斧头、镐、工具锤和护甲会显示在这里。",
   "villagepleb_menu_click_to_give": "点击即可给予：会放进其装备栏（原来的放进背包）。",

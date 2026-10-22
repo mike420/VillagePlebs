@@ -26,7 +26,7 @@ Thank you for your support, and happy gaming! ⚔️  ...... (A Paypal account i
   * **Follows you anywhere:** through portals, into crypts and caves, onto boats and through doors; it steers round stakes and fires and gets itself unstuck.
   * **Home life:** it takes a free bed and empty chests, works towards better gear (gathering, smelting, crafting and upgrading at your stations), hunts, cooks, keeps its fires burning and repairs its gear and your base. While you are away it catches up on all of it.
   * **Needs like a player:** food, stamina, skills that rise, carry weight, weather and rest.
-  * **Gear slots of its own**, and its bag shows beside your inventory: drag items between you.
+  * **Gear slots of its own**, and its bag shows below your inventory: drag items between you.
   * **A journal** of its life, small talk that fits the moment, and a menu with its status, stats, orders, home, gear, looks and companions.
   * **EpicMMO System:** it earns experience and levels from what it kills and gathers.
   * **StarLevelSystem:** it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.

@@ -10,11 +10,12 @@ using static VillagePlebs.Shared.Translations;
 namespace VillagePlebs
 {
     /// <summary>
-    /// Its bag beside your inventory: whenever your inventory is open and one of your companions is within 10 m, its bag shows to the right
-    /// of yours, in a copy of the game's own chest panel and grid (so dragging, splitting stacks and tooltips are the game's), titled with its
-    /// name and weight. Drag between the two as with a chest; right-click one of its items to take it. It is not "opened" like a chest, so
-    /// the companion carries on meanwhile. Where it goes: right of your inventory (the chest panel below it, the crafting panel on the
-    /// right), or under the crafting panel when there is no room there.
+    /// Its bag with your inventory: whenever your inventory is open and one of your companions is within 10 m, its bag shows below yours,
+    /// in a copy of the game's own chest panel and grid in the game's own look (so dragging, splitting stacks and tooltips are the game's),
+    /// titled with its name and weight. Drag between the two as with a chest; right-click one of its items to take it. It is not "opened"
+    /// like a chest, so the companion carries on meanwhile. Where it goes: under your inventory, where a chest's panel goes; with a chest
+    /// open as well, under the chest, or right of your inventory when there is no room on the screen (under the crafting panel when that
+    /// is in the way).
     ///
     /// With a controller it is a panel of its own (LB/RB to it, as to a chest): the chest panel it is copied from brings the chest's
     /// gamepad group, which the game never switched off for a copy, so its grid took every A press along with yours and dropped what you
@@ -30,7 +31,7 @@ namespace VillagePlebs
         private static InventoryGrid _grid;
         private static TMP_Text _name, _weight;
         private static Humanoid _shown;
-        private static (Vector2 screen, bool crafting) _placedFor;
+        private static (Vector2 screen, bool crafting, bool chest) _placedFor;
         private static UIGroupHandler _group;   // its gamepad group (Join, Leave)
         private static InventoryGui _gui;
         private static readonly AccessTools.FieldRef<InventoryGui, int> ActiveGroup = AccessTools.FieldRefAccess<InventoryGui, int>("m_activeGroup");
@@ -51,8 +52,8 @@ namespace VillagePlebs
                 _grid.UpdateInventory(c.GetInventory(), null, DragItem(gui));
                 if (_name != null) _name.text = T("villagepleb_bagpanel_title", Companion.NameOf(c));
                 if (_weight != null) _weight.text = $"{Carry.Weight(c):0}/{Carry.Max(c):0}";
-                // Placed again when the screen size changes, or the crafting panel comes or goes.
-                var now = (new Vector2(Screen.width, Screen.height), gui.m_crafting != null && gui.m_crafting.gameObject.activeInHierarchy);
+                // Placed again when the screen size changes, or the crafting panel or a chest comes or goes.
+                var now = (new Vector2(Screen.width, Screen.height), gui.m_crafting != null && gui.m_crafting.gameObject.activeInHierarchy, ChestOpen(gui));
                 if (_placedFor != now) { Place(gui); _placedFor = now; }
             }
             catch (Exception e)
@@ -106,40 +107,13 @@ namespace VillagePlebs
             _group = group;
             _name = Find(copy, gui.m_container, gui.m_containerName);
             _weight = Find(copy, gui.m_container, gui.m_containerWeight);
-            Restyle(copy);
             // Room for its two gear rows (and the gap above them) under the bag: the chest panel is made for four rows.
             float extra = (Gear.Rows - Gear.BagRows) * _grid.m_elementSpace + InventoryGrid_UpdateGui_Bag.Gap;
             _panel.sizeDelta += new Vector2(0f, extra);
             InventoryGrid_UpdateGui_Bag.Forget();
             copy.SetActive(true);
-            VillagePlebsPlugin.Instance?.Note("Companion bag panel made beside the inventory");
+            VillagePlebsPlugin.Instance?.Note("Companion bag panel made below the inventory");
             return true;
-        }
-
-        /// <summary>
-        /// The copy in the Mod Settings panel's look, as the companion menu is: the game's framed backgrounds (drawn with sliced sprites)
-        /// made flat, the biggest in the panel's colour and outline, the ones inside it (the grid's sunken box) in its field colour; its title
-        /// and weight in its font and colours. The item cells (made by the grid from the game's own) and the weight's icon are left as they are.
-        /// </summary>
-        private static void Restyle(GameObject copy)
-        {
-            Transform cells = _grid.m_gridRoot;
-            var frames = copy.GetComponentsInChildren<Image>(true)
-                .Where(i => i.sprite != null && i.type != Image.Type.Simple && (cells == null || !i.transform.IsChildOf(cells)))
-                .OrderByDescending(i => i.rectTransform.rect.width * i.rectTransform.rect.height).ToList();
-            for (int k = 0; k < frames.Count; k++)
-            {
-                Image img = frames[k];
-                img.sprite = null;
-                img.type = Image.Type.Simple;
-                img.color = k == 0 ? MagicMike.ModSettings.Theme.Panel : MagicMike.ModSettings.Theme.Field;
-                Outline line = img.GetComponent<Outline>() ?? img.gameObject.AddComponent<Outline>();
-                line.effectColor = k == 0 ? MagicMike.ModSettings.Theme.PanelOutline : MagicMike.ModSettings.Theme.FieldOutline;
-                line.effectDistance = k == 0 ? new Vector2(2f, -2f) : new Vector2(1f, -1f);
-            }
-            foreach (TMP_Text t in copy.GetComponentsInChildren<TMP_Text>(true)) t.font = MagicMike.ModSettings.Widgets.Font;
-            if (_name != null) { _name.color = MagicMike.ModSettings.Theme.TextBright; _name.fontStyle = FontStyles.Bold; }
-            if (_weight != null) _weight.color = MagicMike.ModSettings.Theme.Text;
         }
 
         /// <summary>The inventory screen's own handler, as the game hooks it to its chest grid (null when this game version has no such method).</summary>
@@ -166,8 +140,11 @@ namespace VillagePlebs
             if (!Companion.Take(_shown, p, item, out string why) && why != null) p.Message(MessageHud.MessageType.Center, Words.Show(why));
         }
 
+        private static bool ChestOpen(InventoryGui gui) => CurrentContainer(gui) != null && gui.m_container != null && gui.m_container.gameObject.activeInHierarchy;
+
         /// <summary>
-        /// Right of your inventory (top aligned, past its armour and weight readout), or under the crafting panel when that would overlap it.
+        /// Under your inventory, where a chest's panel goes. With a chest open there as well: under the chest when it fits on the screen,
+        /// else right of your inventory (top aligned, past its armour and weight readout), or under the crafting panel when that would overlap it.
         /// </summary>
         private static void Place(InventoryGui gui)
         {
@@ -177,10 +154,18 @@ namespace VillagePlebs
             _panel.GetWorldCorners(mine);
             float width = mine[2].x - mine[1].x, height = mine[1].y - mine[0].y;
             float gap = (player[2].x - player[1].x) * 0.13f;  // room for the armour and weight readout beside your inventory
-            Vector2 topLeft = new Vector2(player[2].x + gap, player[2].y);
-            Rect? craft = gui.m_crafting != null && gui.m_crafting.gameObject.activeInHierarchy ? WorldRect(gui.m_crafting) : (Rect?)null;
-            Vector2 underCraft = craft is Rect cr ? new Vector2(cr.xMin, cr.yMin - gap * 0.3f) : topLeft;
-            if (craft is Rect c && topLeft.x + width > c.xMin - gap * 0.3f && topLeft.y - height < c.yMax) topLeft = underCraft;
+            Rect chest = WorldRect(gui.m_container);
+            Vector2 topLeft = new Vector2(chest.xMin, chest.yMax);
+            if (ChestOpen(gui))
+            {
+                topLeft = new Vector2(chest.xMin, chest.yMin - gap * 0.15f);
+                if (topLeft.y - height < 0f)
+                {
+                    topLeft = new Vector2(player[2].x + gap, player[2].y);
+                    Rect? craft = gui.m_crafting != null && gui.m_crafting.gameObject.activeInHierarchy ? WorldRect(gui.m_crafting) : (Rect?)null;
+                    if (craft is Rect c && topLeft.x + width > c.xMin - gap * 0.3f && topLeft.y - height < c.yMax) topLeft = new Vector2(c.xMin, c.yMin - gap * 0.3f);
+                }
+            }
             _panel.position += new Vector3(topLeft.x, topLeft.y, mine[1].z) - mine[1];
         }
 
@@ -240,7 +225,7 @@ namespace VillagePlebs
 namespace VillagePlebs
 {
     /// <summary>
-    /// Ctrl-click (the game's quick move) with its bag beside your inventory: from its bag into yours, from yours to it (gear into its slot,
+    /// Ctrl-click (the game's quick move) with its bag below your inventory: from its bag into yours, from yours to it (gear into its slot,
     /// the rest into its bag), as with an open chest. Without its panel showing, the game's own (drop on the ground).
     /// </summary>
     [HarmonyPatch(typeof(InventoryGui), "OnSelectedItem")]
