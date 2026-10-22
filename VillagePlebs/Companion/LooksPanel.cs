@@ -1,0 +1,593 @@
+using System;
+using System.Reflection;
+using HarmonyLib;
+using MagicMike.ModSettings;
+using TMPro;
+using UnityEngine;
+using UnityEngine.Rendering;
+using UnityEngine.UI;
+using static VillagePlebs.Shared.Translations;
+
+namespace VillagePlebs
+{
+    /// <summary>
+    /// The Looks tab: a companion's look chosen on a preview of it and given only when you press Apply. Three columns styled like the Mod
+    /// Settings panel: the choices (gender, skin, hair, beard; with BodyReplacer installed and drawing its body for that gender, its own
+    /// look instead of the hair: BodyReplacerLook), the buttons, and the preview, turned by dragging it.
+    ///
+    /// The menu makes its window again whenever what it shows changes, so what is being chosen, the preview model, its camera and its picture
+    /// live here across that, and only the columns are made again (Build). Teardown when the tab, the companion or the menu closes.
+    /// </summary>
+    internal sealed class LooksPanel
+    {
+        public readonly long Id;
+        public Looks.Look Current;
+
+        private static readonly Vector3 PreviewPos = new Vector3(10060f, 5000f, 10000f);   // (out of the world, away from anything)
+        private const float DragSensitivity = 0.4f;
+        private const float Margin = 8f, ColumnGap = 8f;
+        private const float SectionGap = 10f, HeaderHeight = 24f, ButtonRowHeight = 42f, PickerRowHeight = 36f, SliderHeight = 24f;
+
+        private static readonly MethodInfo UpdateVisuals = AccessTools.Method(typeof(VisEquipment), "UpdateVisuals");
+        private static readonly FieldInfo CurrentModelIndex = AccessTools.Field(typeof(VisEquipment), "m_currentModelIndex");
+
+        private RenderTexture _rt;
+        private Camera _cam;
+        private GameObject _clone, _lightRig;
+        private float _rotation, _lastMouseX;
+        private bool _dragging;
+
+        // the columns (made again with the window)
+        private GameObject _beardGroup, _vanillaLook, _valkyrLook, _muscleSection, _bodyShapeGroup, _eyelinerGroup;
+        private RectTransform _lookContent;
+        private RawImage _previewImg;
+        private Button _maleBtn, _femaleBtn, _hairReset;
+        private TMP_Text _hairName, _beardName, _valkyrHairName, _eyelinerName;
+        private Slider _skinSlider, _hairToneSlider, _hairShadeSlider;
+        private HsvPicker _hairPicker;
+        private Image _hairSwatch;
+
+        private const float ColourPickerHeight = 112f, ResetSize = 20f;
+        // BodyReplacer's body: its shaders don't write alpha, so on the see-through background it would draw invisible; the column's own
+        // colour, solid, so the box blends in
+        private static readonly Color PreviewSolid = new Color(Theme.Field.r, Theme.Field.g, Theme.Field.b, 1f);
+
+        public LooksPanel(Humanoid c)
+        {
+            Id = Companion.IdOf(c);
+            Current = Looks.Of(c);
+            if (string.IsNullOrEmpty(Current.BrLook)) Current.BrLook = BodyReplacerLook.DefaultLook();
+        }
+
+        /// <summary>The columns, filling <paramref name="area"/> (in the menu's window). <paramref name="apply"/>: Apply pressed.</summary>
+        public void Build(RectTransform area, string about, bool mine, Action apply)
+        {
+            _hairPicker?.Destroy();   // (its textures: the old columns went with the old window)
+            _hairPicker = null;
+            Vector2 size = area.sizeDelta;
+            float colW = (size.x - Margin * 2f - ColumnGap * 2f) / 3f, colH = size.y - Margin * 2f;
+            float x = Margin;
+            RectTransform left = Column("VP_LooksChoices", area, x, colW); x += colW + ColumnGap;
+            RectTransform middle = Column("VP_LooksButtons", area, x, colW); x += colW + ColumnGap;
+            RectTransform right = Column("VP_LooksPreview", area, x, colW);
+            BuildChoices(left);
+            BuildButtons(middle, about, mine, apply);
+            BuildPreview(right, colW, colH);
+            Refresh();
+        }
+
+        private static RectTransform Column(string name, Transform parent, float x, float w)
+        {
+            Image box = Widgets.Box(parent, name, Theme.Field, Theme.FieldOutline);
+            return Widgets.Place(box.gameObject, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(x, Margin), new Vector2(x + w, -Margin));
+        }
+
+        // ---- the choices --------------------------------------------------------------------------------------
+
+        // Stacked by a layout, so the groups that don't apply (the beard on the second body; the vanilla hair, or BodyReplacer's look, see
+        // RefreshGroups) leave no gap. Gender and skin tone apply to both: BodyReplacer copies the vanilla skin colour.
+        private void BuildChoices(RectTransform col)
+        {
+            // clipped with a RectMask2D, as the settings panel's list is (a stencil Mask doesn't clip Valheim's flat images and text)
+            GameObject view = new GameObject("Scroll", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
+            view.transform.SetParent(col, false);
+            RectTransform viewRect = (RectTransform)view.transform;
+            Widgets.Fill(view);
+            view.GetComponent<Image>().color = Color.clear;
+            GameObject content = Widgets.Child(view.transform, "Content");
+            _lookContent = (RectTransform)content.transform;
+            _lookContent.anchorMin = new Vector2(0f, 1f);
+            _lookContent.anchorMax = new Vector2(1f, 1f);
+            _lookContent.pivot = new Vector2(0.5f, 1f);
+            _lookContent.anchoredPosition = Vector2.zero;
+            _lookContent.sizeDelta = Vector2.zero;
+            Stack(content, SectionGap, new RectOffset(8, 12, 6, 10));
+            content.AddComponent<ContentSizeFitter>().verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+            ScrollRect scroll = view.AddComponent<ScrollRect>();
+            scroll.content = _lookContent;
+            scroll.viewport = viewRect;
+            scroll.vertical = true;
+            scroll.horizontal = false;
+            scroll.movementType = ScrollRect.MovementType.Clamped;
+            scroll.scrollSensitivity = 40f;
+            Transform list = content.transform;
+
+            Transform genderRow = Row(Section(list, T("villagepleb_looks_gender"), "Gender"), ButtonRowHeight);
+            _maleBtn = ToggleButton(genderRow, T("villagepleb_looks_male"), () => SetModel(0));
+            _femaleBtn = ToggleButton(genderRow, T("villagepleb_looks_female"), () => SetModel(1));
+            _skinSlider = MakeSlider(Section(list, T("villagepleb_looks_skin"), "SkinTone"), Current.Skin, v => { Current.Skin = v; ApplyToClone(); });
+
+            // the game's own hair: its hairstyles, beards and hair colour
+            _vanillaLook = Stack(Widgets.Child(list, "VanillaLook"), SectionGap, new RectOffset(0, 0, 0, 0));
+            Transform vanilla = _vanillaLook.transform;
+            _hairName = PickerRow(Section(vanilla, T("villagepleb_looks_hair"), "HairStyle"), () => StepHair(-1), () => StepHair(1));
+            _beardGroup = Section(vanilla, T("villagepleb_looks_beard"), "BeardStyle").gameObject;
+            _beardName = PickerRow(_beardGroup.transform, () => StepBeard(-1), () => StepBeard(1));
+            _hairToneSlider = MakeSlider(Section(vanilla, T("villagepleb_looks_hair_tone"), "HairTone"), Current.HairTone, v => { Current.HairTone = v; ApplyToClone(); });
+            _hairShadeSlider = MakeSlider(Section(vanilla, T("villagepleb_looks_hair_shade"), "HairShade"), Current.HairShade, v => { Current.HairShade = v; ApplyToClone(); });
+
+            if (BodyReplacerLook.Available) BuildValkyrLook(list);
+        }
+
+        // BodyReplacer's look, for when it draws its own body on the companion: its hairstyles, hair and eye colour, body shape, eyeliner and
+        // muscle (only with BodyReplacer installed)
+        private void BuildValkyrLook(Transform list)
+        {
+            _valkyrLook = Stack(Widgets.Child(list, "ValkyrLook"), SectionGap, new RectOffset(0, 0, 0, 0));
+            Transform valkyr = _valkyrLook.transform;
+            _valkyrHairName = PickerRow(Section(valkyr, T("villagepleb_looks_hair"), "ValkyrHair"), () => StepValkyrHair(-1), () => StepValkyrHair(1));
+            BuildHairColour(Section(valkyr, T("villagepleb_looks_hair_colour"), "ValkyrHairColour"));
+            ValkyrSlider(Section(valkyr, T("villagepleb_looks_eyes"), "EyeColour"), "EyeHue", 0f, 1f);
+            ValkyrSlider(Section(valkyr, T("villagepleb_looks_eye_rich"), "EyeRich"), "EyeSaturation", 0f, 1f);
+            ValkyrSlider(Section(valkyr, T("villagepleb_looks_eye_shade"), "EyeShade"), "EyeValue", 0f, 1f);
+            ValkyrSlider(Section(valkyr, T("villagepleb_looks_eye_glow"), "EyeGlow"), "Glow", 0f, 3f);
+            ValkyrSlider(Section(valkyr, T("villagepleb_looks_iris"), "IrisSize"), "IrisSize", 0.5f, 1.2f);
+            // body shape and eyeliner (the female body has them): sizes run -100 to 100, the slider's middle is 0
+            _bodyShapeGroup = Stack(Widgets.Child(valkyr, "BodyShape"), SectionGap, new RectOffset(0, 0, 0, 0));
+            ValkyrSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_bust"), "Bust"), "BreastSize", -100f, 100f);
+            ValkyrSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_hips"), "Hips"), "ButtSize", -100f, 100f);
+            _eyelinerGroup = Stack(Widgets.Child(valkyr, "Eyeliner"), SectionGap, new RectOffset(0, 0, 0, 0));
+            _eyelinerName = PickerRow(Section(_eyelinerGroup.transform, T("villagepleb_looks_eyeliner"), "EyelinerStyle"), () => StepEyeliner(-1), () => StepEyeliner(1));
+            ValkyrSlider(Section(_eyelinerGroup.transform, T("villagepleb_looks_eyeliner_tone"), "EyelinerTone"), "EyelinerHue", 0f, 1f);
+            ValkyrSlider(Section(_eyelinerGroup.transform, T("villagepleb_looks_eyeliner_rich"), "EyelinerRich"), "EyelinerSaturation", 0f, 1f);
+            ValkyrSlider(Section(_eyelinerGroup.transform, T("villagepleb_looks_eyeliner_shade"), "EyelinerShade"), "EyelinerValue", 0f, 1f);
+            ValkyrSlider(Section(_eyelinerGroup.transform, T("villagepleb_looks_eyeliner_strength"), "EyelinerStrength"), "EyelinerStrength", 0f, 1f);
+            _muscleSection = Section(valkyr, T("villagepleb_looks_muscle"), "Muscle").gameObject;
+            MakeSlider(_muscleSection.transform, (Current.BrMuscle >= 0f ? Current.BrMuscle : BodyReplacerLook.MuscleDefault(Current.Model)) / 100f,
+                v => { Current.BrMuscle = v * 100f; ApplyToClone(); });
+        }
+
+        // A slider for one field of BodyReplacer's look, over that field's range (the slider itself runs 0 to 1)
+        private void ValkyrSlider(Transform section, string field, float min, float max) =>
+            MakeSlider(section, Mathf.InverseLerp(min, max, BodyReplacerLook.Get(Current.BrLook, field)), v => SetValkyrField(field, Mathf.Lerp(min, max, v)));
+
+        private void SetValkyrField(string field, float value)
+        {
+            Current.BrLook = BodyReplacerLook.Set(Current.BrLook, field, value);
+            ApplyToClone();
+        }
+
+        // The style this body shows, among the ones it offers (each body has its own list)
+        private int ValkyrHairIndex(int[] ids) =>
+            Mathf.Max(0, Array.IndexOf(ids, BodyReplacerLook.ShownHairStyle(Current.Model, Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "HairStyle")))));
+
+        private void StepValkyrHair(int by)
+        {
+            int[] ids = BodyReplacerLook.HairStyleIds(Current.Model);
+            if (ids.Length == 0) return;
+            SetValkyrField("HairStyle", ids[(ValkyrHairIndex(ids) + by + ids.Length) % ids.Length]);
+            Refresh();
+        }
+
+        private void StepEyeliner(int by)
+        {
+            int count = BodyReplacerLook.EyelinerNames().Length;
+            if (count == 0) return;
+            int style = Mathf.Clamp(Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "EyelinerStyle")), 0, count - 1);
+            SetValkyrField("EyelinerStyle", (style + by + count) % count);
+            Refresh();
+        }
+
+        // BodyReplacer's hair colour, picked as on its own panel: a swatch and a reset button in the header, the picker below
+        private void BuildHairColour(Transform section)
+        {
+            RectTransform header = (RectTransform)section.GetChild(0);
+            _hairSwatch = Widgets.Box(header, "Swatch", Color.white, new Color(0f, 0f, 0f, 0.8f), 1.5f);
+            _hairSwatch.raycastTarget = false;
+            Widgets.Place(_hairSwatch.gameObject, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-26f, -7f), new Vector2(-12f, 7f));
+            _hairReset = Widgets.IconButton<ResetIcon>(header, 3f);
+            Widgets.Place(_hairReset.gameObject, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-(ResetSize + 34f), -ResetSize / 2f), new Vector2(-34f, ResetSize / 2f));
+            _hairReset.onClick.AddListener(ResetValkyrHair);
+            _hairPicker = new HsvPicker(section, ColourPickerHeight) { OnChanged = SetValkyrHairColour };
+        }
+
+        // Picking a colour switches it on (until then the hairstyle's own colour shows)
+        private void SetValkyrHairColour(float hue, float saturation, float value)
+        {
+            string look = BodyReplacerLook.Set(Current.BrLook, "HairHue", hue);
+            look = BodyReplacerLook.Set(look, "HairSaturation", saturation);
+            look = BodyReplacerLook.Set(look, "HairValue", value);
+            Current.BrLook = BodyReplacerLook.Set(look, "CustomHair", 1f);
+            Refresh();
+            ApplyToClone();
+        }
+
+        // Back to the hairstyle's own colour
+        private void ResetValkyrHair()
+        {
+            string defaults = BodyReplacerLook.DefaultLook(), look = Current.BrLook;
+            foreach (string field in new[] { "HairHue", "HairSaturation", "HairValue" }) look = BodyReplacerLook.Set(look, field, BodyReplacerLook.Get(defaults, field));
+            Current.BrLook = BodyReplacerLook.Set(look, "CustomHair", 0f);
+            Refresh();
+            ApplyToClone();
+        }
+
+        // ---- the buttons ----------------------------------------------------------------------------------------
+
+        private void BuildButtons(RectTransform col, string about, bool mine, Action apply)
+        {
+            const float btnH = 44f;
+            Button random = Widgets.Button(col, T("villagepleb_menu_randomise"), 18f);
+            Widgets.Place(random.gameObject, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(12f, -8f - btnH), new Vector2(-12f, -8f));
+            random.onClick.AddListener(() => SetAll(Looks.Random()));
+            Button likeMe = Widgets.Button(col, T("villagepleb_menu_look_like_me"), 18f);
+            Widgets.Place(likeMe.gameObject, new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(12f, -16f - btnH * 2f), new Vector2(-12f, -16f - btnH));
+            likeMe.onClick.AddListener(() => SetAll(Looks.Like(Player.m_localPlayer)));
+
+            Button applyBtn = Widgets.Button(col, T("villagepleb_looks_apply"), 20f);
+            Widgets.Place(applyBtn.gameObject, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(12f, 8f), new Vector2(-12f, 8f + btnH));
+            applyBtn.interactable = mine;
+            applyBtn.onClick.AddListener(() => apply());
+
+            TMP_Text text = Widgets.Label(col, about, 17f, Theme.Text, TextAlignmentOptions.TopLeft);
+            text.textWrappingMode = TextWrappingModes.Normal;
+            text.overflowMode = TextOverflowModes.Ellipsis;
+            Widgets.Place(text.gameObject, Vector2.zero, Vector2.one, new Vector2(12f, btnH + 16f), new Vector2(-12f, -24f - btnH * 2f));
+        }
+
+        // ---- the preview ----------------------------------------------------------------------------------------
+
+        private void BuildPreview(RectTransform col, float colW, float colH)
+        {
+            GameObject go = new GameObject("PreviewImg", typeof(RectTransform));
+            go.transform.SetParent(col, false);
+            Widgets.Fill(go);
+            _previewImg = go.AddComponent<RawImage>();
+            _previewImg.color = Color.white;
+            _previewImg.raycastTarget = true;
+            int width = Mathf.Max(64, Mathf.RoundToInt(colW) * 4), height = Mathf.Max(64, Mathf.RoundToInt(colH) * 4);
+            if (_rt != null && (_rt.width != width || _rt.height != height)) { _rt.Release(); UnityEngine.Object.Destroy(_rt); _rt = null; }   // (the window changed size)
+            if (_rt == null) _rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4, filterMode = FilterMode.Trilinear };
+            _previewImg.texture = _rt;
+            if (_cam == null)
+            {
+                var camGO = new GameObject("VP_LooksPreviewCam");
+                UnityEngine.Object.DontDestroyOnLoad(camGO);
+                _cam = camGO.AddComponent<Camera>();
+                _cam.clearFlags = CameraClearFlags.Color;
+                _cam.backgroundColor = Color.clear;
+                _cam.fieldOfView = 30f;
+                _cam.nearClipPlane = 0.1f;
+                _cam.farClipPlane = 10f;
+                _cam.depth = -2f;
+                _cam.enabled = false;   // (drawn by hand each frame: UpdatePerFrame)
+                _cam.cullingMask = CharacterMask();
+            }
+            _cam.targetTexture = _rt;
+            if (_clone == null) MakeClone();
+        }
+
+        /// <summary>Each frame while the tab shows: turning by dragging, and drawing the preview (in its own light).</summary>
+        public void UpdatePerFrame()
+        {
+            if (_previewImg == null || !_previewImg.gameObject.activeInHierarchy || _cam == null) return;
+            if (!_dragging && Input.GetMouseButtonDown(0) && RectTransformUtility.RectangleContainsScreenPoint(_previewImg.rectTransform, Input.mousePosition, null))
+            {
+                _dragging = true;
+                _lastMouseX = Input.mousePosition.x;
+            }
+            // turned only by dragging it with the left mouse button; left alone it stays where it was put
+            if (_dragging)
+            {
+                if (Input.GetMouseButton(0))
+                {
+                    _rotation = (_rotation + (Input.mousePosition.x - _lastMouseX) * DragSensitivity) % 360f;
+                    _lastMouseX = Input.mousePosition.x;
+                }
+                else _dragging = false;
+            }
+            Vector3 target = PreviewPos + Vector3.up * 0.9f;
+            float a = _rotation * Mathf.Deg2Rad;
+            _cam.transform.position = target + new Vector3(Mathf.Sin(a), 0.3f, Mathf.Cos(a)) * 5f;
+            _cam.transform.LookAt(target);
+
+            Color ambient = RenderSettings.ambientLight;
+            float intensity = RenderSettings.ambientIntensity;
+            AmbientMode mode = RenderSettings.ambientMode;
+            try
+            {
+                RenderSettings.ambientMode = AmbientMode.Flat;
+                RenderSettings.ambientLight = new Color(0.45f, 0.4f, 0.35f);
+                RenderSettings.ambientIntensity = 1.2f;
+                _cam.backgroundColor = BodyReplacerLook.Drawn(_clone) ? PreviewSolid : Color.clear;
+                _cam.Render();
+            }
+            finally
+            {
+                RenderSettings.ambientMode = mode;
+                RenderSettings.ambientLight = ambient;
+                RenderSettings.ambientIntensity = intensity;
+            }
+        }
+
+        public void Teardown()
+        {
+            _hairPicker?.Destroy();
+            _hairPicker = null;
+            if (_lightRig != null) UnityEngine.Object.Destroy(_lightRig);
+            if (_clone != null) UnityEngine.Object.Destroy(_clone);
+            if (_cam != null) UnityEngine.Object.Destroy(_cam.gameObject);
+            if (_rt != null) { _rt.Release(); UnityEngine.Object.Destroy(_rt); }
+            _lightRig = _clone = null;
+            _cam = null;
+            _rt = null;
+            _previewImg = null;
+        }
+
+        private static int CharacterMask()
+        {
+            int character = LayerMask.NameToLayer("character"), net = LayerMask.NameToLayer("character_net");
+            int mask = 1 << (character < 0 ? 9 : character);
+            if (net >= 0) mask |= 1 << net;
+            return mask;
+        }
+
+        /// <summary>A still copy of the player model, out of the world: only its looks do anything.</summary>
+        private void MakeClone()
+        {
+            GameObject prefab = ZNetScene.instance?.GetPrefab("Player");
+            if (prefab == null) { VillagePlebsPlugin.Instance?.Warn("Looks preview: the Player prefab was not found"); return; }
+            ZNetView.m_forceDisableInit = true;
+            try { _clone = UnityEngine.Object.Instantiate(prefab, PreviewPos, Quaternion.identity); }
+            finally { ZNetView.m_forceDisableInit = false; }
+            // built from the Player prefab: BodyReplacer draws it as it draws companions (its Creatures As Valkyr setting), not as a player
+            BodyReplacerLook.TreatAsCreature(_clone);
+            Rigidbody body = _clone.GetComponent<Rigidbody>();
+            if (body != null) UnityEngine.Object.Destroy(body);
+            foreach (MonoBehaviour b in _clone.GetComponentsInChildren<MonoBehaviour>(true)) if (!(b is VisEquipment)) b.enabled = false;
+            foreach (Renderer r in _clone.GetComponentsInChildren<Renderer>(true)) r.enabled = true;
+            foreach (Animator anim in _clone.GetComponentsInChildren<Animator>()) StandStill(anim);
+            _lightRig = new GameObject("VP_LooksPreviewLights");
+            UnityEngine.Object.DontDestroyOnLoad(_lightRig);
+            _lightRig.transform.position = PreviewPos;
+            int mask = CharacterMask();
+            AddLight("Key", new Vector3(1.5f, 2.5f, 3.5f), 2f, new Color(1f, 0.92f, 0.82f), 15f, mask);
+            AddLight("Fill", new Vector3(-2.5f, 1.5f, 3f), 1.2f, new Color(0.9f, 0.92f, 1f), 15f, mask);
+            AddLight("Rim", new Vector3(0f, 3f, -2.5f), 1.2f, new Color(0.95f, 0.88f, 0.78f), 15f, mask);
+            AddLight("Bottom", new Vector3(0f, -0.5f, 3f), 0.5f, new Color(0.85f, 0.82f, 0.78f), 10f, mask);
+            ApplyToClone();
+        }
+
+        private void AddLight(string name, Vector3 pos, float intensity, Color color, float range, int mask)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(_lightRig.transform, false);
+            go.transform.localPosition = pos;
+            Light light = go.AddComponent<Light>();
+            light.type = LightType.Point;
+            light.intensity = intensity;
+            light.color = color;
+            light.range = range;
+            light.shadows = LightShadows.None;
+            light.cullingMask = mask;
+        }
+
+        // Standing, not sitting or lying (the Player prefab's animator starts in whatever state), then held still
+        private static void StandStill(Animator anim)
+        {
+            anim.updateMode = AnimatorUpdateMode.Normal;
+            anim.cullingMode = AnimatorCullingMode.AlwaysAnimate;
+            anim.applyRootMotion = false;
+            anim.enabled = true;
+            anim.speed = 1f;
+            anim.Rebind();
+            anim.Update(0f);
+            foreach (AnimatorControllerParameter p in anim.parameters)
+            {
+                if (p.type == AnimatorControllerParameterType.Bool && Array.IndexOf(new[] { "emote_sit", "attach_bed", "sleeping", "sit", "sitting", "crouch", "inBed", "in_bed" }, p.name) >= 0) anim.SetBool(p.name, false);
+                if (p.type == AnimatorControllerParameterType.Trigger && Array.IndexOf(new[] { "emote_stop", "wakeup", "wake" }, p.name) >= 0) anim.SetTrigger(p.name);
+            }
+            foreach (string state in new[] { "Idle", "idle", "Movement", "Move", "Base Layer.Idle", "Base Layer.Movement" })
+                if (anim.HasState(0, Animator.StringToHash(state))) anim.Play(Animator.StringToHash(state), 0, 0f);
+            for (int i = 0; i < 20; i++) anim.Update(0.1f);
+            anim.speed = 0f;
+        }
+
+        private void ApplyToClone()
+        {
+            VisEquipment vis = _clone != null ? _clone.GetComponent<VisEquipment>() : null;
+            if (vis == null) return;
+            BodyReplacerLook.Apply(_clone, Current.BrLook, Current.BrMuscle);
+            CurrentModelIndex?.SetValue(vis, -1);   // (the body is made again: a copy that is never drawn by the game breaks no mesh)
+            vis.SetModel(Current.Model);
+            vis.SetHairItem(Current.Hair);
+            vis.SetBeardItem(Current.Model == 0 ? Current.Beard : 0);
+            vis.SetSkinColor(Looks.SkinColor(Current.Skin));
+            vis.SetHairColor(Looks.HairColor(Current.HairTone, Current.HairShade));
+            UpdateVisuals?.Invoke(vis, null);
+            Animator anim = _clone.GetComponentInChildren<Animator>(true);
+            if (anim != null) { anim.Update(0f); anim.speed = 0f; }
+            int layer = LayerMask.NameToLayer("character");
+            foreach (Transform t in _clone.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer < 0 ? 9 : layer;
+        }
+
+        // ---- changing what is chosen ----------------------------------------------------------------------------
+
+        private void SetModel(int model)
+        {
+            Current.Model = model;
+            Refresh();
+            ApplyToClone();
+        }
+
+        private void StepHair(int by) { Current.Hair = Looks.Step(Current.Hair, Looks.Hairs(), by); Refresh(); ApplyToClone(); }
+        private void StepBeard(int by) { Current.Beard = Looks.Step(Current.Beard, Looks.Beards(), by); Refresh(); ApplyToClone(); }
+
+        // Randomise, Look like me: the game's own look; BodyReplacer's is kept as it is
+        private void SetAll(Looks.Look look)
+        {
+            look.BrLook = Current.BrLook;
+            look.BrMuscle = Current.BrMuscle;
+            Current = look;
+            Refresh();
+            ApplyToClone();
+        }
+
+        /// <summary>The controls showing what is chosen: the vanilla hair options, or BodyReplacer's look when it draws its own body for this gender.</summary>
+        private void Refresh()
+        {
+            SetToggle(_maleBtn, Current.Model == 0);
+            SetToggle(_femaleBtn, Current.Model == 1);
+            bool valkyr = BodyReplacerLook.Replaces(Current.Model);
+            if (_vanillaLook != null) _vanillaLook.SetActive(!valkyr);
+            if (_valkyrLook != null) _valkyrLook.SetActive(valkyr);
+            if (_beardGroup != null) _beardGroup.SetActive(Current.Model == 0);
+            if (_muscleSection != null) _muscleSection.SetActive(BodyReplacerLook.HasMuscle(Current.Model));
+            if (_bodyShapeGroup != null) _bodyShapeGroup.SetActive(BodyReplacerLook.HasBodyShape(Current.Model));
+            if (_eyelinerGroup != null) _eyelinerGroup.SetActive(BodyReplacerLook.HasEyeliner(Current.Model));
+            if (_hairName != null) _hairName.text = Words.Show(Looks.StyleName(Current.Hair, Looks.Hairs()));
+            if (_beardName != null) _beardName.text = Words.Show(Looks.StyleName(Current.Beard, Looks.Beards()));
+            _skinSlider?.SetValueWithoutNotify(Current.Skin);
+            _hairToneSlider?.SetValueWithoutNotify(Current.HairTone);
+            _hairShadeSlider?.SetValueWithoutNotify(Current.HairShade);
+            if (_valkyrHairName != null)
+            {
+                string[] names = BodyReplacerLook.HairStyleNames(Current.Model);
+                _valkyrHairName.text = names.Length > 0 ? names[Mathf.Min(ValkyrHairIndex(BodyReplacerLook.HairStyleIds(Current.Model)), names.Length - 1)] : "";
+            }
+            if (_eyelinerName != null)
+            {
+                string[] names = BodyReplacerLook.EyelinerNames();
+                _eyelinerName.text = names.Length > 0 ? names[Mathf.Clamp(Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "EyelinerStyle")), 0, names.Length - 1)] : "";
+            }
+            if (_hairPicker != null)
+            {
+                float hue = BodyReplacerLook.Get(Current.BrLook, "HairHue"), saturation = BodyReplacerLook.Get(Current.BrLook, "HairSaturation"), value = BodyReplacerLook.Get(Current.BrLook, "HairValue");
+                _hairPicker.Set(hue, saturation, value);
+                _hairSwatch.color = Color.HSVToRGB(hue, saturation, value);
+                _hairReset.gameObject.SetActive(BodyReplacerLook.Get(Current.BrLook, "CustomHair") > 0f);
+            }
+            if (_lookContent != null) LayoutRebuilder.MarkLayoutForRebuild(_lookContent);
+        }
+
+        // ---- the pieces, as the Mod Settings panel draws them ---------------------------------------------------
+
+        // Lays its children out top to bottom, full width, each at its own height
+        private static GameObject Stack(GameObject go, float spacing, RectOffset padding)
+        {
+            VerticalLayoutGroup layout = go.AddComponent<VerticalLayoutGroup>();
+            layout.spacing = spacing;
+            layout.padding = padding;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = false;
+            return go;
+        }
+
+        private static void Height(GameObject go, float h)
+        {
+            LayoutElement element = go.GetComponent<LayoutElement>() ?? go.AddComponent<LayoutElement>();
+            element.minHeight = h;
+            element.preferredHeight = h;
+        }
+
+        // A small section header, like the settings panel's (a dark bar with an accent strip), with room below for its controls
+        private static Transform Section(Transform parent, string text, string name)
+        {
+            GameObject section = Stack(Widgets.Child(parent, name), 4f, new RectOffset(0, 0, 0, 0));
+            Image bar = Widgets.Box(section.transform, name + "Label", Theme.Header);
+            bar.raycastTarget = false;
+            Height(bar.gameObject, HeaderHeight);
+            Image accent = Widgets.Box(bar.transform, "Accent", Theme.Accent);
+            accent.raycastTarget = false;
+            Widgets.Place(accent.gameObject, new Vector2(0f, 0f), new Vector2(0f, 1f), Vector2.zero, new Vector2(4f, 0f));
+            TMP_Text label = Widgets.Label(bar.transform, text, 15f, Theme.TextBright, TextAlignmentOptions.MidlineLeft, bold: true);
+            Widgets.Place(label.gameObject, Vector2.zero, Vector2.one, new Vector2(12f, 0f), new Vector2(-6f, 0f));
+            return section.transform;
+        }
+
+        // Controls side by side, sharing the width
+        private static Transform Row(Transform parent, float h)
+        {
+            GameObject row = Widgets.Child(parent, "Row");
+            Height(row, h);
+            HorizontalLayoutGroup layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4f;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            layout.childForceExpandWidth = true;
+            layout.childForceExpandHeight = true;
+            return row.transform;
+        }
+
+        // One of a set of choices (gender); SetToggle shows which is picked
+        private static Button ToggleButton(Transform parent, string label, Action onClick)
+        {
+            Button button = Widgets.Button(parent, label, 17f);
+            button.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            button.onClick.AddListener(() => onClick());
+            return button;
+        }
+
+        // Picked: lit like the settings panel's selected tab
+        private static void SetToggle(Button btn, bool on)
+        {
+            if (btn == null) return;
+            btn.colors = on ? Theme.Colors(Theme.Selected, Theme.Selected, Theme.ButtonPressed, Theme.ButtonDisabled)
+                            : Theme.Colors(Theme.Button, Theme.ButtonHover, Theme.ButtonPressed, Theme.ButtonDisabled);
+            TMP_Text text = btn.GetComponentInChildren<TMP_Text>(true);
+            if (text != null) text.color = on ? Theme.TextBright : Theme.Text;
+        }
+
+        // [<]  name  [>]
+        private static TMP_Text PickerRow(Transform parent, Action prev, Action next)
+        {
+            GameObject row = Widgets.Child(parent, "PickerRow");
+            Height(row, PickerRowHeight);
+            HorizontalLayoutGroup layout = row.AddComponent<HorizontalLayoutGroup>();
+            layout.spacing = 4f;
+            layout.childAlignment = TextAnchor.MiddleCenter;
+            layout.childForceExpandWidth = false;
+            layout.childForceExpandHeight = true;
+            layout.childControlWidth = true;
+            layout.childControlHeight = true;
+            Button p = Widgets.Button(row.transform, "<", 20f);
+            LayoutElement pe = p.gameObject.AddComponent<LayoutElement>();
+            pe.minWidth = pe.preferredWidth = PickerRowHeight;
+            p.onClick.AddListener(() => prev());
+            Image nameBox = Widgets.Box(row.transform, "Name", Theme.Track, Theme.FieldOutline);
+            nameBox.raycastTarget = false;
+            nameBox.gameObject.AddComponent<LayoutElement>().flexibleWidth = 1f;
+            TMP_Text name = Widgets.Label(nameBox.transform, "", 16f, Theme.Text, TextAlignmentOptions.Center);
+            Widgets.Fill(name.gameObject, 4f);
+            Button n = Widgets.Button(row.transform, ">", 20f);
+            LayoutElement ne = n.gameObject.AddComponent<LayoutElement>();
+            ne.minWidth = ne.preferredWidth = PickerRowHeight;
+            n.onClick.AddListener(() => next());
+            return name;
+        }
+
+        private static Slider MakeSlider(Transform parent, float value, Action<float> onChange)
+        {
+            Slider slider = Widgets.Slider(parent);
+            Height(slider.gameObject, SliderHeight);
+            slider.wholeNumbers = false;
+            slider.minValue = 0f;
+            slider.maxValue = 1f;
+            slider.value = value;
+            slider.onValueChanged.AddListener(v => onChange(v));
+            return slider;
+        }
+    }
+}

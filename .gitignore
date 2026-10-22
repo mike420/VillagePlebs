@@ -1,0 +1,14 @@
+# Build output
+bin/
+obj/
+*.user
+*.suo
+
+# Visual Studio cache
+.vs/
+
+# Local machine paths
+Environment.props
+
+# Release packages (built by the Release configuration)
+VillagePlebs/ThunderStore/

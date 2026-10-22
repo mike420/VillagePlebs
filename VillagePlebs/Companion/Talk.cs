@@ -1,0 +1,196 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using HarmonyLib;
+using Newtonsoft.Json.Linq;
+using UnityEngine;
+using UnityEngine.Networking;
+
+namespace VillagePlebs
+{
+    /// <summary>
+    /// Talking to a companion in chat: start a message with its name ("Rádvar, follow me", "Rádvar go home", "rádvar: be careful") and it
+    /// does what you ask, and answers above its head. Plain words do (follow, stay, guard, home, come here, aggressive, careful, passive, your things). The message still goes
+    /// to chat as usual. Your own companions, or another player's that lets friends give it orders.
+    /// </summary>
+    internal static class Talk
+    {
+        // The words a player types stay English (commands); "meaning" is a note for us; the reply is packed text (Words.P), said in the player's language.
+        private static readonly (string id, string meaning, string[] words, string reply)[] Intents =
+        {
+            // errands first (their words are more particular: "repair your gear" is not "your gear")
+            ("e:PutAway", "Put away what it carries into the chests.", new[] { "put away", "put your things away", "store your", "stash", "unload", "empty your bag" }, null),
+            ("e:Restock", "Fill its food slots from the chests.", new[] { "restock", "stock up", "get food", "grab food", "get some food" }, null),
+            ("e:BetterGear", "Look in the chests for better gear and wear it.", new[] { "gear up", "better gear", "new gear", "check gear", "check your gear", "armour up", "armor up", "upgrade your gear" }, null),
+            ("e:RepairGear", "Repair its own gear at a workbench or forge.", new[] { "repair your gear", "fix your gear", "repair your stuff", "fix your stuff", "repair gear" }, null),
+            ("e:RepairBase", "Repair the base with its hammer.", new[] { "repair the base", "fix the base", "repair base", "repair the walls", "fix the walls", "repair" }, null),
+            ("e:Fires", "Feed the fires.", new[] { "feed the fire", "fires", "fuel", "fire" }, null),
+            ("e:Cook", "Cook the raw food it carries.", new[] { "cook" }, null),
+            ("follow", "Follow the player and fight beside them (go on an adventure together).", new[] { "follow", "come with", "with me", "let's go", "lets go", "adventure", "join" }, Words.P("villagepleb_talk_reply_follow")),
+            ("come", "Come to the player right now.", new[] { "come here", "come", "here", "to me", "over here" }, Words.P("villagepleb_talk_reply_come")),
+            ("stay", "Stay where it is.", new[] { "stay", "wait", "hold", "stop" }, Words.P("villagepleb_talk_reply_stay")),
+            ("guard", "Guard the spot where it stands.", new[] { "guard", "watch", "protect this" }, Words.P("villagepleb_talk_reply_guard")),
+            ("home", "Go home and live its own life there (gather, store, craft).", new[] { "go home", "home", "live", "gather", "work", "chop", "mine" }, Words.P("villagepleb_talk_reply_home")),
+            ("aggressive", "Fight aggressively.", new[] { "aggressive", "attack everything", "kill", "go wild" }, Words.P("villagepleb_talk_reply_aggressive")),
+            ("defensive", "Fight defensively, stay close and careful.", new[] { "defensive", "careful", "be careful", "stay close" }, Words.P("villagepleb_talk_reply_defensive")),
+            ("passive", "Avoid fighting.", new[] { "passive", "don't fight", "dont fight", "no fighting", "peace" }, Words.P("villagepleb_talk_reply_passive")),
+            ("balanced", "Fight normally.", new[] { "balanced", "normal", "fight normally" }, Words.P("villagepleb_talk_reply_balanced")),
+            ("auto", "Decide for itself how to fight and help, by what the player is doing.", new[] { "your call", "decide", "up to you", "auto", "use your judgement", "use your judgment" }, Words.P("villagepleb_talk_reply_auto")),
+            ("grave", "Go and get its things back from its tombstone.", new[] { "grave", "tombstone", "your stuff", "your things", "your gear" }, Words.P("villagepleb_talk_reply_grave")),
+        };
+
+        /// <summary>Called for every chat line the local player sends.</summary>
+        public static void Heard(string text)
+        {
+            Player me = Player.m_localPlayer;
+            if (me == null || string.IsNullOrWhiteSpace(text)) return;
+            string t = text.Trim();
+            foreach (Humanoid c in Companion.All().Where(h => Companion.CanCommand(h, me) && Vector3.Distance(h.transform.position, me.transform.position) < 150f))
+            {
+                string name = Companion.NameOf(c);
+                if (!StartsWithName(t, name)) continue;
+                string rest = t.Substring(name.Length).TrimStart(',', ':', ' ', '!', '.').Trim();
+                if (rest.Length == 0) { Say(c, Words.P("villagepleb_talk_yes")); return; }
+                Do(c, me, ByWords(rest), rest);
+                return;
+            }
+        }
+
+        private static bool StartsWithName(string text, string name)
+        {
+            if (text.Length < name.Length) return false;
+            string head = text.Substring(0, name.Length);
+            bool same = string.Compare(head, name, StringComparison.OrdinalIgnoreCase) == 0
+                        || string.Compare(Plain(head), Plain(name), StringComparison.OrdinalIgnoreCase) == 0; // "Radvar" works for "Rádvar"
+            return same && (text.Length == name.Length || !char.IsLetterOrDigit(text[name.Length]));
+        }
+
+        private static string Plain(string s) => new string(s.Normalize(NormalizationForm.FormD).Where(ch => System.Globalization.CharUnicodeInfo.GetUnicodeCategory(ch) != System.Globalization.UnicodeCategory.NonSpacingMark).ToArray());
+
+        private static string ByWords(string rest)
+        {
+            string r = rest.ToLowerInvariant();
+            foreach (var i in Intents) if (i.words.Any(w => r.Contains(w))) return i.id;
+            return null;
+        }
+
+        private static void Do(Humanoid c, Player me, string intent, string said)
+        {
+            var match = Intents.FirstOrDefault(i => i.id == intent);
+            if (intent == null || match.id == null) { Say(c, Words.P("villagepleb_talk_dont_follow")); return; }
+            if (intent.StartsWith("e:") && Enum.TryParse(intent.Substring(2), out Errand errand))
+            {
+                string result = Errands.Run(Brain.Get(c), errand); // (it says what it does, or why not)
+                Brain.Get(c)?.Remember(Words.P("villagepleb_talk_you_said", said, errand));
+                VillagePlebsPlugin.Instance?.Note($"{me.GetPlayerName()} told {Companion.NameOf(c)} \"{said}\" -> errand {errand}: {result}");
+                return;
+            }
+            bool ok = true;
+            switch (intent)
+            {
+                case "follow": ok = Home.Follow(c); break;
+                case "come":
+                    ok = Home.Follow(c);
+                    if (ok && Vector3.Distance(c.transform.position, me.transform.position) > 15f) Brain.TeleportBehind(c, me, "villagepleb_brain_came_to");
+                    break;
+                case "stay": ok = Companion.Write(c, z => z.Set(Keys.Order, (int)Order.Stay)); break;
+                case "guard": ok = Companion.Write(c, z => { z.Set(Keys.Order, (int)Order.Guard); z.Set(Keys.Post, c.transform.position); }); break;
+                case "home": ok = Home.GoHome(c, true); break;
+                case "aggressive": ok = Companion.Write(c, z => z.Set(Keys.Style, (int)Style.Aggressive)); break;
+                case "defensive": ok = Companion.Write(c, z => z.Set(Keys.Style, (int)Style.Defensive)); break;
+                case "passive": ok = Companion.Write(c, z => z.Set(Keys.Style, (int)Style.Passive)); break;
+                case "balanced": ok = Companion.Write(c, z => z.Set(Keys.Style, (int)Style.Balanced)); break;
+                case "auto": ok = Companion.Write(c, z => z.Set(Keys.Style, (int)Style.Auto)); break;
+                case "grave":
+                    if (!Grave.Has(c)) { Say(c, Words.P("villagepleb_talk_no_grave")); return; }
+                    Grave.Fetch(Brain.Get(c), null);
+                    break;
+            }
+            if (!ok) { Say(c, Words.P("villagepleb_talk_busy")); return; }
+            Say(c, match.reply);
+            Brain.Get(c)?.Remember(Words.P("villagepleb_talk_you_said", said, intent));
+            VillagePlebsPlugin.Instance?.Note($"{me.GetPlayerName()} told {Companion.NameOf(c)} \"{said}\" -> {intent}");
+        }
+
+        /// <summary>Words above its head (on this game). Packed text (Words.P) is made into the player's words here.</summary>
+        internal static void Say(Humanoid c, string text)
+        {
+            if (c != null && Chat.instance != null) Chat.instance.SetNpcText(c.gameObject, Vector3.up * 2.3f, 30f, 5f, "", Words.Show(text), false);
+        }
+
+        // ---- telling its player what it is up to ----------------------------------------------------------------
+
+        public const string ChattyKey = "vp_chatty";
+        public static bool Chatty(Component c) => Companion.Zdo(c)?.GetBool(ChattyKey, true) ?? true;
+
+        private static readonly Dictionary<string, float> LastSaid = new Dictionary<string, float>();
+        private static readonly AccessTools.FieldRef<Chat, float> HideTimer =
+            AccessTools.Field(typeof(Chat), "m_hideTimer") != null ? AccessTools.FieldRefAccess<Chat, float>("m_hideTimer") : null;
+
+        /// <summary>
+        /// It tells its player something in chat ("Rádvar: my bag is full, I'm taking it home"), and says it above its head. With a topic,
+        /// not again about the same thing for that many minutes. Its player sees it wherever they are (the game running it may be another
+        /// player's: then it goes over the network). Off with "Tells you what it is up to" in its Orders tab.
+        /// </summary>
+        public static bool Hush; // catching up (CatchUp): one report at the end, not a line for each thing
+
+        public static void Tell(Humanoid c, string text, string topic = null, float minutes = 0f)
+        {
+            if (c == null || string.IsNullOrEmpty(text)) return;
+            if (Hush) { Activity.Log(c, "(away) " + text); return; }
+            if (topic != null)
+            {
+                string key = Companion.IdOf(c) + ":" + topic;
+                if (LastSaid.TryGetValue(key, out float at) && Time.time - at < minutes * 60f) return;
+                LastSaid[key] = Time.time;
+            }
+            Say(c, text);
+            Activity.Log(c, "said: " + text);
+            if (!Chatty(c)) return;
+            Player local = Player.m_localPlayer;
+            if (local != null && Companion.IsMine(c, local)) ToChat(Companion.NameOf(c), text);
+            else Net.SendSays(Companion.MasterId(c), Companion.NameOf(c), text);
+        }
+
+        /// <summary>
+        /// What it is up to that you need not be told in chat (its goal, a hunting trip, materials made on the way): above its head and in its
+        /// activity log only. Chat is for what needs you (it is out of food, its bag is full, it needs something it cannot get) and the big
+        /// moments (new gear, falling, what it did while you were away).
+        /// </summary>
+        public static void Mention(Humanoid c, string text, string topic = null, float minutes = 0f)
+        {
+            if (c == null || string.IsNullOrEmpty(text)) return;
+            if (Hush) { Activity.Log(c, "(away) " + text); return; }
+            if (topic != null)
+            {
+                string key = Companion.IdOf(c) + ":" + topic;
+                if (LastSaid.TryGetValue(key, out float at) && Time.time - at < minutes * 60f) return;
+                LastSaid[key] = Time.time;
+            }
+            Say(c, text);
+            Activity.Log(c, "said: " + text);
+        }
+
+        /// <summary>A line in the chat window from a companion, shown even when the window was hidden.</summary>
+        public static void ToChat(string name, string text)
+        {
+            if (Chat.instance == null) return;
+            Chat.instance.AddString(name, Words.Show(text), Talker.Type.Normal);
+            if (HideTimer != null) HideTimer(Chat.instance) = 0f;
+        }
+
+        public static void Forget() => LastSaid.Clear();
+    }
+
+    [HarmonyPatch(typeof(Chat), nameof(Chat.SendText))]
+    internal static class Chat_SendText
+    {
+        private static void Postfix(string text)
+        {
+            try { Talk.Heard(text); }
+            catch (Exception e) { VillagePlebsPlugin.Instance?.Warn("Companion chat: " + e.Message); }
+        }
+    }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "VillagePlebs",
+  "description": "A viking companion who plays like a player: comes on your adventures, fights beside you and lives its own life at home.",
+  "version_number": "1.0.0",
+  "website_url": "https://discord.gg/mnr36G6J4x",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2350",
+    "ValheimModding-Jotunn-2.30.2"
+  ]
+}
