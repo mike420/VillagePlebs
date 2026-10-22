@@ -89,6 +89,8 @@ namespace VillagePlebs
         public string WorkNote;
         public Vector3 WorkSpot;
         public float NextWorkLook, NextDoorLook, NextUpgradeLook, YieldUntil;
+        public float NextApartLook;          // when it next looks for another companion standing in it (Brain.Apart)
+        public Humanoid ApartFrom;           // the one it is stepping away from, until they are apart
         public Vector3 YieldTo;
         public Player YieldFrom;
         public bool CaughtUp;                                       // living at home while nobody was there (CatchUp)
@@ -581,20 +583,31 @@ namespace VillagePlebs
         private static void Apart(Humanoid me, float dt)
         {
             if (me.IsAttached() || !me.IsOnGround()) return;
-            foreach (Humanoid other in Companion.All())
+            BrainState st = Get(me);
+            // Looked for four times a second (every character in the scene is gone through: not every frame, with many about); one it
+            // is standing in is stepped away from every frame until they are apart
+            if (st.ApartFrom == null && Time.time >= st.NextApartLook)
             {
-                if (other == me || other.IsDead()) continue;
-                Vector3 away = me.transform.position - other.transform.position;
-                if (Mathf.Abs(away.y) > 1.5f) continue;
-                away.y = 0f;
-                if (away.sqrMagnitude > Room * Room) continue;
-                if (away.sqrMagnitude < 0.0001f) away = me.transform.right * (Companion.IdOf(me) < Companion.IdOf(other) ? 1f : -1f);   // (right on top: opposite ways)
-                Vector3 to = me.transform.position + away.normalized * (1.5f * dt);
-                if (!Steer.Safe(to, me)) return;   // (never onto the stakes)
-                Rigidbody body = me.GetComponent<Rigidbody>();
-                if (body != null) body.position = to; else me.transform.position = to;
-                return;
+                st.NextApartLook = Time.time + 0.25f;
+                st.ApartFrom = Companion.All().FirstOrDefault(o => o != me && !o.IsDead() && Overlap(me, o, out _));
             }
+            Humanoid other = st.ApartFrom;
+            if (other == null) return;
+            if (other.IsDead() || !Overlap(me, other, out Vector3 away)) { st.ApartFrom = null; return; }
+            if (away.sqrMagnitude < 0.0001f) away = me.transform.right * (Companion.IdOf(me) < Companion.IdOf(other) ? 1f : -1f);   // (right on top: opposite ways)
+            Vector3 to = me.transform.position + away.normalized * (1.5f * dt);
+            if (!Steer.Safe(to, me)) { st.ApartFrom = null; return; }   // (never onto the stakes)
+            Rigidbody body = me.GetComponent<Rigidbody>();
+            if (body != null) body.position = to; else me.transform.position = to;
+        }
+
+        /// <summary>Two companions standing in each other (on the same level, closer than Room); away: from the other to it, flat.</summary>
+        private static bool Overlap(Humanoid me, Humanoid other, out Vector3 away)
+        {
+            away = me.transform.position - other.transform.position;
+            if (Mathf.Abs(away.y) > 1.5f) return false;
+            away.y = 0f;
+            return away.sqrMagnitude <= Room * Room;
         }
 
         private const float Room = 0.8f;   // how close two companions may stand
