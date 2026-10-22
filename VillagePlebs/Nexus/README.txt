@@ -1,6 +1,6 @@
 [size=6][b]VillagePlebs[/b][/size]
 
-A viking companion, a follower NPC who plays like a player: comes on your adventures, fights beside you, lives its own life at home, and gets better as it goes.
+Create multiple viking companions, follower NPC's who play like a player: come on your adventures, fight beside you, lives their own life at home, and gets better as they go.
 
 
 [size=5][b]Donations[/b][/size]
@@ -39,21 +39,65 @@ Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in
 [b]General[/b]
 [list]
 [*][b]Menu Key[/b] (default J)
+[/list]
+
+[b]General[/b]
+[list]
 [*][b]Command Key[/b] (default H)
 [/list]
 
 [b]Companion[/b]
 [list]
 [*][b]Max Companions[/b] (default 1)
+[/list]
+
+[b]Companion[/b]
+[list]
 [*][b]Max Bought Companions[/b] (default 2)
+[/list]
+
+[b]Companion[/b]
+[list]
 [*][b]Companion Price[/b] (default 500)
+[/list]
+
+[b]Companion[/b]
+[list]
 [*][b]While Away[/b] (default Mild)
+[/list]
+
+[b]Companion[/b]
+[list]
 [*][b]Fight Range[/b] (default 12)
+[/list]
+
+[b]Companion[/b]
+[list]
 [*][b]Show Decisions[/b] (default true)
+[/list]
+
+[b]Companion[/b]
+[list]
 [*][b]Respawn Seconds[/b] (default 30)
+[/list]
+
+[b]Companion[/b]
+[list]
 [*][b]Base Health[/b] (default 25)
+[/list]
+
+[b]Companion[/b]
+[list]
 [*][b]Base Stamina[/b] (default 75)
+[/list]
+
+[b]Companion[/b]
+[list]
 [*][b]Eat Below Percent[/b] (default 10)
+[/list]
+
+[b]Companion[/b]
+[list]
 [*][b]Starting Skill[/b] (default 0)
 [/list]
 

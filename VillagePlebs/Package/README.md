@@ -1,9 +1,9 @@
 # 🧔 VillagePlebs
 
-A viking companion, a follower NPC who plays like a player: comes on your adventures, fights beside you, lives its own life at home, and gets better as it goes.
+Create multiple viking companions, follower NPC's who play like a player: come on your adventures, fight beside you, lives their own life at home, and gets better as they go.
 
 <br>
-<br>
+
 
 ## 💶 Donations: 
 
@@ -41,19 +41,20 @@ Settings are in `BepInEx/config/MagicMike.VillagePlebs.cfg`. Change them in game
 | Section | Setting | Default | What it does |
 |---|---|---|---|
 | General | Menu Key | J | Tap: your companion's menu (or the summon panel). Hold: your companions near you come with you, or go home. |
-| | Command Key | H | Point at something and press it to give an order. |
+| General | Command Key | H | Point at something and press it to give an order. |
 | Companion | Max Companions | 1 | How many companions each player can have for free, summoned from the menu (synced). |
-| | Max Bought Companions | 2 | How many more each player can buy from any trader (Haldor, Hildir, the Bog Witch), 0 to 6. Buying one lets you name them; the coins are taken when they join you (synced). |
-| | Companion Price | 500 | What a trader asks for a companion, in coins (synced). |
-| | While Away | Mild | What a companion at home does while nobody is near: `Mild`, `Real` or `Off` (synced). |
-| | Fight Range | 12 | It fights enemies that come this close (in metres) to it or to you. |
-| | Show Decisions | true | Shows what it decides in a fight above its head. |
-| | Respawn Seconds | 30 | Seconds after falling before it wakes in its bed or beside you (synced). |
-| | Base Health | 25 | Its health before food (synced). |
-| | Base Stamina | 75 | Its stamina before food (synced). |
-| | Eat Below Percent | 10 | It eats a food again once that food's time left drops below this percent (synced). |
-| | Starting Skill | 0 | The skill level a new companion starts at (synced). |
+| Companion | Max Bought Companions | 2 | How many more each player can buy from any trader (Haldor, Hildir, the Bog Witch), 0 to 6. Buying one lets you name them; the coins are taken when they join you (synced). |
+| Companion | Companion Price | 500 | What a trader asks for a companion, in coins (synced). |
+| Companion | While Away | Mild | What a companion at home does while nobody is near: `Mild`, `Real` or `Off` (synced). |
+| Companion | Fight Range | 12 | It fights enemies that come this close (in metres) to it or to you. |
+| Companion | Show Decisions | true | Shows what it decides in a fight above its head. |
+| Companion | Respawn Seconds | 30 | Seconds after falling before it wakes in its bed or beside you (synced). |
+| Companion | Base Health | 25 | Its health before food (synced). |
+| Companion | Base Stamina | 75 | Its stamina before food (synced). |
+| Companion | Eat Below Percent | 10 | It eats a food again once that food's time left drops below this percent (synced). |
+| Companion | Starting Skill | 0 | The skill level a new companion starts at (synced). |
 | EpicMMO | Companion Exp | 1 | With EpicMMO System: the experience a companion earns, as a multiple of a player's. 0: off (synced). |
+
 <br>
 
 ## 👥 Multiplayer:

@@ -43,11 +43,11 @@ namespace VillagePlebs
         private const float PanPerPixel = 0.004f, LowestPan = -1.4f, HighestPan = 0.4f;
 
         // the columns (made again with the window)
-        private GameObject _beardGroup, _vanillaLook, _valkyrLook, _muscleSection, _bodyShapeGroup;
+        private GameObject _beardGroup, _vanillaLook, _einherjarLook, _muscleSection, _bodyShapeGroup;
         private RectTransform _lookContent;
         private RawImage _previewImg;
         private Button _maleBtn, _femaleBtn, _hairReset;
-        private TMP_Text _hairName, _beardName, _valkyrHairName;
+        private TMP_Text _hairName, _beardName, _einherjarHairName;
         private Slider _skinSlider, _hairToneSlider, _hairShadeSlider;
         private HsvPicker _hairPicker;
         private Image _hairSwatch;
@@ -142,50 +142,50 @@ namespace VillagePlebs
             _hairToneSlider = MakeSlider(Section(vanilla, T("villagepleb_looks_hair_tone"), "HairTone"), Current.HairTone, v => { Current.HairTone = v; ApplyToClone(); });
             _hairShadeSlider = MakeSlider(Section(vanilla, T("villagepleb_looks_hair_shade"), "HairShade"), Current.HairShade, v => { Current.HairShade = v; ApplyToClone(); });
 
-            if (BodyReplacerLook.Available) BuildValkyrLook(list);
+            if (BodyReplacerLook.Available) BuildEinherjarLook(list);
         }
 
         // BodyReplacer's look, for when it draws its own body on the companion: its hairstyles, hair and eye colour, body shape and
         // muscle (only with BodyReplacer installed)
-        private void BuildValkyrLook(Transform list)
+        private void BuildEinherjarLook(Transform list)
         {
-            _valkyrLook = Stack(Widgets.Child(list, "ValkyrLook"), SectionGap, new RectOffset(0, 0, 0, 0));
-            Transform valkyr = _valkyrLook.transform;
-            _valkyrHairName = PickerRow(Section(valkyr, T("villagepleb_looks_hair"), "ValkyrHair"), () => StepValkyrHair(-1), () => StepValkyrHair(1));
-            BuildHairColour(Section(valkyr, T("villagepleb_looks_hair_colour"), "ValkyrHairColour"));
-            ValkyrSlider(Section(valkyr, T("villagepleb_looks_eyes"), "EyeColour"), "EyeHue", 0f, 1f);
-            ValkyrSlider(Section(valkyr, T("villagepleb_looks_eye_rich"), "EyeRich"), "EyeSaturation", 0f, 1f);
-            ValkyrSlider(Section(valkyr, T("villagepleb_looks_eye_shade"), "EyeShade"), "EyeValue", 0f, 1f);
-            ValkyrSlider(Section(valkyr, T("villagepleb_looks_eye_glow"), "EyeGlow"), "Glow", 0f, 3f);
-            ValkyrSlider(Section(valkyr, T("villagepleb_looks_iris"), "IrisSize"), "IrisSize", 0.5f, 1.2f);
+            _einherjarLook = Stack(Widgets.Child(list, "EinherjarLook"), SectionGap, new RectOffset(0, 0, 0, 0));
+            Transform einherjar = _einherjarLook.transform;
+            _einherjarHairName = PickerRow(Section(einherjar, T("villagepleb_looks_hair"), "EinherjarHair"), () => StepEinherjarHair(-1), () => StepEinherjarHair(1));
+            BuildHairColour(Section(einherjar, T("villagepleb_looks_hair_colour"), "EinherjarHairColour"));
+            EinherjarSlider(Section(einherjar, T("villagepleb_looks_eyes"), "EyeColour"), "EyeHue", 0f, 1f);
+            EinherjarSlider(Section(einherjar, T("villagepleb_looks_eye_rich"), "EyeRich"), "EyeSaturation", 0f, 1f);
+            EinherjarSlider(Section(einherjar, T("villagepleb_looks_eye_shade"), "EyeShade"), "EyeValue", 0f, 1f);
+            EinherjarSlider(Section(einherjar, T("villagepleb_looks_eye_glow"), "EyeGlow"), "Glow", 0f, 3f);
+            EinherjarSlider(Section(einherjar, T("villagepleb_looks_iris"), "IrisSize"), "IrisSize", 0.5f, 1.2f);
             // body shape (the female body has it): sizes run -100 to 100, the slider's middle is 0
-            _bodyShapeGroup = Stack(Widgets.Child(valkyr, "BodyShape"), SectionGap, new RectOffset(0, 0, 0, 0));
-            ValkyrSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_bust"), "Bust"), "BreastSize", -100f, 100f);
-            ValkyrSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_hips"), "Hips"), "ButtSize", -100f, 100f);
-            _muscleSection = Section(valkyr, T("villagepleb_looks_muscle"), "Muscle").gameObject;
+            _bodyShapeGroup = Stack(Widgets.Child(einherjar, "BodyShape"), SectionGap, new RectOffset(0, 0, 0, 0));
+            EinherjarSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_bust"), "Bust"), "BreastSize", -100f, 100f);
+            EinherjarSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_hips"), "Hips"), "ButtSize", -100f, 100f);
+            _muscleSection = Section(einherjar, T("villagepleb_looks_muscle"), "Muscle").gameObject;
             MakeSlider(_muscleSection.transform, (Current.BrMuscle >= 0f ? Current.BrMuscle : BodyReplacerLook.MuscleDefault(Current.Model)) / 100f,
                 v => { Current.BrMuscle = v * 100f; ApplyToClone(); });
         }
 
         // A slider for one field of BodyReplacer's look, over that field's range (the slider itself runs 0 to 1)
-        private void ValkyrSlider(Transform section, string field, float min, float max) =>
-            MakeSlider(section, Mathf.InverseLerp(min, max, BodyReplacerLook.Get(Current.BrLook, field)), v => SetValkyrField(field, Mathf.Lerp(min, max, v)));
+        private void EinherjarSlider(Transform section, string field, float min, float max) =>
+            MakeSlider(section, Mathf.InverseLerp(min, max, BodyReplacerLook.Get(Current.BrLook, field)), v => SetEinherjarField(field, Mathf.Lerp(min, max, v)));
 
-        private void SetValkyrField(string field, float value)
+        private void SetEinherjarField(string field, float value)
         {
             Current.BrLook = BodyReplacerLook.Set(Current.BrLook, field, value);
             ApplyToClone();
         }
 
         // The style this body shows, among the ones it offers (each body has its own list)
-        private int ValkyrHairIndex(int[] ids) =>
+        private int EinherjarHairIndex(int[] ids) =>
             Mathf.Max(0, Array.IndexOf(ids, BodyReplacerLook.ShownHairStyle(Current.Model, Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "HairStyle")))));
 
-        private void StepValkyrHair(int by)
+        private void StepEinherjarHair(int by)
         {
             int[] ids = BodyReplacerLook.HairStyleIds(Current.Model);
             if (ids.Length == 0) return;
-            SetValkyrField("HairStyle", ids[(ValkyrHairIndex(ids) + by + ids.Length) % ids.Length]);
+            SetEinherjarField("HairStyle", ids[(EinherjarHairIndex(ids) + by + ids.Length) % ids.Length]);
             Refresh();
         }
 
@@ -198,12 +198,12 @@ namespace VillagePlebs
             Widgets.Place(_hairSwatch.gameObject, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-26f, -7f), new Vector2(-12f, 7f));
             _hairReset = Widgets.IconButton<ResetIcon>(header, 3f);
             Widgets.Place(_hairReset.gameObject, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(-(ResetSize + 34f), -ResetSize / 2f), new Vector2(-34f, ResetSize / 2f));
-            _hairReset.onClick.AddListener(ResetValkyrHair);
-            _hairPicker = new HsvPicker(section, ColourPickerHeight) { OnChanged = SetValkyrHairColour };
+            _hairReset.onClick.AddListener(ResetEinherjarHair);
+            _hairPicker = new HsvPicker(section, ColourPickerHeight) { OnChanged = SetEinherjarHairColour };
         }
 
         // Picking a colour switches it on (until then the hairstyle's own colour shows)
-        private void SetValkyrHairColour(float hue, float saturation, float value)
+        private void SetEinherjarHairColour(float hue, float saturation, float value)
         {
             string look = BodyReplacerLook.Set(Current.BrLook, "HairHue", hue);
             look = BodyReplacerLook.Set(look, "HairSaturation", saturation);
@@ -214,7 +214,7 @@ namespace VillagePlebs
         }
 
         // Back to the hairstyle's own colour
-        private void ResetValkyrHair()
+        private void ResetEinherjarHair()
         {
             string defaults = BodyReplacerLook.DefaultLook(), look = Current.BrLook;
             foreach (string field in new[] { "HairHue", "HairSaturation", "HairValue" }) look = BodyReplacerLook.Set(look, field, BodyReplacerLook.Get(defaults, field));
@@ -424,7 +424,7 @@ namespace VillagePlebs
             ZNetView.m_forceDisableInit = true;
             try { _clone = UnityEngine.Object.Instantiate(prefab, PreviewPos, Quaternion.identity); }
             finally { ZNetView.m_forceDisableInit = false; }
-            // built from the Player prefab: BodyReplacer draws it as it draws companions (its Creatures As Valkyr setting), not as a player
+            // built from the Player prefab: BodyReplacer draws it as it draws companions (its Creatures As Einherjar setting), not as a player
             BodyReplacerLook.TreatAsCreature(_clone);
             Rigidbody body = _clone.GetComponent<Rigidbody>();
             if (body != null) UnityEngine.Object.Destroy(body);
@@ -576,9 +576,9 @@ namespace VillagePlebs
         {
             SetToggle(_maleBtn, Current.Model == 0);
             SetToggle(_femaleBtn, Current.Model == 1);
-            bool valkyr = BodyReplacerLook.Replaces(Current.Model);
-            if (_vanillaLook != null) _vanillaLook.SetActive(!valkyr);
-            if (_valkyrLook != null) _valkyrLook.SetActive(valkyr);
+            bool einherjar = BodyReplacerLook.Replaces(Current.Model);
+            if (_vanillaLook != null) _vanillaLook.SetActive(!einherjar);
+            if (_einherjarLook != null) _einherjarLook.SetActive(einherjar);
             if (_beardGroup != null) _beardGroup.SetActive(Current.Model == 0);
             if (_muscleSection != null) _muscleSection.SetActive(BodyReplacerLook.HasMuscle(Current.Model));
             if (_bodyShapeGroup != null) _bodyShapeGroup.SetActive(BodyReplacerLook.HasBodyShape(Current.Model));
@@ -587,10 +587,10 @@ namespace VillagePlebs
             _skinSlider?.SetValueWithoutNotify(Current.Skin);
             _hairToneSlider?.SetValueWithoutNotify(Current.HairTone);
             _hairShadeSlider?.SetValueWithoutNotify(Current.HairShade);
-            if (_valkyrHairName != null)
+            if (_einherjarHairName != null)
             {
                 string[] names = BodyReplacerLook.HairStyleNames(Current.Model);
-                _valkyrHairName.text = names.Length > 0 ? names[Mathf.Min(ValkyrHairIndex(BodyReplacerLook.HairStyleIds(Current.Model)), names.Length - 1)] : "";
+                _einherjarHairName.text = names.Length > 0 ? names[Mathf.Min(EinherjarHairIndex(BodyReplacerLook.HairStyleIds(Current.Model)), names.Length - 1)] : "";
             }
             if (_hairPicker != null)
             {

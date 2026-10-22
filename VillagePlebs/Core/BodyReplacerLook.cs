@@ -5,11 +5,6 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// BodyReplacer draws its own body on companions (with its Creatures As Valkyr setting) and takes their hairstyle, hair colour and eye
-    /// colour from a look of its own rather than the vanilla ones. This reaches its ValkyrLookApi, found through its plugin, so VillagePlebs
-    /// doesn't depend on it; everything here does nothing when it isn't installed (or is a version without the API).
-    /// </summary>
     internal static class BodyReplacerLook
     {
         private const string Guid = "MagicMike.BodyReplacer";
@@ -39,7 +34,7 @@ namespace VillagePlebs
             {
                 if (!Chainloader.PluginInfos.TryGetValue(Guid, out BepInEx.PluginInfo plugin) || plugin.Instance == null) return;
                 Assembly assembly = plugin.Instance.GetType().Assembly;
-                Type api = assembly.GetType("BodyReplacer.ValkyrLookApi");
+                Type api = assembly.GetType("BodyReplacer.EinherjarLookApi");
                 FieldInfo version = api?.GetField("Version", BindingFlags.Public | BindingFlags.Static);
                 if (version == null || (int)version.GetValue(null) != ApiVersion)
                 {
@@ -58,7 +53,7 @@ namespace VillagePlebs
                 _setField = Bind<Func<string, string, float, string>>(api, "SetField");
                 _treatAsCreature = Bind<Action<GameObject>>(api, "TreatAsCreature");
                 _applyLook = Bind<Action<GameObject, string, float>>(api, "ApplyLook");
-                _visualType = assembly.GetType("BodyReplacer.LokiValkyrVisual");
+                _visualType = assembly.GetType("BodyReplacer.EinherjarVisual");
                 VillagePlebsPlugin.Instance?.Note("BodyReplacer found: companions can be given its hairstyles and colours");
             }
             catch (Exception e)
