@@ -43,11 +43,11 @@ namespace VillagePlebs
         private const float PanPerPixel = 0.004f, LowestPan = -1.4f, HighestPan = 0.4f;
 
         // the columns (made again with the window)
-        private GameObject _beardGroup, _vanillaLook, _valkyrLook, _muscleSection, _bodyShapeGroup, _eyelinerGroup;
+        private GameObject _beardGroup, _vanillaLook, _valkyrLook, _muscleSection, _bodyShapeGroup;
         private RectTransform _lookContent;
         private RawImage _previewImg;
         private Button _maleBtn, _femaleBtn, _hairReset;
-        private TMP_Text _hairName, _beardName, _valkyrHairName, _eyelinerName;
+        private TMP_Text _hairName, _beardName, _valkyrHairName;
         private Slider _skinSlider, _hairToneSlider, _hairShadeSlider;
         private HsvPicker _hairPicker;
         private Image _hairSwatch;
@@ -145,7 +145,7 @@ namespace VillagePlebs
             if (BodyReplacerLook.Available) BuildValkyrLook(list);
         }
 
-        // BodyReplacer's look, for when it draws its own body on the companion: its hairstyles, hair and eye colour, body shape, eyeliner and
+        // BodyReplacer's look, for when it draws its own body on the companion: its hairstyles, hair and eye colour, body shape and
         // muscle (only with BodyReplacer installed)
         private void BuildValkyrLook(Transform list)
         {
@@ -158,16 +158,10 @@ namespace VillagePlebs
             ValkyrSlider(Section(valkyr, T("villagepleb_looks_eye_shade"), "EyeShade"), "EyeValue", 0f, 1f);
             ValkyrSlider(Section(valkyr, T("villagepleb_looks_eye_glow"), "EyeGlow"), "Glow", 0f, 3f);
             ValkyrSlider(Section(valkyr, T("villagepleb_looks_iris"), "IrisSize"), "IrisSize", 0.5f, 1.2f);
-            // body shape and eyeliner (the female body has them): sizes run -100 to 100, the slider's middle is 0
+            // body shape (the female body has it): sizes run -100 to 100, the slider's middle is 0
             _bodyShapeGroup = Stack(Widgets.Child(valkyr, "BodyShape"), SectionGap, new RectOffset(0, 0, 0, 0));
             ValkyrSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_bust"), "Bust"), "BreastSize", -100f, 100f);
             ValkyrSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_hips"), "Hips"), "ButtSize", -100f, 100f);
-            _eyelinerGroup = Stack(Widgets.Child(valkyr, "Eyeliner"), SectionGap, new RectOffset(0, 0, 0, 0));
-            _eyelinerName = PickerRow(Section(_eyelinerGroup.transform, T("villagepleb_looks_eyeliner"), "EyelinerStyle"), () => StepEyeliner(-1), () => StepEyeliner(1));
-            ValkyrSlider(Section(_eyelinerGroup.transform, T("villagepleb_looks_eyeliner_tone"), "EyelinerTone"), "EyelinerHue", 0f, 1f);
-            ValkyrSlider(Section(_eyelinerGroup.transform, T("villagepleb_looks_eyeliner_rich"), "EyelinerRich"), "EyelinerSaturation", 0f, 1f);
-            ValkyrSlider(Section(_eyelinerGroup.transform, T("villagepleb_looks_eyeliner_shade"), "EyelinerShade"), "EyelinerValue", 0f, 1f);
-            ValkyrSlider(Section(_eyelinerGroup.transform, T("villagepleb_looks_eyeliner_strength"), "EyelinerStrength"), "EyelinerStrength", 0f, 1f);
             _muscleSection = Section(valkyr, T("villagepleb_looks_muscle"), "Muscle").gameObject;
             MakeSlider(_muscleSection.transform, (Current.BrMuscle >= 0f ? Current.BrMuscle : BodyReplacerLook.MuscleDefault(Current.Model)) / 100f,
                 v => { Current.BrMuscle = v * 100f; ApplyToClone(); });
@@ -192,15 +186,6 @@ namespace VillagePlebs
             int[] ids = BodyReplacerLook.HairStyleIds(Current.Model);
             if (ids.Length == 0) return;
             SetValkyrField("HairStyle", ids[(ValkyrHairIndex(ids) + by + ids.Length) % ids.Length]);
-            Refresh();
-        }
-
-        private void StepEyeliner(int by)
-        {
-            int count = BodyReplacerLook.EyelinerNames().Length;
-            if (count == 0) return;
-            int style = Mathf.Clamp(Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "EyelinerStyle")), 0, count - 1);
-            SetValkyrField("EyelinerStyle", (style + by + count) % count);
             Refresh();
         }
 
@@ -597,7 +582,6 @@ namespace VillagePlebs
             if (_beardGroup != null) _beardGroup.SetActive(Current.Model == 0);
             if (_muscleSection != null) _muscleSection.SetActive(BodyReplacerLook.HasMuscle(Current.Model));
             if (_bodyShapeGroup != null) _bodyShapeGroup.SetActive(BodyReplacerLook.HasBodyShape(Current.Model));
-            if (_eyelinerGroup != null) _eyelinerGroup.SetActive(BodyReplacerLook.HasEyeliner(Current.Model));
             if (_hairName != null) _hairName.text = Words.Show(Looks.StyleName(Current.Hair, Looks.Hairs()));
             if (_beardName != null) _beardName.text = Words.Show(Looks.StyleName(Current.Beard, Looks.Beards()));
             _skinSlider?.SetValueWithoutNotify(Current.Skin);
@@ -607,11 +591,6 @@ namespace VillagePlebs
             {
                 string[] names = BodyReplacerLook.HairStyleNames(Current.Model);
                 _valkyrHairName.text = names.Length > 0 ? names[Mathf.Min(ValkyrHairIndex(BodyReplacerLook.HairStyleIds(Current.Model)), names.Length - 1)] : "";
-            }
-            if (_eyelinerName != null)
-            {
-                string[] names = BodyReplacerLook.EyelinerNames();
-                _eyelinerName.text = names.Length > 0 ? names[Mathf.Clamp(Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "EyelinerStyle")), 0, names.Length - 1)] : "";
             }
             if (_hairPicker != null)
             {

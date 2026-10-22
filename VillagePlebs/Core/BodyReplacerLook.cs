@@ -20,9 +20,8 @@ namespace VillagePlebs
         private static Func<int, int[]> _hairStyleIds;
         private static Func<int, string[]> _hairStyleNames;
         private static Func<int, int, int> _shownHairStyle;
-        private static Func<int, bool> _hasMuscle, _hasBodyShape, _hasEyeliner;
+        private static Func<int, bool> _hasMuscle, _hasBodyShape;
         private static Func<int, float> _muscleDefault;
-        private static Func<string[]> _eyelinerNames;
         private static Func<string> _defaultLook;
         private static Func<string, string, float> _getField;
         private static Func<string, string, float, string> _setField;
@@ -54,8 +53,6 @@ namespace VillagePlebs
                 _hasMuscle = Bind<Func<int, bool>>(api, "HasMuscle");
                 _muscleDefault = Bind<Func<int, float>>(api, "MuscleDefault");
                 _hasBodyShape = Bind<Func<int, bool>>(api, "HasBodyShape");
-                _hasEyeliner = Bind<Func<int, bool>>(api, "HasEyeliner");
-                _eyelinerNames = Bind<Func<string[]>>(api, "EyelinerNames");
                 _defaultLook = Bind<Func<string>>(api, "DefaultLook");
                 _getField = Bind<Func<string, string, float>>(api, "GetField");
                 _setField = Bind<Func<string, string, float, string>>(api, "SetField");
@@ -88,8 +85,6 @@ namespace VillagePlebs
         public static float MuscleDefault(int model) => Available ? _muscleDefault(model) : 50f;
         /// <summary>Bust and hip size, on a body that has them.</summary>
         public static bool HasBodyShape(int model) => Available && _hasBodyShape(model);
-        public static bool HasEyeliner(int model) => Available && _hasEyeliner(model);
-        public static string[] EyelinerNames() => Available ? _eyelinerNames() : Array.Empty<string>();
         public static string DefaultLook() => Available ? _defaultLook() : "";
         public static float Get(string look, string field) => Available ? _getField(look, field) : 0f;
         public static string Set(string look, string field, float value) => Available ? _setField(look, field, value) : look;
