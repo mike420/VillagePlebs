@@ -1,6 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
-  <!-- Visual Studio solution builds get this through JotunnLib (from the solution folder); this covers building the project on its own -->
   <Import Project="$(MSBuildThisFileDirectory)..\Environment.props" Condition="'$(SolutionDir)' == '' And Exists('$(MSBuildThisFileDirectory)..\Environment.props')" />
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -45,15 +44,10 @@
     <StartWorkingDirectory>$(VALHEIM_INSTALL)</StartWorkingDirectory>
   </PropertyGroup>
   <ItemGroup>
-    <!-- The companions' words: one file per language in Assets\Translations\<Language>\VillagePlebs.json, put in
-         BepInEx\config\VillagePlebs\Translations\<Language>\ (CopyOutputAssets; the package's config folder) and read from there by
-         Core\Translations.cs. English is also built in, for any key the files lack. -->
     <EmbeddedResource Include="Assets\Translations\English\VillagePlebs.json">
       <LogicalName>translations/English.json</LogicalName>
     </EmbeddedResource>
-    <!-- (not English again: it is listed above, and would show twice in the project) -->
     <None Include="Assets\Translations\**\VillagePlebs.json" Exclude="Assets\Translations\English\VillagePlebs.json" />
-    <!-- Traders' lists: the icon of a companion for sale (Companion\Trading.cs) -->
     <EmbeddedResource Include="Assets\gift_box.png">
       <LogicalName>gift_box.png</LogicalName>
     </EmbeddedResource>
@@ -66,7 +60,6 @@
     <Compile Include="Companion\*.cs" />
     <Compile Include="Core\*.cs" />
   </ItemGroup>
-  <!-- ModSettings is shared with other mods: the Shared folder is the ValheimShared git submodule -->
   <ItemGroup>
     <Compile Include="..\Shared\ModSettings\*.cs">
       <Link>ModSettings\%(Filename)%(Extension)</Link>
@@ -84,7 +77,6 @@
     <None Include="app.config" Visible="false" />
     <None Include="README.md" Visible="false" />
   </ItemGroup>
-  <!-- The game's own copy, beyond the ones JotunnLib references: JSON (saved companion profiles) -->
   <ItemGroup>
     <Reference Include="Newtonsoft.Json">
       <HintPath>$(VALHEIM_INSTALL)\valheim_Data\Managed\Newtonsoft.Json.dll</HintPath>

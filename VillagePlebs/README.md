@@ -1,14 +1,3 @@
-﻿# JotunnModStub
-Upon building for release, this README.md is copied into the `Package` folder for thunderstore packaging. Remember to also edit the manifest.json and supply your own mod icon.
+﻿# VillagePlebs
 
-## Installation (manual)
-
-
-## Features
-
-
-## Changelog
-
-
-## Known issues
-You can find the github at:
+See [Package/README.md](Package/README.md) for the mod's description, features and settings, and the [repository README](../README.md) for building it.

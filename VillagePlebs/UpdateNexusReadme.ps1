@@ -1,9 +1,5 @@
 param ($readmeFile, $nexusFile)
 
-# Converts the ThunderStore README (markdown) into BBCode for the Nexus mod page.
-# Nexus has no tables or inline code, and shows emoji as "?", so the config table becomes one list per section,
-# inline code becomes bold, and emoji are dropped.
-
 function Convert-Inline([string] $text) {
     $text = [regex]::Replace($text, '<a href="([^"]+)">!\[[^\]]*\]\(([^)]+)\)</a>', '[url=$1][img]$2[/img][/url]')
     $text = [regex]::Replace($text, '!\[[^\]]*\]\(([^)]+)\)', '[img]$1[/img]')
@@ -14,15 +10,12 @@ function Convert-Inline([string] $text) {
     return $text
 }
 
-# Inline <br> becomes a line break, except one at the end of the line, which the line's own break replaces;
-# done after Remove-Emoji so its Trim keeps trailing breaks
 function Convert-Line([string] $text) {
     $text = (Remove-Emoji (Convert-Inline $text)) -replace '\s*<br\s*/?>$', ''
     return ($text -replace '\s*<br\s*/?>\s*', "`r`n")
 }
 
 function Remove-Emoji([string] $text) {
-    # Surrogate pairs (most emoji), the symbol blocks with the other emoji used, and the emoji variation selector
     $emoji = '[' + [char]0xD800 + '-' + [char]0xDFFF + [char]0x2600 + '-' + [char]0x27BF + [char]0x2B00 + '-' + [char]0x2BFF + [char]0xFE0F + ']'
     $text = [regex]::Replace($text, $emoji, '')
     return ([regex]::Replace($text, ' {2,}', ' ')).Trim()
@@ -58,7 +51,6 @@ try {
         }
     }
 
-    # Image cells are joined to the text cell after them ("[img]..[/img] Raw Meat"), giving one label per item
     function Join-Cells([string[]] $cells) {
         $parts = New-Object System.Collections.Generic.List[string]
         $image = ''
@@ -76,8 +68,6 @@ try {
         return $parts
     }
 
-    # The config table (icon | Piece | Setting | Default, or Section | Setting | Default | What it does; Piece or Section blank on follow-up rows) becomes one list per piece;
-    # any other table becomes one list item per row
     function Flush-Table {
         $rows = $script:tableRows
         if ($rows.Count -eq 0) { return }
@@ -93,10 +83,12 @@ try {
             $settingColumn = [array]::IndexOf($header, 'Setting')
             $defaultColumn = [array]::IndexOf($header, 'Default')
             $started = $false
+            $lastPiece = $null
             foreach ($cells in $body) {
                 $piece = $cells[$pieceColumn]
-                if ($piece -or -not $started) {
+                if (($piece -and $piece -ne $lastPiece) -or -not $started) {
                     if (-not $piece) { $piece = 'General' }
+                    $lastPiece = $piece
                     Close-List
                     if ($started) { $script:out.Add('') }
                     $label = (@(Join-Cells $cells[0..$pieceColumn]) -join ' ')
@@ -130,7 +122,6 @@ try {
         $trimmed = $line.Trim()
 
         if ($trimmed -match '^\|') {
-            # Strip exactly one outer pipe each side so a leading empty cell ("||") is kept
             $inner = $trimmed -replace '^\|', '' -replace '\|$', ''
             $tableRows.Add([string[]]($inner.Split('|') | ForEach-Object { $_.Trim() }))
             continue
@@ -147,7 +138,6 @@ try {
         }
         Close-List
 
-        # <details>/<summary> collapsibles become a bold title followed by a Nexus spoiler
         if ($trimmed -match '^<details>$') {
             continue
         }
@@ -181,7 +171,6 @@ try {
     Flush-Table
     Close-List
 
-    # At most two blank lines in a row, a blank line after each heading, none at the ends
     $text = ($out -join "`r`n")
     $text = [regex]::Replace($text, '(\r\n){4,}', "`r`n`r`n`r`n")
     $text = [regex]::Replace($text, '(\[/size\])\r\n(?!\r\n)', "`$1`r`n`r`n")

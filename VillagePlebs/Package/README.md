@@ -1,6 +1,6 @@
 # 🧔 VillagePlebs
 
-Create multiple viking companions, follower NPC's who play like a player: come on your adventures, fight beside you, lives their own life at home, and gets better as they go.
+Create multiple viking companions, follower NPCs who play like a player: they come on your adventures, fight beside you, live their own lives at home, and get better as they go.
 
 <br>
 
@@ -20,7 +20,7 @@ Thank you for your support, and happy gaming! ⚔️  ...... (A Paypal account i
 ## ⭐ Features:
 
   * Press `J` to summon your companion or open its menu (`E` on it too). Hold `J`: your companions come with you, or go home.
-  * **Point and command:** aim at something and press `H`: an enemy (they attack it), a tree, rock or plant (it works it), your chest (it puts its things in), a cart (it pulls it), the ground (it waits there), the sky (it comes back).
+  * **Point and command:** aim at something and press `H`: an enemy (it attacks it), a tree, rock or plant (it works it), your chest (it puts its things in), a cart (it pulls it), its tombstone (it fetches its things), a free bed (it makes it its bed), the ground (it waits there), the sky (it comes back).
   * **Let it decide:** it reads what you are doing. It fights beside you, mines or chops beside you and keeps close while you explore; where a place is too dangerous for its gear it tells you and only defends.
   * **Combat:** timed parries (it learns each creature's swing), dodge rolls, flanking, backstabs, weapon specials, meads, kiting with a bow, and care around bosses.
   * **Follows you anywhere:** through portals, into crypts and caves, onto boats and through doors; it steers round stakes and fires and gets itself unstuck.
@@ -30,6 +30,7 @@ Thank you for your support, and happy gaming! ⚔️  ...... (A Paypal account i
   * **A journal** of its life, small talk that fits the moment, and a menu with its status, stats, orders, home, inventory, looks and companions.
   * **EpicMMO System:** it earns experience and levels from what it kills and gathers.
   * **StarLevelSystem:** it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.
+  * **Body Replacer (optional):** with Magic Mike's Body Replacer installed, its looks menu also offers that mod's Einherjar bodies, game hairstyles and tattoos.
   * **Languages:** English, Russian, German, Chinese, Portuguese (Brazil), Spanish, French, Polish and Turkish, following the game's language setting.
 <br>
 <br>
@@ -41,7 +42,7 @@ Settings are in `BepInEx/config/MagicMike.VillagePlebs.cfg`. Change them in game
 | Section | Setting | Default | What it does |
 |---|---|---|---|
 | General | Menu Key | J | Tap: your companion's menu (or the summon panel). Hold: your companions near you come with you, or go home. |
-| General | Command Key | H | Point at something and press it to give an order. |
+| General | Command Key | H | Point at something and press it to give an order: an enemy, a tree, rock or plant, your chest, a cart, its tombstone, a free bed, the ground or the sky. |
 | Companion | Max Companions | 1 | How many companions each player can have for free, summoned from the menu (synced). |
 | Companion | Max Bought Companions | 2 | How many more each player can buy from any trader (Haldor, Hildir, the Bog Witch), 0 to 6. Buying one lets you name them; the coins are taken when they join you (synced). |
 | Companion | Companion Price | 500 | What a trader asks for a companion, in coins (synced). |
@@ -68,6 +69,7 @@ Restart the game after installing or updating so the companion registers cleanly
 
   * <a href="https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/">BepInExPack Valheim</a>
   * <a href="https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/">Jötunn</a>
+  * Optional: Body Replacer by Magic Mike, for more looks.
 
 <br>
 

@@ -1,6 +1,6 @@
 [size=6][b]VillagePlebs[/b][/size]
 
-Create multiple viking companions, follower NPC's who play like a player: come on your adventures, fight beside you, lives their own life at home, and gets better as they go.
+Create multiple viking companions, follower NPCs who play like a player: they come on your adventures, fight beside you, live their own lives at home, and get better as they go.
 
 
 [size=5][b]Donations[/b][/size]
@@ -18,7 +18,7 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 
 [list]
 [*]Press [b]J[/b] to summon your companion or open its menu ([b]E[/b] on it too). Hold [b]J[/b]: your companions come with you, or go home.
-[*][b]Point and command:[/b] aim at something and press [b]H[/b]: an enemy (they attack it), a tree, rock or plant (it works it), your chest (it puts its things in), a cart (it pulls it), the ground (it waits there), the sky (it comes back).
+[*][b]Point and command:[/b] aim at something and press [b]H[/b]: an enemy (it attacks it), a tree, rock or plant (it works it), your chest (it puts its things in), a cart (it pulls it), its tombstone (it fetches its things), a free bed (it makes it its bed), the ground (it waits there), the sky (it comes back).
 [*][b]Let it decide:[/b] it reads what you are doing. It fights beside you, mines or chops beside you and keeps close while you explore; where a place is too dangerous for its gear it tells you and only defends.
 [*][b]Combat:[/b] timed parries (it learns each creature's swing), dodge rolls, flanking, backstabs, weapon specials, meads, kiting with a bow, and care around bosses.
 [*][b]Follows you anywhere:[/b] through portals, into crypts and caves, onto boats and through doors; it steers round stakes and fires and gets itself unstuck.
@@ -28,6 +28,7 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status, stats, orders, home, inventory, looks and companions.
 [*][b]EpicMMO System:[/b] it earns experience and levels from what it kills and gathers.
 [*][b]StarLevelSystem:[/b] it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.
+[*][b]Body Replacer (optional):[/b] with Magic Mike's Body Replacer installed, its looks menu also offers that mod's Einherjar bodies, game hairstyles and tattoos.
 [*][b]Languages:[/b] English, Russian, German, Chinese, Portuguese (Brazil), Spanish, French, Polish and Turkish, following the game's language setting.
 [/list]
 
@@ -39,65 +40,21 @@ Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in
 [b]General[/b]
 [list]
 [*][b]Menu Key[/b] (default J)
-[/list]
-
-[b]General[/b]
-[list]
 [*][b]Command Key[/b] (default H)
 [/list]
 
 [b]Companion[/b]
 [list]
 [*][b]Max Companions[/b] (default 1)
-[/list]
-
-[b]Companion[/b]
-[list]
 [*][b]Max Bought Companions[/b] (default 2)
-[/list]
-
-[b]Companion[/b]
-[list]
 [*][b]Companion Price[/b] (default 500)
-[/list]
-
-[b]Companion[/b]
-[list]
 [*][b]While Away[/b] (default Mild)
-[/list]
-
-[b]Companion[/b]
-[list]
 [*][b]Fight Range[/b] (default 12)
-[/list]
-
-[b]Companion[/b]
-[list]
 [*][b]Show Decisions[/b] (default true)
-[/list]
-
-[b]Companion[/b]
-[list]
 [*][b]Respawn Seconds[/b] (default 30)
-[/list]
-
-[b]Companion[/b]
-[list]
 [*][b]Base Health[/b] (default 25)
-[/list]
-
-[b]Companion[/b]
-[list]
 [*][b]Base Stamina[/b] (default 75)
-[/list]
-
-[b]Companion[/b]
-[list]
 [*][b]Eat Below Percent[/b] (default 10)
-[/list]
-
-[b]Companion[/b]
-[list]
 [*][b]Starting Skill[/b] (default 0)
 [/list]
 
@@ -119,6 +76,7 @@ Restart the game after installing or updating so the companion registers cleanly
 [list]
 [*][url=https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/]BepInExPack Valheim[/url]
 [*][url=https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/]Jötunn[/url]
+[*]Optional: Body Replacer by Magic Mike, for more looks.
 [/list]
 
 
