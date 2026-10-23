@@ -17,6 +17,15 @@ Thank you for your support, and happy gaming! ⚔️  ...... (A Paypal account i
 <br>
 <br>
 
+
+## 📦 Requirements:
+
+  * <a href="https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/">BepInExPack Valheim</a>
+  * <a href="https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/">Jötunn</a>
+  * Optional: Body Replacer by Magic Mike, for more looks.
+
+<br>
+
 ## ⭐ Features:
 
   * Press `J` to summon your companion or open its menu (`E` on it too). Hold `J`: your companions come with you, or go home.
@@ -63,14 +72,6 @@ Settings are in `BepInEx/config/MagicMike.VillagePlebs.cfg`. Change them in game
 Everyone in the world needs the mod, **the host too**: without it the game deletes saved companions. Each companion belongs to whoever summoned it. The host decides how many companions each player can have, what they do while you're away, respawn time, base health and stamina, when they eat, starting skill and EpicMMO experience.
 
 Restart the game after installing or updating so the companion registers cleanly.
-<br>
-
-## 📦 Requirements:
-
-  * <a href="https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/">BepInExPack Valheim</a>
-  * <a href="https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/">Jötunn</a>
-  * Optional: Body Replacer by Magic Mike, for more looks.
-
 <br>
 
 ## 💻 Installation:

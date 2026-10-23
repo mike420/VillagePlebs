@@ -14,6 +14,15 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [url=https://www.paypal.com/donate/?hosted_button_id=BN8HEWHRMAREU][img]https://imgup.uk/i/n7Sg7WK9.png[/img][/url]
 
 
+[size=5][b]Requirements[/b][/size]
+
+[list]
+[*][url=https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/]BepInExPack Valheim[/url]
+[*][url=https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/]Jötunn[/url]
+[*]Optional: Body Replacer by Magic Mike, for more looks.
+[/list]
+
+
 [size=5][b]Features[/b][/size]
 
 [list]
@@ -69,15 +78,6 @@ Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in
 Everyone in the world needs the mod, [b]the host too[/b]: without it the game deletes saved companions. Each companion belongs to whoever summoned it. The host decides how many companions each player can have, what they do while you're away, respawn time, base health and stamina, when they eat, starting skill and EpicMMO experience.
 
 Restart the game after installing or updating so the companion registers cleanly.
-
-
-[size=5][b]Requirements[/b][/size]
-
-[list]
-[*][url=https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/]BepInExPack Valheim[/url]
-[*][url=https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/]Jötunn[/url]
-[*]Optional: Body Replacer by Magic Mike, for more looks.
-[/list]
 
 
 [size=5][b]Installation[/b][/size]
