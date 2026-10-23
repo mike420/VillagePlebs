@@ -5,31 +5,23 @@ using static VillagePlebs.Words;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// What it is working toward: its next piece of better gear (an upgrade of something it wears, or something new worth making at a station
-    /// near home), what that still needs, and where those things come from. It gathers toward it first (Work prefers the trees, rocks,
-    /// plants and animals that drop what is missing), makes the in-between materials itself (bronze from copper and tin, at the forge) and
-    /// asks you for what it cannot get (a troll hide, an ore it has no pickaxe for). Without a goal it gathers what it can, as before.
-    /// </summary>
     internal class Goal
     {
-        public string What = "";                    // "bronze helmet", "bronze axe (level 2)" (packed text, Words.P)
-        public ItemDrop.ItemData Item;              // upgrading this
-        public Recipe Recipe;                       // or making this
+        public string What = "";
+        public ItemDrop.ItemData Item;
+        public Recipe Recipe;
         public CraftingStation Station;
-        public readonly Dictionary<string, int> Raw = new Dictionary<string, int>();       // item prefab name -> how many to gather
-        public readonly Dictionary<string, string> Names = new Dictionary<string, string>(); // item prefab name -> its m_name ("$item_copperore")
-        public readonly List<string> Ask = new List<string>();                           // "2 troll hide" it cannot get itself (packed text)
-        public readonly List<KeyValuePair<Recipe, CraftingStation>> Steps = new List<KeyValuePair<Recipe, CraftingStation>>(); // materials to make on the way
-        public readonly HashSet<string> Smelt = new HashSet<string>();                   // bars that need a smelter, by m_name ("$item_copper")
-        public int Cost;                                                                 // how much is missing (to pick the nearest goal)
+        public readonly Dictionary<string, int> Raw = new Dictionary<string, int>();
+        public readonly Dictionary<string, string> Names = new Dictionary<string, string>();
+        public readonly List<string> Ask = new List<string>();
+        public readonly List<KeyValuePair<Recipe, CraftingStation>> Steps = new List<KeyValuePair<Recipe, CraftingStation>>();
+        public readonly HashSet<string> Smelt = new HashSet<string>();
+        public int Cost;
 
         public bool Wants(string prefab) => prefab != null && Raw.ContainsKey(prefab);
 
-        /// <summary>"4 copper ore, 2 tin ore" (packed text)</summary>
         public string RawText() => string.Join(", ", Raw.Select(kv => P("villagepleb_goals_amount", kv.Value, Low(Names[kv.Key]))));
 
-        /// <summary>The names of what it gathers for it, each a packed "copper ore" (for And / Or).</summary>
         public IEnumerable<string> Things() => Names.Values.Select(Goals.Thing);
     }
 
@@ -37,10 +29,10 @@ namespace VillagePlebs
     {
         private class Source { public Job Job; public int Tier; public string Creature, Prefab; }
 
-        private static Dictionary<string, List<Source>> _sources;   // item prefab name -> what drops it
-        private static Dictionary<string, ItemDrop> _smeltedFrom;   // bar prefab name -> the ore a smelter makes it from
-        private static HashSet<string> _crops;                     // what your planted crops grow into: never picked
-        private static Dictionary<string, float> _unfindable;      // the companion being planned for: what is not near its home
+        private static Dictionary<string, List<Source>> _sources;
+        private static Dictionary<string, ItemDrop> _smeltedFrom;
+        private static HashSet<string> _crops;
+        private static Dictionary<string, float> _unfindable;
 
         private static readonly HashSet<string> Prey = new HashSet<string> { "Deer", "Boar", "Neck", "Hare" };
 
@@ -77,7 +69,7 @@ namespace VillagePlebs
                 MineRock5 rock5 = prefab.GetComponent<MineRock5>();
                 if (rock5 != null) Add(rock5.m_dropItems, Work.IsOre(rock5.m_dropItems) ? Job.Ore : Job.Stone, rock5.m_minToolTier);
                 Pickable pick = prefab.GetComponent<Pickable>();
-                if (pick != null && pick.m_itemPrefab != null && !_crops.Contains(prefab.name)) AddOne(pick.m_itemPrefab.name, new Source { Job = Job.Forage, Prefab = prefab.name }); // (flint on the shore grows back or not)
+                if (pick != null && pick.m_itemPrefab != null && !_crops.Contains(prefab.name)) AddOne(pick.m_itemPrefab.name, new Source { Job = Job.Forage, Prefab = prefab.name });
                 CharacterDrop cd = prefab.GetComponent<CharacterDrop>();
                 if (cd != null && Prey.Contains(prefab.name))
                     foreach (CharacterDrop.Drop d in cd.m_drops) if (d?.m_prefab != null) AddOne(d.m_prefab.name, new Source { Job = Job.Hunt, Creature = prefab.name });
@@ -100,34 +92,29 @@ namespace VillagePlebs
             list.Add(s);
         }
 
-        /// <summary>Can it get this itself, with the tools it has? (an axe or pickaxe of the tier the source needs, a weapon for hunting)</summary>
         private static bool CanGather(Humanoid me, string item)
         {
             if (!_sources.TryGetValue(item, out List<Source> list)) return false;
-            if (_unfindable != null && _unfindable.TryGetValue(item, out float until) && until > Time.time) return false; // not near home
+            if (_unfindable != null && _unfindable.TryGetValue(item, out float until) && until > Time.time) return false;
             int axe = Work.Axe(me)?.m_shared.m_toolTier ?? -1, pick = Work.Pickaxe(me)?.m_shared.m_toolTier ?? -1;
             bool armed = Companion.BestMelee(me) != null || Companion.BestRanged(me) != null;
             return list.Any(s => s.Job == Job.Forage || (s.Job == Job.Hunt && armed) || (s.Job == Job.Wood && axe >= s.Tier) || ((s.Job == Job.Stone || s.Job == Job.Ore) && pick >= s.Tier));
         }
 
-        /// <summary>Something that work of that kind drops (wood and resin from trees, stone and ore from rocks, berries from bushes).</summary>
         public static bool DroppedBy(string item, Job job)
         {
             Learn();
             return _sources != null && _sources.TryGetValue(item, out List<Source> list) && list.Any(s => (s.Job & job) != 0);
         }
 
-        /// <summary>The wild pickables (not crops) that give this item: "Pickable_Flint" for flint.</summary>
         public static IEnumerable<string> PickablesFor(string item)
         {
             Learn();
             return _sources != null && _sources.TryGetValue(item, out List<Source> list) ? list.Where(s => s.Prefab != null).Select(s => s.Prefab).Distinct() : Enumerable.Empty<string>();
         }
 
-        /// <summary>A pickable your crops grow into (never picked by it).</summary>
         public static bool IsCrop(string prefab) { Learn(); return _crops != null && _crops.Contains(prefab); }
 
-        /// <summary>The jobs that get what the goal is missing, and the creatures to hunt for it.</summary>
         public static Job JobsFor(Goal g, out HashSet<string> creatures)
         {
             creatures = new HashSet<string>();
@@ -145,10 +132,6 @@ namespace VillagePlebs
             return me.GetInventory().CountItems(name) + chests.Sum(c => c != null ? c.GetInventory().CountItems(name) : 0);
         }
 
-        /// <summary>
-        /// Its next goal, or null when there is nothing to work toward (nothing better to make or upgrade at the stations near home). Goals it
-        /// can gather everything for come first, then the cheapest; with only goals it needs help with, the one needing least from you.
-        /// </summary>
         public static Goal Pick(Humanoid me, Vector3 center, float radius, BrainState st = null)
         {
             Learn();
@@ -171,13 +154,12 @@ namespace VillagePlebs
             foreach (Recipe r in ObjectDB.instance.m_recipes)
             {
                 if (r == null || !r.m_enabled || r.m_item == null || !Upgrades.WorthMaking(me, r.m_item.m_itemData)) continue;
-                if (r.m_item.m_itemData.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Ammo) continue; // arrows are made when it has the things (Upgrades), never a goal
+                if (r.m_item.m_itemData.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Ammo) continue;
                 CraftingStation at = r.m_craftingStation == null ? null : stations.FirstOrDefault(s => s.m_name == r.m_craftingStation.m_name && s.GetLevel() >= Mathf.Max(1, r.m_minStationLevel));
-                if (at == null && r.m_craftingStation != null) continue; // (no station needed: made anywhere)
+                if (at == null && r.m_craftingStation != null) continue;
                 var g = new Goal { Recipe = r, Station = at, What = P("villagepleb_goals_make_what", Low(r.m_item.m_itemData.m_shared.m_name)) };
                 if (Build(me, chests, stations, g, r, 1)) goals.Add(g);
             }
-            // Its mission first, while it is still among them (it sticks to what it set out to do); never one it gave up within the hour.
             var ranked = goals.Where(g => st == null || !Missions.Blocked(st, Missions.KeyOf(g)))
                               .OrderBy(g => g.Ask.Count > 0 ? 1 : 0).ThenBy(g => g.Ask.Count).ThenBy(g => g.Cost).ToList();
             if (st != null)
@@ -190,10 +172,6 @@ namespace VillagePlebs
             return ranked.FirstOrDefault();
         }
 
-        /// <summary>
-        /// A goal for materials something else needs (your plan's pieces): for each item and how many are still short, where it comes from
-        /// (gathered, smelted, made at a station near home) or that it must ask you. Null when nothing is short.
-        /// </summary>
         public static Goal ForNeeds(Humanoid me, Vector3 center, float radius, BrainState st, IEnumerable<KeyValuePair<ItemDrop, int>> short_, List<Container> chests, string what)
         {
             Learn();
@@ -205,7 +183,6 @@ namespace VillagePlebs
             return g.Cost > 0 ? g : null;
         }
 
-        /// <summary>Fills in what the goal is missing; false when nothing is (then Upgrades makes it at once) .</summary>
         private static bool Build(Humanoid me, List<Container> chests, List<CraftingStation> stations, Goal g, Recipe r, int quality)
         {
             bool missing = false;
@@ -220,10 +197,6 @@ namespace VillagePlebs
             return missing;
         }
 
-        /// <summary>
-        /// Where "need" of an item comes from: gathered (a tree, a rock, a plant, an animal it can deal with), smelted from an ore (it gathers
-        /// the ore; a smelter makes the bars), or made from other materials at a station near home (bronze); else it has to ask you.
-        /// </summary>
         private static void Expand(Humanoid me, List<Container> chests, List<CraftingStation> stations, Goal g, ItemDrop item, int need, int depth)
         {
             string prefab = item.gameObject.name;
@@ -255,21 +228,17 @@ namespace VillagePlebs
             g.Cost += 100;
         }
 
-        /// <summary>An in-between material for its goal it can make right now (bronze, when it has the copper and tin), and where.</summary>
         public static KeyValuePair<Recipe, CraftingStation>? StepReady(Humanoid me, Goal g)
         {
             if (g == null) return null;
             foreach (var step in g.Steps)
             {
-                List<Container> chests = Upgrades.ChestsNear(me, step.Value != null ? step.Value.transform.position : me.transform.position); // as Upgrades.Craft pays
+                List<Container> chests = Upgrades.ChestsNear(me, step.Value != null ? step.Value.transform.position : me.transform.position);
                 if (Upgrades.Needs(step.Key).All(q => q.m_resItem == null || Have(me, chests, q.m_resItem) >= q.GetAmount(1))) return step;
             }
             return null;
         }
 
-        /// <summary>
-        /// Tell its player about a new goal, and ask for what it cannot get itself (each at most every so often). Called when it picks one.
-        /// </summary>
         public static void Announce(BrainState st, Goal g)
         {
             Humanoid me = st.Body;
@@ -279,20 +248,17 @@ namespace VillagePlebs
                 st.GoalSaid = g.What;
                 string need = g.Raw.Count > 0 ? " " + P("villagepleb_goals_still_need", g.RawText()) : "";
                 string smelt = g.Smelt.Count > 0 ? " " + P(g.Smelt.Count == 1 ? "villagepleb_goals_smelter_one" : "villagepleb_goals_smelter_many", And(g.Smelt.Select(Thing))) : "";
-                Talk.Mention(me, P("villagepleb_goals_working_toward", g.What) + need + smelt, "goal:" + g.What, 30f); // (its menu shows it: not for chat)
+                Talk.Mention(me, P("villagepleb_goals_working_toward", g.What) + need + smelt, "goal:" + g.What, 30f);
                 st.Remember(P("villagepleb_goals_remember_working", g.What));
             }
             if (g.Ask.Count > 0)
                 Talk.Tell(me, P("villagepleb_goals_ask", g.What, And(g.Ask)), "ask:" + g.What, 60f);
         }
 
-        /// <summary>A thing's name ("$item_copper") as packed text, in lower case mid-sentence: "copper".</summary>
         public static string Thing(string token) => P("villagepleb_goals_thing", Low(token));
 
-        /// <summary>"copper, tin and iron" (packed text); the items are packed text themselves.</summary>
         public static string And(IEnumerable<string> items) => Join(items, "villagepleb_goals_and");
 
-        /// <summary>"copper, tin or iron" (packed text).</summary>
         public static string Or(IEnumerable<string> items) => Join(items, "villagepleb_goals_or");
 
         private static string Join(IEnumerable<string> items, string key)

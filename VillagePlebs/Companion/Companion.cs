@@ -10,10 +10,6 @@ namespace VillagePlebs
     public enum Order { Follow, Stay, Guard, Gather }
     public enum Style { Aggressive, Balanced, Defensive, Passive, Auto }
 
-    /// <summary>
-    /// A companion's saved settings, in its ZDO so they travel with it and every player sees the same. Only the ZDO's owner writes them
-    /// (the menu claims ownership first), as the game itself does.
-    /// </summary>
     internal static class Keys
     {
         public const string Master = "vp_master", MasterName = "vp_mastername", Name = "vp_name", Order = "vp_order", Post = "vp_post",
@@ -41,7 +37,6 @@ namespace VillagePlebs
 
         public static IEnumerable<Humanoid> All() => Character.GetAllCharacters().OfType<Humanoid>().Where(Is);
 
-        /// <summary>Its own lasting id (made by its owner the first time it is asked for).</summary>
         public static long IdOf(Component c)
         {
             ZDO zdo = Zdo(c);
@@ -59,16 +54,13 @@ namespace VillagePlebs
         public static bool IsMine(Component c, Player p) => p != null && MasterId(c) == p.GetPlayerID();
         public static string NameOf(Component c) { string n = Zdo(c)?.GetString(Keys.Name, ""); return string.IsNullOrEmpty(n) ? T("villagepleb_companion") : n; }
         public static Order OrderOf(Component c) => (Order)(Zdo(c)?.GetInt(Keys.Order, 0) ?? 0);
-        /// <summary>The style it fights with right now (what "let it decide" worked out, or the one you picked).</summary>
         public static Style StyleOf(Component c) => c is Humanoid h ? Following.Effective(h) : Chosen(c);
-        /// <summary>The style you picked (Auto: let it decide).</summary>
         public static Style Chosen(Component c) => (Style)(Zdo(c)?.GetInt(Keys.Style, (int)Style.Auto) ?? (int)Style.Auto);
         public static int RetreatOf(Component c) => Zdo(c)?.GetInt(Keys.Retreat, 30) ?? 30;
         public static bool Potions(Component c) => Zdo(c)?.GetBool(Keys.Potions, true) ?? true;
         public static bool Protect(Component c) => Zdo(c)?.GetBool(Keys.Protect, true) ?? true;
         public static string StatusOf(Component c) => Brain.LiveStatus(c as Humanoid) ?? Zdo(c)?.GetString(Keys.Status, "") ?? "";
 
-        /// <summary>The player it serves, if that player is in the world right now.</summary>
         public static Player Master(Component c)
         {
             long id = MasterId(c);
@@ -77,15 +69,12 @@ namespace VillagePlebs
             return null;
         }
 
-        /// <summary>The nearest of your companions within range, or null.</summary>
         public static Humanoid MineNear(Player p, float range) =>
             All().Where(c => IsMine(c, p) && Vector3.Distance(c.transform.position, p.transform.position) < range)
                  .OrderBy(c => Vector3.Distance(c.transform.position, p.transform.position)).FirstOrDefault();
 
-        /// <summary>Its owner, or anyone when its owner lets friends give it orders (Orders tab).</summary>
         public static bool CanCommand(Component c, Player p) => IsMine(c, p) || (Zdo(c)?.GetBool(Keys.Friends, false) ?? false);
 
-        /// <summary>Change a setting: take the companion over first (only an owner's writes stick). False if someone has its gear open.</summary>
         public static bool Write(Humanoid c, System.Action<ZDO> change)
         {
             ZNetView view = c != null ? c.GetComponent<ZNetView>() : null;
@@ -93,7 +82,7 @@ namespace VillagePlebs
             Container gear = c.GetComponent<Container>();
             if (!view.IsOwner())
             {
-                if (gear != null) { if (!Containers.Take(gear)) return false; } // (its bag loaded fresh as it is taken over, before anything is moved)
+                if (gear != null) { if (!Containers.Take(gear)) return false; }
                 else view.ClaimOwnership();
             }
             change(view.GetZDO());
@@ -102,7 +91,6 @@ namespace VillagePlebs
 
         private static float _nextClaim;
 
-        /// <summary>Your companions run on your game while you are near them (their brain, their bag). Never while its gear is open.</summary>
         public static void KeepOwnership(Player p)
         {
             if (Time.time < _nextClaim) return;
@@ -112,20 +100,14 @@ namespace VillagePlebs
                 if (!IsMine(c, p)) continue;
                 ZNetView view = c.GetComponent<ZNetView>();
                 if (view.IsOwner()) continue;
-                // Near you it runs on your game. Further away too, when nobody runs it (the game that did has left): else it stood frozen
-                // wherever it was (once in the sea, where it had fled).
                 bool orphan = !Running(view.GetZDO().GetOwner());
                 if (!orphan && Vector3.Distance(c.transform.position, p.transform.position) > 64f) continue;
                 Container gear = c.GetComponent<Container>();
-                if (gear != null) Containers.Take(gear, orphan); // (not while its gear is open; its bag loaded fresh as it is taken over)
+                if (gear != null) Containers.Take(gear, orphan);
                 else view.ClaimOwnership();
             }
         }
 
-        /// <summary>
-        /// A game that is in the world right now (it runs what it owns). The host knows every player's game (GetPeer); another player's game
-        /// knows only the host's, so it looks for the owner among the players in the world (each one's character carries their game's id).
-        /// </summary>
         private static bool Running(long owner)
         {
             if (owner == 0L || ZNet.instance == null) return false;
@@ -134,13 +116,10 @@ namespace VillagePlebs
             return false;
         }
 
-        // ---- summoning -----------------------------------------------------------------------------------
-
         public static Humanoid Summon(Player p, string name)
         {
             GameObject prefab = Prefab.Get();
             if (prefab == null) { VillagePlebsPlugin.Tell(T("villagepleb_companion_not_made")); return null; }
-            // a server without the mod would delete the companion (and the gear it carries) as soon as its area loads
             if (!VillagePlebs.Shared.ServerCheck.Installed) { VillagePlebsPlugin.Tell(T("villagepleb_server_missing")); return null; }
             Vector3 pos = p.transform.position - p.transform.forward * 2f + p.transform.right * 1f;
             if (ZoneSystem.instance != null && ZoneSystem.instance.GetSolidHeight(pos, out float height)) pos.y = Mathf.Max(pos.y, height);
@@ -160,20 +139,18 @@ namespace VillagePlebs
             Journal.Started(c);
             Journal.Add(c, P("villagepleb_companion_joined", p.GetPlayerName()));
             p.m_customData["vp_name"] = NameOf(c);
-            Profile.Save(p, Profile.Of(c)); // who it is, so it can wake in its bed after falling
+            Profile.Save(p, Profile.Of(c));
             VillagePlebsPlugin.Instance?.Note($"{p.GetPlayerName()} summoned the companion {NameOf(c)} at {pos:F0}");
             return c;
         }
 
-        /// <summary>A look of its own: man or woman, skin and hair colour (the game picks the hair and beard for player-like NPCs).</summary>
         private static void Dress(Humanoid c) => Looks.Randomise(c, true);
 
-        /// <summary>Send it home: only with its gear taken out first, so nothing can be lost.</summary>
         public static bool Dismiss(Humanoid c, out string why)
         {
             Container gear = c.GetComponent<Container>();
             ZNetView view = c.GetComponent<ZNetView>();
-            if (gear != null && !Containers.Take(gear)) { why = P("villagepleb_companion_gear_open"); return false; } // (what is really in its bag, before it is checked)
+            if (gear != null && !Containers.Take(gear)) { why = P("villagepleb_companion_gear_open"); return false; }
             if (gear != null && gear.GetInventory().NrOfItems() > 0) { why = P("villagepleb_companion_take_gear_first"); return false; }
             if (!view.IsOwner()) view.ClaimOwnership();
             VillagePlebsPlugin.Instance?.Note($"The companion {NameOf(c)} was sent home");
@@ -183,37 +160,23 @@ namespace VillagePlebs
             return true;
         }
 
-        /// <summary>
-        /// Save its bag now. The bag (its gear chest) saves itself when items come and go, but not when an item itself changes: an upgrade, a
-        /// repair, wear. Without this those were lost whenever the companion was made again from its save (its area reloading, a new body).
-        /// </summary>
         public static void SaveBag(Humanoid c)
         {
             if (c != null && c.GetComponent<ZNetView>() is ZNetView v && v.IsValid() && v.IsOwner()) c.GetInventory().m_onChanged?.Invoke();
         }
 
-        /// <summary>From before 0.22.0: the gear it wore when it fell, kept on its save and its player's character (Profile.Kept).</summary>
         public const string KeptKey = "vp_kept";
 
-        /// <summary>
-        /// It fell (or is sent away for good): everything it has, the gear in its gear slots too, goes into a tombstone where it is, as a
-        /// player's does, each item in the cell it had (its gear in the two gear rows). The tombstone is part of the world, so nothing depends
-        /// on who is online or on a save that has not happened yet: before 0.22.0 its worn gear was kept on its own save (gone with its body)
-        /// and on its player's character (saved only every half hour, and not at all when that player was offline), and was lost when it fell
-        /// on another player's game. When it wakes, its player's game takes its gear rows back out of the tombstone (Grave.WearAgain); a
-        /// tombstone too far to reach then, it goes back to. Returns how many stacks went into the tombstone.
-        /// </summary>
         public static int DropGear(Humanoid c)
         {
             Container gear = c.GetComponent<Container>();
             Inventory inv = gear != null ? gear.GetInventory() : null;
             if (inv == null || inv.NrOfItems() == 0) return 0;
             int had = inv.NrOfItems(), worn = inv.GetAllItems().Count(Gear.InSlot);
-            foreach (ItemDrop.ItemData item in inv.GetAllItems()) item.m_equipped = false; // (the game's move leaves equipped items out)
+            foreach (ItemDrop.ItemData item in inv.GetAllItems()) item.m_equipped = false;
 
             Container grave = Tomb(c, inv, c.GetCenterPoint(), c.transform.rotation);
 
-            // Anything still in the bag (no grave could be made): on the ground beside it, never lost.
             int dropped = 0;
             foreach (ItemDrop.ItemData item in inv.GetAllItems().ToList())
             {
@@ -227,12 +190,6 @@ namespace VillagePlebs
             return saved;
         }
 
-        /// <summary>
-        /// A tombstone like a player's, at a place, with everything in inv moved into it: its player can take it all back with one E. The
-        /// game's own move (MoveInventoryToGrave) makes the tombstone as big as the bag it empties: adding items one by one only fitted the
-        /// tombstone's own 4 slots, and the rest was lost. Marked as this companion's (its name for the map, its id for fetching its things).
-        /// Null when none could be made (what was in inv stays there). Its fall, here or while you were away (CatchUp.Fall).
-        /// </summary>
         public static Container Tomb(Humanoid c, Inventory inv, Vector3 at, Quaternion rot)
         {
             GameObject scenePlayer = ZNetScene.instance.GetPrefab("Player");
@@ -249,7 +206,6 @@ namespace VillagePlebs
             return grave;
         }
 
-        /// <summary>Put packed items back into a companion's bag (it wears them again by itself). How many stacks.</summary>
         public static int Unpack(Humanoid c, string packed)
         {
             if (string.IsNullOrEmpty(packed)) return 0;
@@ -262,7 +218,7 @@ namespace VillagePlebs
                 {
                     item.m_equipped = false;
                     if (c.GetInventory().AddItem(item)) n++;
-                    else ItemDrop.DropItem(item, item.m_stack, c.transform.position + Vector3.up, Quaternion.identity); // never lost
+                    else ItemDrop.DropItem(item, item.m_stack, c.transform.position + Vector3.up, Quaternion.identity);
                 }
                 SaveBag(c);
                 return n;
@@ -270,17 +226,13 @@ namespace VillagePlebs
             catch (System.Exception e) { VillagePlebsPlugin.Instance?.Warn("Could not give the companion its gear back: " + e.Message); return 0; }
         }
 
-        // ---- gear ----------------------------------------------------------------------------------------
-
-        /// <summary>The humanoid's own inventory is the gear chest's (called when the chest wakes up), so it wears and wields what you put in.</summary>
         public static void ShareInventory(Container gear)
         {
             Humanoid h = gear.GetComponent<Humanoid>();
-            Gear.Grow(gear.GetInventory()); // (one from before its gear slots: two rows more)
+            Gear.Grow(gear.GetInventory());
             if (h != null && HumanoidInventory != null) HumanoidInventory.SetValue(h, gear.GetInventory());
         }
 
-        /// <summary>Its equipment slots, for the Inventory tab (an empty slot has a null item).</summary>
         public static KeyValuePair<string, ItemDrop.ItemData>[] Slots(Humanoid h) => new[]
         {
             new KeyValuePair<string, ItemDrop.ItemData>("Weapon", Right(h)), new KeyValuePair<string, ItemDrop.ItemData>("Shield", Left(h)),
@@ -289,7 +241,6 @@ namespace VillagePlebs
             new KeyValuePair<string, ItemDrop.ItemData>("Ammo", Ammo(h)),
         };
 
-        /// <summary>Things worth giving a companion: weapons, armour, shields, arrows and bolts, healing potions.</summary>
         public static bool Useful(Humanoid h, ItemDrop.ItemData i)
         {
             var t = i.m_shared.m_itemType;
@@ -299,7 +250,6 @@ namespace VillagePlebs
                 || Food.IsFood(i);
         }
 
-        /// <summary>Move an item from the companion to the player (true if it fit). The companion must be ours and its gear closed.</summary>
         public static bool Take(Humanoid c, Player p, ItemDrop.ItemData item, out string why)
         {
             why = null;
@@ -307,8 +257,6 @@ namespace VillagePlebs
             Inventory mine = p.GetInventory(), its = c.GetInventory();
             if (!its.ContainsItem(item))
             {
-                // taking it over may have read its bag again from its save (Containers.Take): new copies of every item, the one asked for
-                // among them in the same cell
                 ItemDrop.ItemData now = its.GetItemAt(item.m_gridPos.x, item.m_gridPos.y);
                 if (now == null || now.m_shared.m_name != item.m_shared.m_name) return false;
                 item = now;
@@ -321,7 +269,6 @@ namespace VillagePlebs
             return true;
         }
 
-        /// <summary>Move an item from the player to the companion (true if it fit): gear into its gear slot, the rest into its bag.</summary>
         public static bool Give(Humanoid c, Player p, ItemDrop.ItemData item, out string why)
         {
             why = null;
@@ -354,10 +301,6 @@ namespace VillagePlebs
 
         public static ItemDrop.ItemData BestMelee(Humanoid h) => h.GetInventory().GetAllItems().Where(IsMelee).OrderByDescending(i => i.GetDamage().GetTotalDamage()).FirstOrDefault();
 
-        /// <summary>
-        /// The melee weapon that does the most harm to this creature, by its resistances and weaknesses (a club for skeletons, which blunt
-        /// breaks; never a weapon it shrugs off). Without a target: the hardest-hitting one.
-        /// </summary>
         public static ItemDrop.ItemData BestMeleeAgainst(Humanoid h, Character target)
         {
             if (target == null) return BestMelee(h);
@@ -381,16 +324,11 @@ namespace VillagePlebs
             h.GetInventory().GetAllItems().Where(i => i.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Consumable && i.m_shared.m_consumeStatusEffect is SE_Stats se
                 && (se.m_healthOverTime > 0f || se.m_healthUpFront > 0f) && i.m_shared.m_food <= 0f).ToList();
 
-        /// <summary>
-        /// Wear the best armour and hold the wanted weapon (and a shield with a one-handed one). Anything worn that has left the inventory (you
-        /// took it out) is taken off first. Equipped items are not flagged as equipped in the inventory, so an item you take out never
-        /// arrives in yours marked as worn.
-        /// </summary>
         public static void Maintain(Humanoid h, bool wantRanged, ItemDrop.ItemData tool = null, Character against = null)
         {
             if (h.InAttack()) return;
             Inventory inv = h.GetInventory();
-            if (h.GetComponent<ZNetView>()?.IsOwner() ?? false) Gear.Arrange(h); // the best it has into its gear slots
+            if (h.GetComponent<ZNetView>()?.IsOwner() ?? false) Gear.Arrange(h);
             foreach (ItemDrop.ItemData worn in Worn(h).ToList())
                 if (!inv.ContainsItem(worn)) h.UnequipItem(worn, false);
 
@@ -409,7 +347,6 @@ namespace VillagePlebs
                 ItemDrop.ItemData ammo = inv.GetAmmoItem(weapon.m_shared.m_ammoType);
                 if (ammo != null && ammo.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Ammo) Equip(h, ammo);
             }
-            // A shield beside a one-handed weapon, or on its own with bare fists (as a player can).
             if (weapon == null || weapon.m_shared.m_itemType == ItemDrop.ItemData.ItemType.OneHandedWeapon)
             {
                 ItemDrop.ItemData shield = items.Where(i => i.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Shield).OrderByDescending(i => i.m_shared.m_blockPower).FirstOrDefault();
@@ -423,13 +360,10 @@ namespace VillagePlebs
             item.m_equipped = false;
         }
 
-        /// <summary>Its shield, if it holds one.</summary>
         public static ItemDrop.ItemData Shield(Humanoid h) { ItemDrop.ItemData l = Left(h); return l != null && l.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Shield ? l : null; }
 
-        /// <summary>Something to block with (a shield, or the weapon itself as players do).</summary>
         public static bool CanBlock(Humanoid h) => Shield(h) != null || (Right(h) != null && !IsRanged(Right(h)));
 
-        /// <summary>The armour it wears (helmet, chest, legs, cape, belt): a weapon's or shield's own armour value is not body armour.</summary>
         public static float Armor(Humanoid h) => Worn(h).Where(i => IsArmour(i)).Sum(i => i.GetArmor());
 
         private static bool IsArmour(ItemDrop.ItemData i)
@@ -439,7 +373,6 @@ namespace VillagePlebs
                 || t == ItemDrop.ItemData.ItemType.Shoulder || t == ItemDrop.ItemData.ItemType.Utility;
         }
 
-        /// <summary>Drink a healing potion if it has one and is not already under one's effect. True if it drank.</summary>
         public static bool Drink(Humanoid h)
         {
             SEMan seman = h.GetSEMan();

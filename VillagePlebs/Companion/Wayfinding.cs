@@ -5,13 +5,6 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Its own way-finding, for when the game's has none (its walk map comes out empty in some places, a big base among them: then the game
-    /// finds no way anywhere there, and walking straight took it into the stakes). A search over a grid of 0.75 m squares between it and
-    /// where it goes (up to about 70 m): a square it can stand on is ground or a floor a step away from the last (stairs too), with room for
-    /// its body (no wall, post or fence there; a door is fine, it opens it), and nothing that hurts within reach (stakes, fire: Steer). It
-    /// walks the way square by square, and looks again when the target moves or it is held up.
-    /// </summary>
     internal static class Wayfinding
     {
         private const float Cell = 0.75f, Step = 0.8f, Margin = 10f, MaxRange = 90f;
@@ -20,7 +13,6 @@ namespace VillagePlebs
         private static readonly int Solid = LayerMask.GetMask("Default", "static_solid", "piece", "vehicle");
         private static readonly Collider[] Hits = new Collider[16];
 
-        /// <summary>Following its own way to the point: true while it walks it (then the rest of MoveTo waits).</summary>
         public static bool Follow(BrainState st, Humanoid me, Vector3 to, bool run)
         {
             Vector3 pos = me.transform.position;
@@ -29,8 +21,8 @@ namespace VillagePlebs
             {
                 if (Time.time < st.NextPathTry) return st.Path != null && Walk(st, me, run);
                 st.NextPathTry = Time.time + 1.5f;
-                st.Path = Find(me, pos, to, 12f); // (the way it walks: a longer search than a quick "can it get there")
-                if (st.Path == null && TimedOut) st.NextPathTry = Time.time + 0.3f; // (no time this frame: again in a moment)
+                st.Path = Find(me, pos, to, 12f);
+                if (st.Path == null && TimedOut) st.NextPathTry = Time.time + 0.3f;
                 st.PathTo = to;
                 st.PathIndex = 0;
                 st.PathUntil = Time.time + 20f;
@@ -46,12 +38,10 @@ namespace VillagePlebs
             List<Vector3> path = st.Path;
             Vector3 pos = me.transform.position;
             while (st.PathIndex < path.Count && Utils.DistanceXZ(path[st.PathIndex], pos) < 0.6f) st.PathIndex++;
-            if (st.PathIndex >= path.Count) { st.Path = null; return false; } // there
-            // Held up (a door it could not open, someone in the way): a new way in a moment.
+            if (st.PathIndex >= path.Count) { st.Path = null; return false; }
             float left = Utils.DistanceXZ(path[path.Count - 1], pos) + (path.Count - st.PathIndex) * 0.01f;
             if (left < st.PathBest - 0.3f) { st.PathBest = left; st.PathProgressAt = Time.time; }
             else if (Time.time - st.PathProgressAt > 3f) { st.Path = null; st.NextPathTry = Time.time + 0.5f; return false; }
-            // Cut corners: the furthest of the next few squares it can walk to straight.
             int aim = st.PathIndex;
             for (int i = st.PathIndex + 1; i < Mathf.Min(path.Count, st.PathIndex + 5); i++)
                 if (Straight(me, pos, path[i])) aim = i; else break;
@@ -78,10 +68,6 @@ namespace VillagePlebs
 
         private static readonly Dictionary<Vector3Int, (bool ok, float until)> Reach = new Dictionary<Vector3Int, (bool, float)>();
 
-        /// <summary>
-        /// Can it get there by its own way-finding? Remembered (a way: 15 s; none: a minute), by where it is (to 8 m) and where to: the search is
-        /// not free. When the search runs out of its time, it takes it as a yes and tries (it finds out on the way) rather than hold the game up.
-        /// </summary>
         public static bool CanReach(BrainState st, Humanoid me, Vector3 to)
         {
             if (Utils.DistanceXZ(me.transform.position, to) < 2.5f) return true;
@@ -90,25 +76,23 @@ namespace VillagePlebs
             if (Reach.TryGetValue(key, out var r) && Time.time < r.until) return r.ok;
             if (Reach.Count > 500) Reach.Clear();
             List<Vector3> way = Find(me, p, to);
-            if (way == null && TimedOut) return true; // (no time to be sure: it tries)
+            if (way == null && TimedOut) return true;
             Reach[key] = (way != null, Time.time + (way != null ? 15f : 60f));
             return way != null;
         }
 
-        /// <summary>The last search ran out of its time (4 ms to ask, 12 ms for the way it walks; 14 ms for all of them in one frame) before it was sure.</summary>
         public static bool TimedOut;
         private static int _frame;
         private static float _frameMs;
 
         private static readonly Comparer<(float f, int n, Vector2Int k)> Order = Comparer<(float f, int n, Vector2Int k)>.Create((a, b) => a.f != b.f ? a.f.CompareTo(b.f) : a.n.CompareTo(b.n));
 
-        /// <summary>The way (squares to walk through), or null when there is none it can find (or it is too far for this).</summary>
         public static List<Vector3> Find(Humanoid me, Vector3 from, Vector3 to, float budgetMs = 4f)
         {
             TimedOut = false;
             if (Utils.DistanceXZ(from, to) > MaxRange) return null;
             if (_frame != Time.frameCount) { _frame = Time.frameCount; _frameMs = 0f; }
-            if (_frameMs >= 14f) { TimedOut = true; return null; } // (this frame has had its share)
+            if (_frameMs >= 14f) { TimedOut = true; return null; }
             var watch = System.Diagnostics.Stopwatch.StartNew();
             Vector2 min = new Vector2(Mathf.Min(from.x, to.x) - Margin, Mathf.Min(from.z, to.z) - Margin);
             Vector2Int Key(Vector3 p) => new Vector2Int(Mathf.RoundToInt((p.x - min.x) / Cell), Mathf.RoundToInt((p.z - min.y) / Cell));
@@ -119,7 +103,7 @@ namespace VillagePlebs
             var height = new Dictionary<Vector2Int, float> { [start] = from.y };
             var cost = new Dictionary<Vector2Int, float> { [start] = 0f };
             var came = new Dictionary<Vector2Int, Vector2Int>();
-            var open = new SortedSet<(float f, int n, Vector2Int k)>(Order); // (by cost, then by when added: a square is never compared)
+            var open = new SortedSet<(float f, int n, Vector2Int k)>(Order);
             int counter = 0;
             open.Add((Vector2.Distance(start, goal), counter++, start));
             Vector2Int[] dirs = { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1), new Vector2Int(1, 1), new Vector2Int(1, -1), new Vector2Int(-1, 1), new Vector2Int(-1, -1) };
@@ -127,7 +111,7 @@ namespace VillagePlebs
             Vector2Int? reached = null;
             while (open.Count > 0 && expanded++ < MaxNodes)
             {
-                if ((expanded & 63) == 0 && watch.Elapsed.TotalMilliseconds > budgetMs) { TimedOut = true; break; } // (the game must not stutter for it)
+                if ((expanded & 63) == 0 && watch.Elapsed.TotalMilliseconds > budgetMs) { TimedOut = true; break; }
                 var cur = open.Min;
                 open.Remove(cur);
                 Vector2Int k = cur.k;
@@ -138,7 +122,7 @@ namespace VillagePlebs
                     Vector2Int n = k + d;
                     if (n.x < 0 || n.y < 0 || n.x > w || n.y > h) continue;
                     if (!Stand(me, At(n, y), y, out float ny)) continue;
-                    if (d.x != 0 && d.y != 0 && (!Stand(me, At(new Vector2Int(k.x + d.x, k.y), y), y, out _) || !Stand(me, At(new Vector2Int(k.x, k.y + d.y), y), y, out _))) continue; // (no squeezing past a corner)
+                    if (d.x != 0 && d.y != 0 && (!Stand(me, At(new Vector2Int(k.x + d.x, k.y), y), y, out _) || !Stand(me, At(new Vector2Int(k.x, k.y + d.y), y), y, out _))) continue;
                     float g = cost[k] + (d.x != 0 && d.y != 0 ? 1.414f : 1f) + Mathf.Abs(ny - y) * 0.5f;
                     if (cost.TryGetValue(n, out float had) && had <= g) continue;
                     cost[n] = g; height[n] = ny; came[n] = k;
@@ -154,7 +138,6 @@ namespace VillagePlebs
             return path;
         }
 
-        /// <summary>Can it stand there, coming from height y: ground or a floor a step up or down, room for its body, nothing that hurts.</summary>
         private static bool Stand(Humanoid me, Vector3 p, float y, out float ny)
         {
             ny = y;
@@ -166,7 +149,6 @@ namespace VillagePlebs
             return Room(me, feet) && Steer.Clear(feet, me);
         }
 
-        /// <summary>Room for its body there (a door counts as room: it opens it).</summary>
         internal static bool Room(Humanoid me, Vector3 feet)
         {
             int n = Physics.OverlapCapsuleNonAlloc(feet + Vector3.up * 0.55f, feet + Vector3.up * 1.6f, 0.3f, Hits, Solid, QueryTriggerInteraction.Ignore);

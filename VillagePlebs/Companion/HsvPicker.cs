@@ -6,8 +6,6 @@ using UnityEngine.UI;
 
 namespace VillagePlebs
 {
-    // A colour picker: saturation across and brightness up the square, hue up the strip beside it. A copy of BodyReplacer's hair
-    // colour picker (its ColorPanel), built from the shared ModSettings widgets, for the Looks tab (LooksPanel).
     internal sealed class HsvPicker
     {
         private const float HueWidth = 20f;
@@ -18,7 +16,6 @@ namespace VillagePlebs
 
         private const int HueSteps = 64;
 
-        // Called with the picked hue, saturation and brightness (0 to 1) as it's pressed or dragged
         public Action<float, float, float> OnChanged;
 
         private readonly RawImage _shades;
@@ -71,7 +68,6 @@ namespace VillagePlebs
             _hueMarker = (RectTransform)hueMarker.transform;
         }
 
-        // Shows a colour without reporting it
         public void Set(float hue, float saturation, float value)
         {
             _hue = Mathf.Clamp01(hue);
@@ -80,7 +76,6 @@ namespace VillagePlebs
             Refresh();
         }
 
-        // Its textures aren't freed with the panel's objects
         public void Destroy()
         {
             if (_shadeTexture != null)
@@ -133,7 +128,6 @@ namespace VillagePlebs
             return rawImage;
         }
 
-        // Every saturation and brightness of the current hue
         private Texture2D ShadeTexture()
         {
             if (_shadeTexture == null)
@@ -176,7 +170,6 @@ namespace VillagePlebs
             return _hueTexture;
         }
 
-        // Reports where it's pressed or dragged, from (0, 0) at its bottom left to (1, 1) at its top right
         private sealed class PickArea : MonoBehaviour, IPointerDownHandler, IDragHandler
         {
             public Action<Vector2> OnPick;

@@ -4,13 +4,6 @@ using static VillagePlebs.Words;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Looking after itself, as a player does. Out on an adventure with you it watches its bag, its gear and its food: when one runs out
-    /// (a full bag, something about to break, nothing left to eat) it tells you, and when its home is near (its bed within 200 m) it goes
-    /// home by itself to sort it out (store, repair, eat); hold the menu key to call it back. When its player has left the world for a
-    /// minute it goes home too, rather than stand waiting. At home the rest is Work's: it fetches food from its chests, cooks, forages and
-    /// hunts, repairs at its workbench, and stores what it carries.
-    /// </summary>
     internal static class Needs
     {
         public static void Tick(BrainState st, Player master)
@@ -23,7 +16,6 @@ namespace VillagePlebs
             Order order = Companion.OrderOf(me);
             bool bed = z.GetBool(Keys.HasBed, false);
 
-            // Its player left: home, after a minute.
             if (order != Order.Gather && master == null)
             {
                 if (st.MasterGoneSince == 0f) st.MasterGoneSince = Time.time;
@@ -36,10 +28,10 @@ namespace VillagePlebs
             }
             st.MasterGoneSince = 0f;
             if (order != Order.Follow) return;
-            if ((Time.time < st.CommandUntil || st.Area != null) && (st.Task != null || st.PickQueue.Count > 0 || st.Area != null) && me.GetHealthPercentage() > 0.4f) return; // what you pointed it at first (the whole patch), then home; badly hurt: home now
+            if ((Time.time < st.CommandUntil || st.Area != null) && (st.Task != null || st.PickQueue.Count > 0 || st.Area != null) && me.GetHealthPercentage() > 0.4f) return;
 
             Inventory inv = me.GetInventory();
-            string topic, item = null;   // (each need its own sentences: "villagepleb_needs_<topic>_home", "_ask", "_went")
+            string topic, item = null;
             ItemDrop.ItemData breaking = inv.GetAllItems().FirstOrDefault(i => (me.IsItemEquiped(i) || Work.IsTool(i)) && i.m_shared.m_useDurability && i.m_shared.m_canBeReparied
                                                                               && i.GetMaxDurability() > 0f && i.m_durability < i.GetMaxDurability() * 0.1f);
             if (inv.GetEmptySlots() == 0 || Carry.Weight(me) > Carry.Max(me) * 0.95f) topic = "bag";

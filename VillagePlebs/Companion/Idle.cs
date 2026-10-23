@@ -9,25 +9,12 @@ namespace VillagePlebs
 {
     internal enum IdlePlan { None, Fire, Chair, Shelter, Stroll }
 
-    /// <summary>
-    /// What a person does between jobs:
-    ///   - at home with nothing to do: it sits by a burning fire (warming up when cold, wet or in the evening), takes a free chair or bench,
-    ///     gets under a roof when it rains, or takes a stroll round its home and looks about; it faces you when you are near;
-    ///   - out with you: when you stop it turns to face you, after a while of you standing about it sits down, and when you sit (on the ground
-    ///     or in a chair) it sits too, in a free chair beside you when there is one; it gets up the moment you go on;
-    ///   - told to stay: after half a minute it sits down where it is;
-    ///   - it waves when you come back after a while away, cheers after a big fight or a boss, gives a thumbs up when you hand it something,
-    ///     and answers your emotes (a wave with a wave, a dance with a dance; "come here" brings it over to you for a little while).
-    /// The game's own emotes and sitting poses (the player's animations, which its body has), seen by everyone. It gets up whenever anything
-    /// else needs doing: sitting has to be kept up every frame, so any other behaviour stands it up.
-    /// </summary>
     internal static class Idle
     {
         private static readonly Dictionary<Chair, Humanoid> Seats = new Dictionary<Chair, Humanoid>();
         private static readonly int Roof = LayerMask.GetMask("Default", "static_solid", "piece");
         private static readonly List<Piece> Near = new List<Piece>();
 
-        // Your emote: its answer.
         private static readonly Dictionary<string, string> Answer = new Dictionary<string, string>
         {
             ["wave"] = "wave", ["cheer"] = "cheer", ["thumbsup"] = "thumbsup", ["laugh"] = "laugh", ["dance"] = "dance", ["bow"] = "bow",
@@ -43,29 +30,21 @@ namespace VillagePlebs
             Seats.Clear();
         }
 
-        // ---- every frame ---------------------------------------------------------------------------------
-
-        /// <summary>Every frame on the game running it: up when nothing keeps it sitting; your return and your emotes.</summary>
         public static void Tick(BrainState st, Player master)
         {
             Humanoid me = st.Body;
             if (!st.IdleReady)
             {
-                // A pose saved from before (its area reloaded while it sat or slept): up.
                 st.IdleReady = true;
                 ZSyncAnimation z = GameFields.Anim(me);
                 z?.SetBool("emote_sit", false); z?.SetBool("attach_chair", false); z?.SetBool("attach_bed", false);
             }
-            // (a chair that was broken under it is Unity's null but still set: up from it too)
-            if ((st.Sitting || !ReferenceEquals(st.SitChair, null)) && (st.SitChair == null && !st.Sitting || Time.time > st.SitKeep || st.Enemies.Count > 0 || me.GetMoveDir().sqrMagnitude > 0.01f)) Stand(st); // (on its way somewhere: up at once)
+            if ((st.Sitting || !ReferenceEquals(st.SitChair, null)) && (st.SitChair == null && !st.Sitting || Time.time > st.SitKeep || st.Enemies.Count > 0 || me.GetMoveDir().sqrMagnitude > 0.01f)) Stand(st);
             if (me.GetVelocity().sqrMagnitude > 0.1f) st.StillSince = Time.time;
             Greet(st, master);
             Mirror(st, master);
         }
 
-        // ---- emotes --------------------------------------------------------------------------------------
-
-        /// <summary>One of the game's emotes (wave, cheer, thumbsup...), standing still for its moment. False when it cannot now.</summary>
         public static bool Emote(BrainState st, string emote)
         {
             Humanoid me = st.Body;
@@ -78,7 +57,6 @@ namespace VillagePlebs
             return true;
         }
 
-        /// <summary>An emote in a moment (when it is free; dropped if it stays busy for a few seconds), facing someone.</summary>
         public static void Queue(BrainState st, string emote, float delay = 0.6f, Character face = null)
         {
             if (st == null) return;
@@ -87,7 +65,6 @@ namespace VillagePlebs
             st.EmoteFace = face;
         }
 
-        /// <summary>Out of a fight: true while an emote plays (it stands for it and the rest waits).</summary>
         public static bool Emoting(BrainState st, Action<Vector3> lookAt)
         {
             if (st.PendingEmote != null && Time.time >= st.PendingEmoteAt)
@@ -102,7 +79,6 @@ namespace VillagePlebs
             return true;
         }
 
-        /// <summary>Back after a while away (two minutes or more, out of sight): a wave and a word.</summary>
         private static void Greet(BrainState st, Player master)
         {
             if (Time.time < st.NextGreetLook) return;
@@ -119,7 +95,6 @@ namespace VillagePlebs
             st.Remember(P("villagepleb_idle_came_back"));
         }
 
-        /// <summary>Your emotes (the game saves them on your character for everyone to see): it answers, within 12 m.</summary>
         private static void Mirror(BrainState st, Player master)
         {
             ZDO z = master != null ? master.GetComponent<ZNetView>()?.GetZDO() : null;
@@ -130,13 +105,12 @@ namespace VillagePlebs
             string e = z.GetString(ZDOVars.s_emote, "");
             if (e.Length == 0 || st.InCombat || st.Asleep || Vector3.Distance(master.transform.position, st.Body.transform.position) > 12f) return;
             if (e == "comehere") st.ComeUntil = Time.time + 20f;
-            if (!Answer.TryGetValue(e, out string reply)) return; // (sitting, resting: it sits with you, WithYou)
+            if (!Answer.TryGetValue(e, out string reply)) return;
             Queue(st, reply, 0.7f, master);
             if (e == "cry" || e == "despair") Banter.Say(st.Body, "cheerup", 1f, P("villagepleb_idle_cheerup_1"), P("villagepleb_idle_cheerup_2"), P("villagepleb_idle_cheerup_3"));
             st.Remember(P("villagepleb_idle_emote_answer", Low("$hud_emotes_" + e), Low("$hud_emotes_" + reply)));
         }
 
-        /// <summary>You beckoned ("come here"): it comes over and stays by you for a little while, then goes back to what it was doing.</summary>
         public static bool Come(BrainState st, Player master, Action<Vector3, float, bool> moveTo, Action stop, Action<Vector3> lookAt)
         {
             if (master == null || Time.time >= st.ComeUntil) return false;
@@ -148,9 +122,6 @@ namespace VillagePlebs
             return true;
         }
 
-        // ---- sitting -------------------------------------------------------------------------------------
-
-        /// <summary>Sits down on the ground (the game's sit), or stays sitting.</summary>
         public static void SitDown(BrainState st)
         {
             if (st.SitChair != null) { HoldChair(st); return; }
@@ -166,7 +137,6 @@ namespace VillagePlebs
         private static bool Free(Chair chair, Humanoid me) =>
             chair != null && !chair.m_inShip && chair.m_attachPoint != null && !chair.IsInUse() && (!Seats.TryGetValue(chair, out Humanoid who) || who == null || who == me);
 
-        /// <summary>Sits in the chair (or stays in it), as a player does. False when it is taken.</summary>
         public static bool TakeChair(BrainState st, Chair chair)
         {
             Humanoid me = st.Body;
@@ -191,11 +161,10 @@ namespace VillagePlebs
             Transform at = chair.m_attachPoint;
             st.Body.transform.SetPositionAndRotation(at.position, at.rotation);
             Rigidbody body = st.Body.GetComponent<Rigidbody>();
-            if (body != null) { body.position = at.position; body.rotation = at.rotation; } // (kinematic: no velocity to clear)
-            GameFields.Anim(st.Body)?.SetBool(chair.m_attachAnimation, true); // kept up (free when already set)
+            if (body != null) { body.position = at.position; body.rotation = at.rotation; }
+            GameFields.Anim(st.Body)?.SetBool(chair.m_attachAnimation, true);
         }
 
-        /// <summary>Up (from the ground or out of its chair).</summary>
         public static void Stand(BrainState st)
         {
             Humanoid me = st?.Body;
@@ -210,7 +179,7 @@ namespace VillagePlebs
                 if (chair != null)
                 {
                     z?.SetBool(chair.m_attachAnimation, false);
-                    me.transform.position = chair.m_attachPoint.position + Flat(chair.m_attachPoint.forward) * 0.8f + Vector3.up * 0.2f; // up, in front of it
+                    me.transform.position = chair.m_attachPoint.position + Flat(chair.m_attachPoint.forward) * 0.8f + Vector3.up * 0.2f;
                 }
                 Rigidbody body = me.GetComponent<Rigidbody>();
                 if (body != null && !st.Asleep && st.Riding == null) body.isKinematic = false;
@@ -219,12 +188,6 @@ namespace VillagePlebs
 
         private static Vector3 Flat(Vector3 v) { v.y = 0f; return v.sqrMagnitude > 0.0001f ? v.normalized : Vector3.forward; }
 
-        // ---- out with you --------------------------------------------------------------------------------
-
-        /// <summary>
-        /// Following and close to you, nothing going on: it faces you when you stop, sits when you sit (a free chair beside you if there is
-        /// one) or after you have stood about for a while. True when it is busy with that (going to a chair, sitting).
-        /// </summary>
         public static bool WithYou(BrainState st, Player master, float d, Action<Vector3, float, bool> moveTo, Action<Vector3> lookAt)
         {
             Humanoid me = st.Body;
@@ -245,7 +208,7 @@ namespace VillagePlebs
                         if (cd > 1.3f) { moveTo(chair.m_attachPoint.position, 0.6f, false); Brain.Status(st, P("villagepleb_idle_status_taking_seat")); return true; }
                         if (TakeChair(st, chair)) { Brain.Status(st, P("villagepleb_idle_status_sitting_with_you")); return true; }
                     }
-                    if (d > 3.5f) return false; // (closer first)
+                    if (d > 3.5f) return false;
                 }
                 SitDown(st);
                 lookAt(master.GetHeadPoint());
@@ -256,20 +219,15 @@ namespace VillagePlebs
             return false;
         }
 
-        /// <summary>Told to stay: after half a minute standing it sits down where it is.</summary>
         public static void Waiting(BrainState st)
         {
             if (Time.time - st.StillSince > 30f) SitDown(st);
         }
 
-        // ---- at home with nothing to do --------------------------------------------------------------------
-
-        /// <summary>Living at home with no job: by the fire, in a chair, out of the rain, or a stroll. False when it has nothing better than the middle of its home.</summary>
         public static bool AtHome(BrainState st, Player master, Vector3 center, float radius, Action<Vector3, float, bool> moveTo, Action stop, Action<Vector3> lookAt)
         {
             Humanoid me = st.Body;
             if (Time.time >= st.IdleUntil || (st.IdlePlan != IdlePlan.None && !StillGood(st))) Pick(st, center, radius);
-            // what it is doing, with why it has no job in brackets (its work note): packed text, Words.P
             string With(string what) => st.WorkNote != null ? P("villagepleb_idle_with_note", what, st.WorkNote) : what;
             bool youNear = master != null && Vector3.Distance(master.transform.position, me.transform.position) < 8f;
             switch (st.IdlePlan)
@@ -280,7 +238,7 @@ namespace VillagePlebs
                     float d = Vector3.Distance(chair.m_attachPoint.position, me.transform.position);
                     string name = chair.m_name;
                     if (st.SitChair != chair && d > 1.3f) { moveTo(chair.m_attachPoint.position, 0.6f, d > 12f); Brain.Status(st, With(P("villagepleb_idle_status_going_to_sit", Low(name)))); return true; }
-                    if (!TakeChair(st, chair)) { st.IdlePlan = IdlePlan.None; st.IdleUntil = 0f; return true; } // (taken meanwhile: something else)
+                    if (!TakeChair(st, chair)) { st.IdlePlan = IdlePlan.None; st.IdleUntil = 0f; return true; }
                     Brain.Status(st, With(P(st.IdleFire != null ? "villagepleb_idle_status_sitting_by_fire_on" : "villagepleb_idle_status_sitting_on", Low(name))));
                     return true;
                 }
@@ -332,12 +290,11 @@ namespace VillagePlebs
             return false;
         }
 
-        /// <summary>What to do for the next minute or so.</summary>
         private static void Pick(BrainState st, Vector3 center, float radius)
         {
             Humanoid me = st.Body;
             st.IdlePlan = IdlePlan.None; st.IdleFire = null; st.IdleChair = null; st.IdleSince = Time.time;
-            st.IdleUntil = Time.time + 5f; // (nothing found: another look in a few seconds, not every frame)
+            st.IdleUntil = Time.time + 5f;
             bool rain = EnvMan.IsWet();
             bool cold = EnvMan.IsCold() || Evening() || me.GetSEMan().HaveStatusEffect(SEMan.s_statusEffectWet) || me.GetSEMan().HaveStatusEffect(SEMan.s_statusEffectCold);
             Fireplace fire = Fires(center, radius).OrderBy(f => Vector3.Distance(f.transform.position, me.transform.position)).FirstOrDefault(f => !rain || Roofed(f.transform.position));
@@ -389,11 +346,8 @@ namespace VillagePlebs
             lookAt(st.LookAroundAt);
         }
 
-        // ---- the places ------------------------------------------------------------------------------------
-
         private static bool Roofed(Vector3 feet) => Physics.Raycast(feet + Vector3.up * 2.1f, Vector3.up, 20f, Roof);
 
-        /// <summary>Burning fires that warm (campfires, hearths, braziers: not torches) around its home.</summary>
         private static IEnumerable<Fireplace> Fires(Vector3 center, float radius)
         {
             Near.Clear();
@@ -415,7 +369,6 @@ namespace VillagePlebs
                        .OrderBy(ch => Vector3.Distance(ch.m_attachPoint.position, center)).ToList();
         }
 
-        /// <summary>A spot two or three metres from the fire, on its level, not in the fire's reach (its nearest side to it first).</summary>
         private static Vector3? BySide(Fireplace fire, Humanoid me)
         {
             Vector3 c = fire.transform.position;
@@ -425,13 +378,12 @@ namespace VillagePlebs
                 {
                     Vector3 p = c + Quaternion.Euler(0f, (i % 2 == 0 ? 1 : -1) * (i + 1) / 2 * 45f, 0f) * toMe * dist;
                     if (!Ground(ref p, c.y, 1f) || !Steer.Safe(p, me)) continue;
-                    if (Physics.CheckCapsule(p + Vector3.up * 0.6f, p + Vector3.up * 1.6f, 0.35f, Roof)) continue; // a wall, a post
+                    if (Physics.CheckCapsule(p + Vector3.up * 0.6f, p + Vector3.up * 1.6f, 0.35f, Roof)) continue;
                     return p;
                 }
             return null;
         }
 
-        /// <summary>A roofed spot around its home (nearest to the middle first).</summary>
         private static Vector3? Dry(Vector3 center, float radius, Humanoid me)
         {
             for (float ring = 0f; ring <= radius; ring += 3f)
@@ -445,10 +397,9 @@ namespace VillagePlebs
             return null;
         }
 
-        /// <summary>Puts the spot on the ground or floor there (false when that is far above or below the given height).</summary>
         private static bool Ground(ref Vector3 p, float near, float within)
         {
-            p.y = near; // (cast from just above that height: from high up it would land on a roof)
+            p.y = near;
             if (ZoneSystem.instance == null || !ZoneSystem.instance.GetSolidHeight(p, out float h, 2)) return false;
             if (Mathf.Abs(h - near) > within) return false;
             p.y = h;
@@ -456,11 +407,6 @@ namespace VillagePlebs
         }
     }
 
-    /// <summary>
-    /// A companion held in place (asleep in its bed, in a chair, in a boat seat: its body made kinematic and put on the spot every frame) skips
-    /// the game's walking step, which sets every character's velocity each physics step: on a kinematic body Unity warns about it every time
-    /// (thousands of "Setting linear velocity of a kinematic body is not supported" in the log). Nothing else of the physics step is skipped.
-    /// </summary>
     [HarmonyPatch(typeof(Character), "UpdateMotion")]
     internal static class Character_UpdateMotion_Held
     {

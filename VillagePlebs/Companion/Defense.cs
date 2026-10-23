@@ -5,25 +5,15 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Defending itself as a good player does, when something swings at it:
-    ///   - a timed block: each kind of creature's swing has its own wind-up, learned by watching (the moment its attack starts, the moment the
-    ///     game deals the hit: Humanoid.StartAttack, Attack.OnAttackTrigger). It raises its shield just before the hit lands, inside the game's
-    ///     parry window (the window starts when the block goes up: Humanoid.UpdateBlock), so a good block is a parry, which staggers the
-    ///     attacker, and it hits back at once. A creature it has not seen swing yet it simply blocks.
-    ///   - stepping aside instead of blocking (the rule RuneFellowship uses): when the attack sweeps an area, cannot be blocked, comes from a
-    ///     bow or a spell, would hit harder than about 80% of its block, or it is short of stamina or has nothing to block with. A quick
-    ///     sideways step to a safe spot (ground, no stakes or fire, no drop, no water), away from the attacker's line.
-    /// </summary>
     internal static class Defense
     {
         private static readonly AccessTools.FieldRef<Humanoid, Attack> CurrentAttack = AccessTools.FieldRefAccess<Humanoid, Attack>("m_currentAttack");
         internal static readonly AccessTools.FieldRef<Attack, Humanoid> AttackOwner = AccessTools.FieldRefAccess<Attack, Humanoid>("m_character");
         private static readonly AccessTools.FieldRef<Humanoid, float> BlockTimer = AccessTools.FieldRefAccess<Humanoid, float>("m_blockTimer");
 
-        private static readonly Dictionary<int, KeyValuePair<string, float>> Started = new Dictionary<int, KeyValuePair<string, float>>(); // attacker -> (kind, when)
-        private static readonly Dictionary<string, float> WindUp = new Dictionary<string, float>();                                       // kind -> seconds to the hit
-        private const float ParryLead = 0.15f;                                                                                              // raise this long before the hit
+        private static readonly Dictionary<int, KeyValuePair<string, float>> Started = new Dictionary<int, KeyValuePair<string, float>>();
+        private static readonly Dictionary<string, float> WindUp = new Dictionary<string, float>();
+        private const float ParryLead = 0.15f;
 
         public static void Forget() { Started.Clear(); WindUp.Clear(); }
 
@@ -40,13 +30,12 @@ namespace VillagePlebs
         {
             Humanoid owner = AttackOwner(attack);
             if (owner == null || owner.IsPlayer() || !Started.TryGetValue(owner.GetInstanceID(), out var start)) return;
-            Started.Remove(owner.GetInstanceID()); // the first hit of a swing only (a combo's later hits do not teach it)
+            Started.Remove(owner.GetInstanceID());
             float delay = Time.time - start.Value;
             if (delay < 0.05f || delay > 3f) return;
             WindUp[start.Key] = WindUp.TryGetValue(start.Key, out float had) ? Mathf.Lerp(had, delay, 0.3f) : delay;
         }
 
-        /// <summary>How far away a swing can reach it: a bow or spell about 30 m, else the attacker's reach.</summary>
         public static float Reach(Character attacker)
         {
             Attack attack = attacker is Humanoid h ? CurrentAttack(h) : null;
@@ -54,7 +43,6 @@ namespace VillagePlebs
             return Mathf.Max(4.5f, (attack?.m_attackRange ?? 3f) + 1.5f) + attacker.GetRadius();
         }
 
-        /// <summary>Should the block go up now? Before a learned hit time: not yet (it waits, facing it). Unknown: yes.</summary>
         public static bool RaiseNow(Character attacker)
         {
             if (!(attacker is Humanoid h) || !Started.TryGetValue(h.GetInstanceID(), out var start) || !WindUp.TryGetValue(start.Key, out float windUp)) return true;
@@ -63,7 +51,6 @@ namespace VillagePlebs
 
         public static bool Learned(Character attacker) => attacker is Humanoid h && Started.TryGetValue(h.GetInstanceID(), out var s) && WindUp.ContainsKey(s.Key);
 
-        /// <summary>Step aside rather than block? (area, unblockable, ranged, too hard a hit, out of breath, nothing to block with)</summary>
         public static bool ShouldEvade(Humanoid me, Character attacker, out string why)
         {
             why = null;
@@ -77,15 +64,14 @@ namespace VillagePlebs
             ItemDrop.ItemData blocker = Companion.Shield(me) ?? me.GetCurrentWeapon();
             float block = blocker != null ? blocker.GetBlockPower(Skill.Get(me, Skills.SkillType.Blocking) / 100f) : 0f;
             float incoming = weapon != null ? weapon.GetDamage().GetTotalDamage() * (attack?.m_damageMultiplier ?? 1f) * Mathf.Max(1, attacker.GetLevel()) : 0f;
-            if (block > 0f && incoming > block * 0.8f && !Learned(attacker)) { why = "a hit harder than its block"; return true; } // (a timed parry takes it whatever its size)
+            if (block > 0f && incoming > block * 0.8f && !Learned(attacker)) { why = "a hit harder than its block"; return true; }
             return false;
         }
 
-        /// <summary>A safe spot about 3 m aside from the attacker's line (or back), and a quick step there. False when there is none.</summary>
         public static bool StepAside(BrainState st, Character attacker)
         {
             Humanoid me = st.Body;
-            if (Stamina.Get(me) < Tactics.DodgeCost) return false; // (no breath for a roll: it blocks or takes it)
+            if (Stamina.Get(me) < Tactics.DodgeCost) return false;
             Vector3 away = me.transform.position - attacker.transform.position;
             away.y = 0f;
             if (away.sqrMagnitude < 0.01f) away = -me.transform.forward;
@@ -96,8 +82,8 @@ namespace VillagePlebs
             {
                 Vector3 to = me.transform.position + dir * 3f;
                 if (!Safe(me, to)) continue;
-                Tactics.Roll(st, dir);      // a player's roll: its animation, its stamina, its moment no hit lands
-                me.ApplyPushback(dir, 25f); // (and the push that carries it)
+                Tactics.Roll(st, dir);
+                me.ApplyPushback(dir, 25f);
                 me.SetMoveDir(dir);
                 me.SetRun(Stamina.CanRun(me));
                 st.EvadeUntil = Time.time + 0.6f;
@@ -112,14 +98,13 @@ namespace VillagePlebs
 
         private static bool Safe(Humanoid me, Vector3 to)
         {
-            if (!Physics.Raycast(to + Vector3.up * 1.5f, Vector3.down, out RaycastHit hit, 3.5f, Ground)) return false;  // ground there
-            if (Mathf.Abs(hit.point.y - me.transform.position.y) > 1f) return false;                                     // no drop, no climb
-            if (ZoneSystem.instance != null && hit.point.y < ZoneSystem.instance.m_waterLevel - 0.5f) return false;       // no water
-            if (Physics.CheckCapsule(me.transform.position + Vector3.up * 0.8f, to + Vector3.up * 0.8f, 0.3f, LayerMask.GetMask("Default", "static_solid", "piece"))) return false; // a wall
-            return Steer.Safe(hit.point, me);                                                                              // no stakes, no fire
+            if (!Physics.Raycast(to + Vector3.up * 1.5f, Vector3.down, out RaycastHit hit, 3.5f, Ground)) return false;
+            if (Mathf.Abs(hit.point.y - me.transform.position.y) > 1f) return false;
+            if (ZoneSystem.instance != null && hit.point.y < ZoneSystem.instance.m_waterLevel - 0.5f) return false;
+            if (Physics.CheckCapsule(me.transform.position + Vector3.up * 0.8f, to + Vector3.up * 0.8f, 0.3f, LayerMask.GetMask("Default", "static_solid", "piece"))) return false;
+            return Steer.Safe(hit.point, me);
         }
 
-        /// <summary>For the log: a block that came inside the parry window (the game staggers the attacker for it).</summary>
         internal static void OnBlocked(Humanoid me, Character attacker, bool blocked)
         {
             if (!blocked || !Companion.Is(me) || attacker == null) return;

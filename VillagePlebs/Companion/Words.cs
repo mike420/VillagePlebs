@@ -9,43 +9,26 @@ using static VillagePlebs.Shared.Translations;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Its words, as data until they are shown. A companion's status, journal, missions, what it remembers and what it says are saved in its
-    /// ZDO or sent to its player, and two players on one server can play in two languages: so they are kept as a key and its values
-    /// (<see cref="P"/>, "packed") and each game makes the words in its own language when it shows them (<see cref="Show"/>). Its activity log
-    /// and debug output stay English (<see cref="English"/>).
-    ///
-    ///   P("villagepleb_x", a, b)   packed text: \u0001key\u0002a\u0002b\u0003. It can sit inside other text and inside another P's values.
-    ///   A value with a "$token" in it (an item's or creature's m_name) is translated by the game when shown; Low(v) also puts it in lower
-    ///   case mid-sentence (not in German, where nouns keep their capital).
-    ///   Show(text)                 every packed part rendered in the player's language; plain text (an old save's English) is left as it is.
-    /// </summary>
     internal static class Words
     {
         private const char Start = '\u0001', Sep = '\u0002', End = '\u0003', Lower = '\u0004';
 
-        /// <summary>Packed text: the key and its values, made into words where it is shown.</summary>
         public static string P(string key, params object[] args)
         {
             var sb = new StringBuilder().Append(Start).Append(key);
             foreach (object a in args ?? new object[0])
-                sb.Append(Sep).Append(Convert.ToString(a, CultureInfo.InvariantCulture));   // (a value may be packed text itself: its marks balance)
+                sb.Append(Sep).Append(Convert.ToString(a, CultureInfo.InvariantCulture));
             return sb.Append(End).ToString();
         }
 
-        /// <summary>A value shown in lower case mid-sentence ("Killed its first boar"), except in German.</summary>
         public static string Low(string value) => Lower + (value ?? "");
 
-        /// <summary>Whether the text has packed parts.</summary>
         public static bool Packed(string text) => text != null && text.IndexOf(Start) >= 0;
 
-        /// <summary>The text in the player's language.</summary>
         public static string Show(string text) => Render(text, false);
 
-        /// <summary>The text in English (activity log, debug output).</summary>
         public static string English(string text) => Render(text, true);
 
-        /// <summary>A name in lower case for the middle of a sentence, in the player's language (German keeps its capitals).</summary>
         public static string Mid(string s)
         {
             if (string.IsNullOrEmpty(s)) return s;
@@ -54,8 +37,6 @@ namespace VillagePlebs
             return lang == "Turkish" ? s.ToLower(new CultureInfo("tr-TR")) : s.ToLowerInvariant();
         }
 
-        // ---- rendering ----------------------------------------------------------------------------------------
-
         private static string Render(string text, bool english)
         {
             if (string.IsNullOrEmpty(text) || text.IndexOf(Start) < 0) return StripMarks(text);
@@ -63,7 +44,6 @@ namespace VillagePlebs
             return Sequence(text, ref i, english, false);
         }
 
-        /// <summary>Text up to the end of the string (or, inside a value, up to its Sep/End), packed parts rendered.</summary>
         private static string Sequence(string s, ref int i, bool english, bool inValue)
         {
             var sb = new StringBuilder();
@@ -98,8 +78,6 @@ namespace VillagePlebs
         }
 
         private static string StripMarks(string text) => text == null || text.IndexOf(Lower) < 0 ? text : text.Replace(Lower.ToString(), "");
-
-        // ---- English, for the log ----------------------------------------------------------------------------
 
         private static Dictionary<string, string> _english;
 

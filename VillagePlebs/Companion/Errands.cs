@@ -6,13 +6,8 @@ namespace VillagePlebs
 {
     internal enum Errand { PutAway, Restock, BetterGear, RepairGear, RepairBase, Fires, Cook }
 
-    /// <summary>
-    /// Errands you send it on from its menu (Orders tab), one click each: the things it does by itself at home now and then, done now. It
-    /// goes, does it, and goes back to what it was doing (following you, its patch, its life at home). Near its home only.
-    /// </summary>
     internal static class Errands
     {
-        // Label: packed text (Words.P), made into words where the menu shows it. Help: notes for us, not shown.
         public static readonly (Errand What, string Label, string Help)[] All =
         {
             (Errand.PutAway, P("villagepleb_errands_put_away"), "What it carries but does not keep goes into the chests: yours, and its stock into its own."),
@@ -24,7 +19,6 @@ namespace VillagePlebs
             (Errand.Cook, P("villagepleb_errands_cook"), "Puts the raw food it carries on a cooking station near home."),
         };
 
-        /// <summary>Send it. What happened, for the menu (packed text): what it is off to do, or why it cannot.</summary>
         public static string Run(BrainState st, Errand what)
         {
             Humanoid me = st?.Body;
@@ -44,10 +38,6 @@ namespace VillagePlebs
         private static bool Go(BrainState st, Work.Kind kind, Component target, Job job = Job.None) =>
             target != null && Work.Ordered(st, Work.New(kind, target, job));
 
-        /// <summary>
-        /// You called it out from home with less than twelve food on it: it fetches some first, from its own chests (or from yours, within its
-        /// ration, when it may take from them), then comes after you. Null when it has enough, is not at home, or finds none.
-        /// </summary>
         public static string ForTheRoad(BrainState st)
         {
             Humanoid me = st?.Body;
@@ -89,7 +79,7 @@ namespace VillagePlebs
                     Container mine = Home.Chests(me).Where(c => !Containers.InUse(c) && c.GetInventory().GetAllItems().Any(i => Gear.WantsFood(me, i)))
                                          .OrderBy(c => Vector3.Distance(c.transform.position, me.transform.position)).FirstOrDefault(c => Reach(me, c));
                     if (mine != null) { going = Go(st, Work.Kind.Store, mine); return P("villagepleb_errands_food_from_mine"); }
-                    Container yours = Work.YourFood(me, center, radius + 20f); // (you sent it: from your chests even with that setting off)
+                    Container yours = Work.YourFood(me, center, radius + 20f);
                     if (yours != null) { going = Go(st, Work.Kind.Fetch, yours); return P("villagepleb_errands_food_from_yours"); }
                     return P("villagepleb_errands_no_food");
                 }

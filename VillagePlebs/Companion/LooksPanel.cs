@@ -10,20 +10,12 @@ using static VillagePlebs.Shared.Translations;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// The Looks tab: a companion's look chosen on a preview of it and given only when you press Apply. Three columns styled like the Mod
-    /// Settings panel: the choices (gender, skin, hair, beard; with BodyReplacer installed and drawing its body for that gender, its own
-    /// look instead of the hair: BodyReplacerLook), the buttons, and the preview, turned by dragging it.
-    ///
-    /// The menu makes its window again whenever what it shows changes, so what is being chosen, the preview model, its camera and its picture
-    /// live here across that, and only the columns are made again (Build). Teardown when the tab, the companion or the menu closes.
-    /// </summary>
     internal sealed class LooksPanel
     {
         public readonly long Id;
         public Looks.Look Current;
 
-        private static readonly Vector3 PreviewPos = new Vector3(10060f, 5000f, 10000f);   // (out of the world, away from anything)
+        private static readonly Vector3 PreviewPos = new Vector3(10060f, 5000f, 10000f);
         private const float DragSensitivity = 0.4f;
         private const float Margin = 8f, ColumnGap = 8f;
         private const float SectionGap = 10f, HeaderHeight = 24f, ButtonRowHeight = 42f, PickerRowHeight = 36f, SliderHeight = 24f;
@@ -34,15 +26,14 @@ namespace VillagePlebs
         private RenderTexture _rt;
         private Camera _cam;
         private GameObject _clone, _lightRig;
-        private int _cloneModel = -1;          // the body the preview copy was made with (another one: a new copy, ApplyToClone)
+        private int _cloneModel = -1;
         private float _rotation, _pan, _zoom, _zoomTarget, _zoomSpeed;
         private Vector2 _lastMouse;
         private bool _dragging;
-        private Light _faceLight;              // lights the face as the view zooms in on it
-        private SkinnedMeshRenderer _eyes;     // BodyReplacer's eyes, when its body is drawn (looked for again when the look changes)
+        private Light _faceLight;
+        private SkinnedMeshRenderer _eyes;
         private const float PanPerPixel = 0.004f, LowestPan = -1.4f, HighestPan = 0.4f;
 
-        // the columns (made again with the window)
         private GameObject _beardGroup, _vanillaLook, _einherjarLook, _muscleSection, _bodyShapeGroup;
         private RectTransform _lookContent;
         private RawImage _previewImg;
@@ -54,18 +45,13 @@ namespace VillagePlebs
         private Image _hairSwatch;
 
         private const float ColourPickerHeight = 112f, ResetSize = 20f;
-        // BodyReplacer's body: its shaders don't write alpha, so on the see-through background it would draw invisible; the column's own
-        // colour, solid, so the box blends in
         private static readonly Color PreviewSolid = new Color(Theme.Field.r, Theme.Field.g, Theme.Field.b, 1f);
 
-        // The armour, weapons and shield the companion has on (it puts on the best in its bag), on the preview too: read from its world
-        // data, so it is right on any game, and checked each frame so the preview follows a change in its bag
         private readonly Humanoid _companion;
         private int _worn;
 
-        // The armour shown (the tick box over the preview): off, a helmet doesn't hide the hair being chosen. Kept until the game closes.
         private static bool _showArmour = true;
-        private RectTransform _armourBox;      // (a click on it doesn't turn the model)
+        private RectTransform _armourBox;
 
         public LooksPanel(Humanoid c)
         {
@@ -76,10 +62,9 @@ namespace VillagePlebs
             if (Current.BrTattoos == null) Current.BrTattoos = "";
         }
 
-        /// <summary>The columns, filling <paramref name="area"/> (in the menu's window). <paramref name="apply"/>: Apply pressed.</summary>
         public void Build(RectTransform area, string about, bool mine, Action apply)
         {
-            _hairPicker?.Destroy();   // (its textures: the old columns went with the old window)
+            _hairPicker?.Destroy();
             _hairPicker = null;
             Vector2 size = area.sizeDelta;
             float colW = (size.x - Margin * 2f - ColumnGap * 2f) / 3f, colH = size.y - Margin * 2f;
@@ -99,16 +84,11 @@ namespace VillagePlebs
             return Widgets.Place(box.gameObject, new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(x, Margin), new Vector2(x + w, -Margin));
         }
 
-        // ---- the choices --------------------------------------------------------------------------------------
-
-        // Stacked by a layout, so the groups that don't apply (the beard on the second body; the vanilla hair, or BodyReplacer's look, see
-        // Refresh) leave no gap. Gender and skin tone apply to both: BodyReplacer copies the vanilla skin colour.
         private void BuildChoices(RectTransform col)
         {
-            // clipped with a RectMask2D, as the settings panel's list is (a stencil Mask doesn't clip Valheim's flat images and text)
             GameObject view = new GameObject("Scroll", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
             view.transform.SetParent(col, false);
-            RectTransform viewRect = Widgets.Place(view, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-(GameUi.BarWidth + 4f), 0f));   // (room for its scrollbar)
+            RectTransform viewRect = Widgets.Place(view, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-(GameUi.BarWidth + 4f), 0f));
             view.GetComponent<Image>().color = Color.clear;
             GameObject content = Widgets.Child(view.transform, "Content");
             _lookContent = (RectTransform)content.transform;
@@ -125,7 +105,7 @@ namespace VillagePlebs
             scroll.vertical = true;
             scroll.horizontal = false;
             scroll.movementType = ScrollRect.MovementType.Clamped;
-            scroll.scrollSensitivity = GameUi.ScrollSpeed;   // (as the menu's lists: the game's wheel moves a ScrollRect only a little per notch)
+            scroll.scrollSensitivity = GameUi.ScrollSpeed;
             scroll.inertia = false;
             GameUi.AddScrollbar(scroll, col, 6f);
             Transform list = content.transform;
@@ -135,7 +115,6 @@ namespace VillagePlebs
             _femaleBtn = ToggleButton(genderRow, T("villagepleb_looks_female"), () => SetModel(1));
             _skinSlider = MakeSlider(Section(list, T("villagepleb_looks_skin"), "SkinTone"), Current.Skin, v => { Current.Skin = v; ApplyToClone(); });
 
-            // the game's own hair: its hairstyles, beards and hair colour
             _vanillaLook = Stack(Widgets.Child(list, "VanillaLook"), SectionGap, new RectOffset(0, 0, 0, 0));
             Transform vanilla = _vanillaLook.transform;
             _hairName = PickerRow(Section(vanilla, T("villagepleb_looks_hair"), "HairStyle"), () => StepHair(-1), () => StepHair(1));
@@ -147,8 +126,6 @@ namespace VillagePlebs
             if (BodyReplacerLook.Available) BuildEinherjarLook(list);
         }
 
-        // BodyReplacer's look, for when it draws its own body on the companion: its hairstyles, hair and eye colour, body shape and
-        // muscle (only with BodyReplacer installed)
         private void BuildEinherjarLook(Transform list)
         {
             _einherjarLook = Stack(Widgets.Child(list, "EinherjarLook"), SectionGap, new RectOffset(0, 0, 0, 0));
@@ -160,7 +137,6 @@ namespace VillagePlebs
             EinherjarSlider(Section(einherjar, T("villagepleb_looks_eye_shade"), "EyeShade"), "EyeValue", 0f, 1f);
             EinherjarSlider(Section(einherjar, T("villagepleb_looks_eye_glow"), "EyeGlow"), "Glow", 0f, 3f);
             EinherjarSlider(Section(einherjar, T("villagepleb_looks_iris"), "IrisSize"), "IrisSize", 0.5f, 1.2f);
-            // body shape (the female body has it): sizes run -100 to 100, the slider's middle is 0
             _bodyShapeGroup = Stack(Widgets.Child(einherjar, "BodyShape"), SectionGap, new RectOffset(0, 0, 0, 0));
             EinherjarSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_bust"), "Bust"), "BreastSize", -100f, 100f);
             EinherjarSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_hips"), "Hips"), "ButtSize", -100f, 100f);
@@ -170,7 +146,6 @@ namespace VillagePlebs
             if (BodyReplacerLook.HasTattoos) BuildTattoos(einherjar);
         }
 
-        // BodyReplacer's tattoos (a newer BodyReplacer): for each area its design (or none) and below it the ink
         private void BuildTattoos(Transform einherjar)
         {
             string[] areas = BodyReplacerLook.TattooAreas();
@@ -185,7 +160,6 @@ namespace VillagePlebs
             }
         }
 
-        // The next or previous design (none sits at the start) or ink for that area
         private void StepTattoo(int area, int designBy, int inkBy)
         {
             int designs = BodyReplacerLook.TattooDesignNames(area).Length + 1, inks = BodyReplacerLook.TattooInkNames().Length;
@@ -197,7 +171,6 @@ namespace VillagePlebs
             ApplyToClone();
         }
 
-        // A slider for one field of BodyReplacer's look, over that field's range (the slider itself runs 0 to 1)
         private void EinherjarSlider(Transform section, string field, float min, float max) =>
             MakeSlider(section, Mathf.InverseLerp(min, max, BodyReplacerLook.Get(Current.BrLook, field)), v => SetEinherjarField(field, Mathf.Lerp(min, max, v)));
 
@@ -207,8 +180,6 @@ namespace VillagePlebs
             ApplyToClone();
         }
 
-        // The style this body shows, among the ones it offers (each body has its own list): its own styles, then (a newer BodyReplacer) the
-        // game's hairstyles it is fitted for, worn as the hair item with its look's HairStyle saying so
         private int EinherjarHairIndex(int[] ids, string[] gameHairs)
         {
             int style = Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "HairStyle"));
@@ -236,7 +207,6 @@ namespace VillagePlebs
             Refresh();
         }
 
-        // BodyReplacer's hair colour, picked as on its own panel: a swatch and a reset button in the header, the picker below
         private void BuildHairColour(Transform section)
         {
             RectTransform header = (RectTransform)section.GetChild(0);
@@ -249,7 +219,6 @@ namespace VillagePlebs
             _hairPicker = new HsvPicker(section, ColourPickerHeight) { OnChanged = SetEinherjarHairColour };
         }
 
-        // Picking a colour switches it on (until then the hairstyle's own colour shows)
         private void SetEinherjarHairColour(float hue, float saturation, float value)
         {
             string look = BodyReplacerLook.Set(Current.BrLook, "HairHue", hue);
@@ -260,7 +229,6 @@ namespace VillagePlebs
             ApplyToClone();
         }
 
-        // Back to the hairstyle's own colour
         private void ResetEinherjarHair()
         {
             string defaults = BodyReplacerLook.DefaultLook(), look = Current.BrLook;
@@ -269,8 +237,6 @@ namespace VillagePlebs
             Refresh();
             ApplyToClone();
         }
-
-        // ---- the buttons ----------------------------------------------------------------------------------------
 
         private void BuildButtons(RectTransform col, string about, bool mine, Action apply)
         {
@@ -287,12 +253,11 @@ namespace VillagePlebs
             applyBtn.interactable = mine;
             applyBtn.onClick.AddListener(() => apply());
 
-            // the words, between the buttons: scrolling, with a scrollbar when they don't fit (a long language, a small window)
             RectTransform area = Widgets.Place(Widgets.Child(col, "About"), Vector2.zero, Vector2.one, new Vector2(12f, btnH + 16f), new Vector2(-4f, -24f - btnH * 2f));
             GameObject view = new GameObject("View", typeof(RectTransform), typeof(Image), typeof(RectMask2D));
             view.transform.SetParent(area, false);
             RectTransform viewRect = Widgets.Place(view, Vector2.zero, Vector2.one, Vector2.zero, new Vector2(-(GameUi.BarWidth + 6f), 0f));
-            view.GetComponent<Image>().color = Color.clear;   // (catches the mouse wheel)
+            view.GetComponent<Image>().color = Color.clear;
             TMP_Text text = Widgets.Label(view.transform, about, 17f, Theme.Text, TextAlignmentOptions.TopLeft);
             text.textWrappingMode = TextWrappingModes.Normal;
             text.overflowMode = TextOverflowModes.Overflow;
@@ -313,8 +278,6 @@ namespace VillagePlebs
             GameUi.AddScrollbar(scroll, area, 0f);
         }
 
-        // ---- the preview ----------------------------------------------------------------------------------------
-
         private void BuildPreview(RectTransform col, float colW, float colH)
         {
             GameObject go = new GameObject("PreviewImg", typeof(RectTransform));
@@ -324,14 +287,12 @@ namespace VillagePlebs
             _previewImg.color = Color.white;
             _previewImg.raycastTarget = true;
             int width = Mathf.Max(64, Mathf.RoundToInt(colW) * 4), height = Mathf.Max(64, Mathf.RoundToInt(colH) * 4);
-            if (_rt != null && (_rt.width != width || _rt.height != height)) { _rt.Release(); UnityEngine.Object.Destroy(_rt); _rt = null; }   // (the window changed size)
+            if (_rt != null && (_rt.width != width || _rt.height != height)) { _rt.Release(); UnityEngine.Object.Destroy(_rt); _rt = null; }
             if (_rt == null) _rt = new RenderTexture(width, height, 24, RenderTextureFormat.ARGB32) { antiAliasing = 4, filterMode = FilterMode.Trilinear };
             _previewImg.texture = _rt;
-            // how to move it, faintly along its bottom
             TMP_Text hint = Widgets.Label(col, T("villagepleb_looks_preview_hint"), 14f, Theme.Muted, TextAlignmentOptions.Center);
             hint.textWrappingMode = TextWrappingModes.Normal;
             Widgets.Place(hint.gameObject, new Vector2(0f, 0f), new Vector2(1f, 0f), new Vector2(6f, 4f), new Vector2(-6f, 42f));
-            // Show armour, in its top left corner
             const float tick = 22f;
             _armourBox = Widgets.Place(Widgets.Child(col, "ShowArmour"), new Vector2(0f, 1f), new Vector2(1f, 1f), new Vector2(8f, -8f - tick), new Vector2(-8f, -8f));
             GameUi.Check(_armourBox, Vector2.zero, tick, _showArmour, on => { _showArmour = on; ApplyToClone(); });
@@ -348,18 +309,13 @@ namespace VillagePlebs
                 _cam.nearClipPlane = 0.1f;
                 _cam.farClipPlane = 10f;
                 _cam.depth = -2f;
-                _cam.enabled = false;   // (drawn by hand each frame: UpdatePerFrame)
+                _cam.enabled = false;
                 _cam.cullingMask = CharacterMask();
             }
             _cam.targetTexture = _rt;
             if (_clone == null) MakeClone();
         }
 
-        /// <summary>
-        /// Each frame while the tab shows: turning and moving it by dragging, zooming with the mouse wheel, and drawing the preview (in its own
-        /// light). As BodyReplacer's character creator does it: the wheel sets how far in (a quarter a notch), the view eases there, and all the
-        /// way in it looks at the face (the eyes), lit by a soft light in front of it.
-        /// </summary>
         public void UpdatePerFrame()
         {
             if (_previewImg == null || !_previewImg.gameObject.activeInHierarchy || _cam == null) return;
@@ -370,7 +326,6 @@ namespace VillagePlebs
                 _dragging = true;
                 _lastMouse = Input.mousePosition;
             }
-            // dragging it with the left mouse button: across turns it, up and down moves along its body; left alone it stays where it was put
             if (_dragging)
             {
                 if (Input.GetMouseButton(0))
@@ -382,12 +337,11 @@ namespace VillagePlebs
                 }
                 else _dragging = false;
             }
-            // (the game's own wheel is held off while the menu is open, GameUi_ScrollWheel: Unity's is read here)
             float wheel = over ? Input.mouseScrollDelta.y : 0f;
             if (wheel != 0f) _zoomTarget = Mathf.Clamp01(_zoomTarget + Mathf.Clamp(wheel, -1f, 1f) * 0.25f);
             _zoom = Mathf.SmoothDamp(_zoom, _zoomTarget, ref _zoomSpeed, 0.12f, float.PositiveInfinity, Time.unscaledDeltaTime);
             if (_zoomTarget <= 0f && _zoom < 0.002f) _zoom = _zoomSpeed = 0f;
-            float t = _zoom * _zoom * (3f - 2f * _zoom);   // (eased at both ends)
+            float t = _zoom * _zoom * (3f - 2f * _zoom);
 
             Vector3 face = t > 0f ? EyeCentre() : Vector3.zero;
             Vector3 target = Vector3.Lerp(PreviewPos + Vector3.up * 0.9f, face, t) + Vector3.up * _pan;
@@ -446,7 +400,6 @@ namespace VillagePlebs
             return mask;
         }
 
-        /// <summary>A still copy of the player model, out of the world: only its looks do anything.</summary>
         private void MakeClone()
         {
             if (!NewBody()) return;
@@ -458,12 +411,11 @@ namespace VillagePlebs
             AddLight("Fill", new Vector3(-2.5f, 1.5f, 3f), 1.2f, new Color(0.9f, 0.92f, 1f), 15f, mask);
             AddLight("Rim", new Vector3(0f, 3f, -2.5f), 1.2f, new Color(0.95f, 0.88f, 0.78f), 15f, mask);
             AddLight("Bottom", new Vector3(0f, -0.5f, 3f), 0.5f, new Color(0.85f, 0.82f, 0.78f), 10f, mask);
-            _faceLight = AddLight("Face", Vector3.zero, 0f, new Color(1f, 0.95f, 0.88f), 1.6f, mask);   // (placed and lit by UpdatePerFrame)
+            _faceLight = AddLight("Face", Vector3.zero, 0f, new Color(1f, 0.95f, 0.88f), 1.6f, mask);
             _faceLight.enabled = false;
             ApplyToClone();
         }
 
-        /// <summary>The copy itself, for the body chosen now (made again for another body: ApplyToClone). False when it can't be made.</summary>
         private bool NewBody()
         {
             GameObject prefab = ZNetScene.instance?.GetPrefab("Player");
@@ -471,7 +423,6 @@ namespace VillagePlebs
             ZNetView.m_forceDisableInit = true;
             try { _clone = UnityEngine.Object.Instantiate(prefab, PreviewPos, Quaternion.identity); }
             finally { ZNetView.m_forceDisableInit = false; }
-            // built from the Player prefab: BodyReplacer draws it as it draws companions (its Creatures As Einherjar setting), not as a player
             BodyReplacerLook.TreatAsCreature(_clone);
             Rigidbody body = _clone.GetComponent<Rigidbody>();
             if (body != null) UnityEngine.Object.Destroy(body);
@@ -482,10 +433,6 @@ namespace VillagePlebs
             return true;
         }
 
-        /// <summary>
-        /// Where the view zooms in to: the middle of the eyes. BodyReplacer's body has eyes of their own (its renderers' names end in
-        /// "_EYES"); the game's own body has its eye point.
-        /// </summary>
         private Vector3 EyeCentre()
         {
             if (_eyes == null || !_eyes.gameObject.activeInHierarchy)
@@ -514,7 +461,6 @@ namespace VillagePlebs
             return light;
         }
 
-        // Standing, not sitting or lying (the Player prefab's animator starts in whatever state), then held still
         private static void StandStill(Animator anim)
         {
             anim.updateMode = AnimatorUpdateMode.Normal;
@@ -539,34 +485,31 @@ namespace VillagePlebs
         {
             VisEquipment vis = _clone != null ? _clone.GetComponent<VisEquipment>() : null;
             if (vis == null) return;
-            // Another body: the preview has drawn this copy, and swapping a drawn body's mesh breaks it (Unity stops drawing it: "mesh data
-            // size and vertex stride"), so a new copy is made for it, as Looks.SetModel makes the companion again
             if (_cloneModel != Current.Model)
             {
-                _clone.SetActive(false);   // (gone this frame: Destroy waits for the end of it)
+                _clone.SetActive(false);
                 UnityEngine.Object.Destroy(_clone);
                 _clone = null;
                 if (!NewBody()) return;
                 vis = _clone.GetComponent<VisEquipment>();
                 if (vis == null) return;
             }
-            _eyes = null;   // (another body may be drawn now: EyeCentre looks again)
+            _eyes = null;
             BodyReplacerLook.Apply(_clone, Current.BrLook, Current.BrMuscle);
             BodyReplacerLook.ApplyTattoos(_clone, Current.BrTattoos);
-            CurrentModelIndex?.SetValue(vis, -1);   // (its body set again, with BodyReplacer's look: the same mesh, so nothing breaks)
+            CurrentModelIndex?.SetValue(vis, -1);
             vis.SetModel(Current.Model);
             vis.SetHairItem(Current.Hair);
             vis.SetBeardItem(Current.Model == 0 ? Current.Beard : 0);
             vis.SetSkinColor(Looks.SkinColor(Current.Skin));
             vis.SetHairColor(Looks.HairColor(Current.HairTone, Current.HairShade));
             ZDO z = Companion.Zdo(_companion);
-            ZDO armour = _showArmour ? z : null;   // (none: every slot empty)
+            ZDO armour = _showArmour ? z : null;
             vis.SetHelmetItem(Worn(armour, ZDOVars.s_helmetItem));
             vis.SetChestItem(Worn(armour, ZDOVars.s_chestItem));
             vis.SetLegItem(Worn(armour, ZDOVars.s_legItem));
             vis.SetShoulderItem(Worn(armour, ZDOVars.s_shoulderItem), Worn(armour, ZDOVars.s_shoulderItemVariant), Worn(armour, ZDOVars.s_shoulderItemQuality));
             vis.SetUtilityItem(Worn(armour, ZDOVars.s_utilityItem));
-            // its weapon or tool and shield, in its hands or on its back as it has them
             vis.SetRightItem(Worn(z, ZDOVars.s_rightItem), Worn(z, ZDOVars.s_rightItemQuality));
             vis.SetLeftItem(Worn(z, ZDOVars.s_leftItem), Worn(z, ZDOVars.s_leftItemVariant), Worn(z, ZDOVars.s_leftItemQuality));
             vis.SetRightBackItem(Worn(z, ZDOVars.s_rightBackItem), Worn(z, ZDOVars.s_rightBackItemQuality));
@@ -579,7 +522,6 @@ namespace VillagePlebs
             foreach (Transform t in _clone.GetComponentsInChildren<Transform>(true)) t.gameObject.layer = layer < 0 ? 9 : layer;
         }
 
-        // One of the companion's slots: the item's hash (0: nothing there), or an item's variant or quality
         private static int Worn(ZDO z, int key) => z?.GetInt(key, 0) ?? 0;
 
         private static readonly int[] WornKeys =
@@ -597,8 +539,6 @@ namespace VillagePlebs
             return h;
         }
 
-        // ---- changing what is chosen ----------------------------------------------------------------------------
-
         private void SetModel(int model)
         {
             Current.Model = model;
@@ -609,7 +549,6 @@ namespace VillagePlebs
         private void StepHair(int by) { Current.Hair = Looks.Step(Current.Hair, Looks.Hairs(), by); Refresh(); ApplyToClone(); }
         private void StepBeard(int by) { Current.Beard = Looks.Step(Current.Beard, Looks.Beards(), by); Refresh(); ApplyToClone(); }
 
-        // Randomise, Look like me: the game's own look; BodyReplacer's (and its tattoos) is kept as it is
         private void SetAll(Looks.Look look)
         {
             look.BrLook = Current.BrLook;
@@ -620,7 +559,6 @@ namespace VillagePlebs
             ApplyToClone();
         }
 
-        /// <summary>The controls showing what is chosen: the vanilla hair options, or BodyReplacer's look when it draws its own body for this gender.</summary>
         private void Refresh()
         {
             SetToggle(_maleBtn, Current.Model == 0);
@@ -650,7 +588,7 @@ namespace VillagePlebs
                     string[] designs = BodyReplacerLook.TattooDesignNames(area);
                     int design = BodyReplacerLook.TattooDesign(Current.BrTattoos, area), ink = BodyReplacerLook.TattooInk(Current.BrTattoos, area);
                     _tattooDesigns[area].text = design > 0 && design <= designs.Length ? designs[design - 1] : Localization.instance.Localize("$menu_none");
-                    _tattooInks[area].text = design > 0 && ink >= 0 && ink < inks.Length ? inks[ink] : "";   // (no ink without a design)
+                    _tattooInks[area].text = design > 0 && ink >= 0 && ink < inks.Length ? inks[ink] : "";
                 }
             }
             if (_hairPicker != null)
@@ -663,9 +601,6 @@ namespace VillagePlebs
             if (_lookContent != null) LayoutRebuilder.MarkLayoutForRebuild(_lookContent);
         }
 
-        // ---- the pieces, as the Mod Settings panel draws them ---------------------------------------------------
-
-        // Lays its children out top to bottom, full width, each at its own height
         private static GameObject Stack(GameObject go, float spacing, RectOffset padding)
         {
             VerticalLayoutGroup layout = go.AddComponent<VerticalLayoutGroup>();
@@ -685,7 +620,6 @@ namespace VillagePlebs
             element.preferredHeight = h;
         }
 
-        // A small section header, like the settings panel's (a dark bar with an accent strip), with room below for its controls
         private static Transform Section(Transform parent, string text, string name)
         {
             GameObject section = Stack(Widgets.Child(parent, name), 4f, new RectOffset(0, 0, 0, 0));
@@ -700,7 +634,6 @@ namespace VillagePlebs
             return section.transform;
         }
 
-        // Controls side by side, sharing the width
         private static Transform Row(Transform parent, float h)
         {
             GameObject row = Widgets.Child(parent, "Row");
@@ -714,7 +647,6 @@ namespace VillagePlebs
             return row.transform;
         }
 
-        // One of a set of choices (gender); SetToggle shows which is picked
         private static Button ToggleButton(Transform parent, string label, Action onClick)
         {
             Button button = Widgets.Button(parent, label, 17f);
@@ -723,7 +655,6 @@ namespace VillagePlebs
             return button;
         }
 
-        // Picked: lit like the settings panel's selected tab
         private static void SetToggle(Button btn, bool on)
         {
             if (btn == null) return;
@@ -733,7 +664,6 @@ namespace VillagePlebs
             if (text != null) text.color = on ? Theme.TextBright : Theme.Text;
         }
 
-        // [<]  name  [>]
         private static TMP_Text PickerRow(Transform parent, Action prev, Action next)
         {
             GameObject row = Widgets.Child(parent, "PickerRow");

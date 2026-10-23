@@ -9,14 +9,8 @@ using static VillagePlebs.Shared.Translations;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Sleeping, as a player sleeps: at night, living at home with a bed, it goes to its bed and lies down in it (the game's own sleeping
-    /// pose); it gets up at dawn, or when something comes for it or its home. It never holds up your sleep (companions are not players).
-    /// </summary>
     internal static class Sleep
     {
-
-        /// <summary>True while it is going to bed or asleep (the rest of its peaceful behaviour waits).</summary>
         public static bool Tick(BrainState st, Action<Vector3, float, bool> moveTo, Action stop)
         {
             Humanoid me = st.Body;
@@ -27,18 +21,15 @@ namespace VillagePlebs
                 if (st.Asleep) Wake(st, P("villagepleb_chores_wake_morning"));
                 return false;
             }
-            // its bed, looked for at most every few seconds (every bed in the scene is gone through)
             Bed bed = st.SleepBed;
             if (bed == null && Time.time >= st.NextBedLook) { st.NextBedLook = Time.time + 5f; bed = st.SleepBed = Home.BedOf(me); }
             if (bed == null)
             {
-                if (st.Asleep) Wake(st, P("villagepleb_chores_wake_bed_gone"));   // (broken under it: up, not held still in the air till morning)
+                if (st.Asleep) Wake(st, P("villagepleb_chores_wake_bed_gone"));
                 return false;
             }
             if (st.Asleep) { Hold(st, bed); return true; }
             Vector3 at = bed.GetSpawnPoint();
-            // Close enough to get in, as a player who can reach the bed does: beside it (a bed up on chests is reached from the floor
-            // below or the stack above it), or near it after trying for a while (it climbs in). Height counts less than distance across.
             Vector3 flat = at - me.transform.position;
             float dy = Mathf.Abs(flat.y);
             flat.y = 0f;
@@ -53,7 +44,7 @@ namespace VillagePlebs
             }
             stop();
             st.BedSince = 0f;
-            st.BedFrom = me.transform.position; // where it climbed in from: it got there, so it can walk away from there
+            st.BedFrom = me.transform.position;
             st.Asleep = true;
             GameFields.Anim(me)?.SetBool("attach_bed", true);
             Rigidbody body = me.GetComponent<Rigidbody>();
@@ -69,12 +60,11 @@ namespace VillagePlebs
             Transform spot = bed.m_spawnPoint != null ? bed.m_spawnPoint : bed.transform;
             me.transform.SetPositionAndRotation(spot.position, spot.rotation);
             Rigidbody body = me.GetComponent<Rigidbody>();
-            if (body != null) { body.position = spot.position; body.rotation = spot.rotation; } // (held: a kinematic body has no velocity to clear)
-            GameFields.Anim(me)?.SetBool("attach_bed", true); // kept up: anything that resets its animator must not stand it up in bed (free when already set)
+            if (body != null) { body.position = spot.position; body.rotation = spot.rotation; }
+            GameFields.Anim(me)?.SetBool("attach_bed", true);
             Brain.Status(st, P("villagepleb_chores_status_sleeping"));
         }
 
-        /// <summary>Gets it out of bed. <paramref name="why"/>: packed text (Words.P), shown in its "Recently".</summary>
         public static void Wake(BrainState st, string why)
         {
             Humanoid me = st.Body;
@@ -83,8 +73,6 @@ namespace VillagePlebs
             GameFields.Anim(me)?.SetBool("attach_bed", false);
             Rigidbody body = me.GetComponent<Rigidbody>();
             if (body != null) body.isKinematic = false;
-            // Out of bed onto the floor beside it (a bed up on chests: down to the floor, not onto the chests), else back where it climbed
-            // in from, else just in front of it.
             Vector3? floor = st.SleepBed != null ? Beside(st.SleepBed.transform, me) : null;
             if (floor != null) me.transform.position = floor.Value;
             else if (st.BedFrom != Vector3.zero && st.SleepBed != null && Vector3.Distance(st.BedFrom, st.SleepBed.GetSpawnPoint()) < 5f) me.transform.position = st.BedFrom;
@@ -95,9 +83,6 @@ namespace VillagePlebs
 
         private static float _nextOffBed;
 
-        /// <summary>
-        /// Awake but standing on a bed (one up on chests: it got out there and found no way down): it hops down beside it, as you would.
-        /// </summary>
         private static void OffBed(BrainState st)
         {
             if (Time.time < _nextOffBed) return;
@@ -114,9 +99,6 @@ namespace VillagePlebs
             st.Remember(P("villagepleb_chores_hopped_off_bed"));
         }
 
-        /// <summary>
-        /// The nearest spot round a bed to stand on that is not the bed itself: lower than the bed's top, with room to stand. Null if none.
-        /// </summary>
         private static Vector3? Beside(Transform bed, Humanoid me)
         {
             Vector3 c = bed.position;
@@ -130,10 +112,10 @@ namespace VillagePlebs
                     Vector3 p = c + Quaternion.Euler(0f, ang, 0f) * Vector3.forward * r;
                     if (!Physics.Raycast(p + Vector3.up * 2.0f, Vector3.down, out RaycastHit hit, 5f, ~0, QueryTriggerInteraction.Ignore)) continue;
                     if (hit.collider.GetComponentInParent<Bed>() != null || hit.collider.GetComponentInParent<Character>() != null || hit.collider.GetComponentInParent<Container>() != null) continue;
-                    if (hit.point.y > c.y - 0.2f || hit.normal.y < 0.7f) continue;            // below the bed (the floor, not chests or beams round it), not a slope
+                    if (hit.point.y > c.y - 0.2f || hit.normal.y < 0.7f) continue;
                     Vector3 stand = hit.point + Vector3.up * 0.05f;
-                    if (Physics.CheckCapsule(stand + Vector3.up * 0.5f, stand + Vector3.up * 1.6f, 0.3f, ~LayerMask.GetMask("character", "character_net", "character_ghost", "item"), QueryTriggerInteraction.Ignore)) continue; // room to stand
-                    float score = r + (c.y - hit.point.y) * 0.3f;                              // near, and not a long drop
+                    if (Physics.CheckCapsule(stand + Vector3.up * 0.5f, stand + Vector3.up * 1.6f, 0.3f, ~LayerMask.GetMask("character", "character_net", "character_ghost", "item"), QueryTriggerInteraction.Ignore)) continue;
+                    float score = r + (c.y - hit.point.y) * 0.3f;
                     if (score < bestScore) { bestScore = score; best = stand; }
                 }
             }
@@ -141,10 +123,6 @@ namespace VillagePlebs
         }
     }
 
-    /// <summary>
-    /// Pulling a cart: point at a cart (the command key) and it hitches itself up (stands at the cart's hitch and takes hold, as the game
-    /// lets any humanoid do) and pulls it along wherever it goes, following you or going home. Point at the cart again and it lets go.
-    /// </summary>
     internal static class Carts
     {
         public static void Toggle(BrainState st, Vagon cart)
@@ -156,7 +134,6 @@ namespace VillagePlebs
             Talk.Say(me, P("villagepleb_chores_cart_pull"));
         }
 
-        /// <summary>True while it is getting hitched up (it walks to the cart and takes hold). Hitched, the rest of its behaviour goes on.</summary>
         public static bool Tick(BrainState st, Action<Vector3, float, bool> moveTo, Action stop)
         {
             Humanoid me = st.Body;
@@ -177,10 +154,6 @@ namespace VillagePlebs
         }
     }
 
-    /// <summary>
-    /// Food it took from one of your chests is marked with that chest's spot; what it did not eat goes back into the same chest once it has
-    /// food of its own again (at home), so your pantry gets back what it did not need.
-    /// </summary>
     internal static class Loans
     {
         public const string Tag = "vp_loan";
@@ -189,14 +162,13 @@ namespace VillagePlebs
         {
             if (item.m_customData == null) item.m_customData = new Dictionary<string, string>();
             Vector3 p = from.transform.position;
-            item.m_customData[Tag] = string.Format(CultureInfo.InvariantCulture, "{0:0.0},{1:0.0},{2:0.0}", p.x, p.y, p.z);   // (a point, whatever the player's language: Return splits at the commas)
+            item.m_customData[Tag] = string.Format(CultureInfo.InvariantCulture, "{0:0.0},{1:0.0},{2:0.0}", p.x, p.y, p.z);
         }
 
-        /// <summary>At home, with food of its own (or fed): borrowed food it did not eat back to the chest it came from. How many.</summary>
         public static int Return(BrainState st)
         {
             Humanoid me = st.Body;
-            if (Work.UsesPantry(me)) return 0; // allowed to take food from your chests: it keeps what it took (to fill its food slots)
+            if (Work.UsesPantry(me)) return 0;
             Inventory inv = me.GetInventory();
             List<ItemDrop.ItemData> borrowed = inv.GetAllItems().Where(i => i.m_customData != null && i.m_customData.ContainsKey(Tag)).ToList();
             if (borrowed.Count == 0) return 0;
@@ -206,25 +178,23 @@ namespace VillagePlebs
             foreach (ItemDrop.ItemData item in borrowed)
             {
                 string[] f = item.m_customData[Tag].Split(',');
-                // (a mark made in a language that writes "12,5": six parts, two to each number)
                 if (f.Length == 6) f = new[] { f[0] + "." + f[1], f[2] + "." + f[3], f[4] + "." + f[5] };
                 if (f.Length != 3 || !float.TryParse(f[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float x) || !float.TryParse(f[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float y)
                     || !float.TryParse(f[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float z)) continue;
                 var spot = new Vector3(x, y, z);
                 Container chest = UnityEngine.Object.FindObjectsByType<Container>(FindObjectsSortMode.None).FirstOrDefault(c => Vector3.Distance(c.transform.position, spot) < 1f && !Containers.InUse(c));
                 if (chest == null || Vector3.Distance(chest.transform.position, me.transform.position) > 60f) continue;
-                if (!Containers.Take(chest)) continue; // (taken over and loaded fresh before it goes in)
+                if (!Containers.Take(chest)) continue;
                 int n = item.m_stack;
                 item.m_customData.Remove(Tag);
                 if (chest.GetInventory().AddItem(item)) { inv.RemoveItem(item); back += n; }
-                else item.m_customData[Tag] = string.Join(",", f); // no room: it keeps it marked
+                else item.m_customData[Tag] = string.Join(",", f);
             }
             if (back > 0) { Companion.SaveBag(me); st.Remember(P("villagepleb_chores_put_back_food", back)); }
             return back;
         }
     }
 
-    /// <summary>Look at it and press a hotbar key: food or a potion it takes one of (and eats or drinks it when it needs to). Anything else is refused.</summary>
     [HarmonyPatch(typeof(Container), nameof(Container.UseItem))]
     internal static class Container_UseItem_Give
     {
@@ -239,8 +209,6 @@ namespace VillagePlebs
                 bool one = Food.IsFood(item) || item.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Consumable;
                 if (one)
                 {
-                    // Only the game running it can change its bag (a change anywhere else is not saved, and the next save there wipes it): a
-                    // friend's game takes it over first, its bag loaded fresh. And out of your inventory before into its bag, so never both.
                     if (!Companion.Write(c, _ => { })) { p.Message(MessageHud.MessageType.Center, T("villagepleb_chores_gear_open", Companion.NameOf(c))); return false; }
                     ItemDrop.ItemData copy = item.Clone();
                     copy.m_stack = 1;
@@ -252,7 +220,6 @@ namespace VillagePlebs
                     Idle.Queue(Brain.Get(c), "thumbsup", 0.3f, p);
                     return false;
                 }
-                // Not food or a potion: nothing happens (a hotbar key must never hand over gear by accident; its gear and bag are given from the menu or your inventory beside it).
                 p.Message(MessageHud.MessageType.Center, T("villagepleb_chores_only_food", Companion.NameOf(c)));
                 __result = false;
             }

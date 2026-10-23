@@ -28,13 +28,10 @@ namespace VillagePlebs
         internal static ConfigEntry<int> MaxCompanions, MaxBought, CompanionPrice;
 
         private Harmony _harmony;
-        internal Harmony Harmony => _harmony;   // (patches on other mods' code, made once they are known: StarLevels)
+        internal Harmony Harmony => _harmony;
 
-        /// <summary>Save a setting changed in the menu.</summary>
         internal void SaveSettings() => Config.Save();
 
-        // All in the mod's own file, in order. The gameplay ones are the server's in multiplayer (how many companions, how strong, how fast
-        // they wake, life while away): Jötunn sends them to everyone, and only an admin can change them while connected.
         private void BindConfig()
         {
             ConfigFile cfg = Config;
@@ -56,14 +53,14 @@ namespace VillagePlebs
 
         private void Awake()
         {
-            VillagePlebs.Shared.Translations.Load(this);   // BepInEx/config/VillagePlebs/Translations/<Language>/VillagePlebs.json: its words in the player's language (Words.cs)
+            VillagePlebs.Shared.Translations.Load(this);
             Instance = this;
             BindConfig();
             MagicMike.ModSettings.ModSettings.Init(this);
 
             _harmony = new Harmony(PluginGUID);
             _harmony.PatchAll();
-            if (ZNetScene.instance != null) { Prefab.Register(ZNetScene.instance); StarLevels.Hook(); } // hot reload while in a world
+            if (ZNetScene.instance != null) { Prefab.Register(ZNetScene.instance); StarLevels.Hook(); }
             Net.Start();
 
             Logger.LogInfo($"{PluginName} {PluginVersion} loaded (menu: {MenuKey.Value}, commands: {CommandKey.Value})");
@@ -71,11 +68,6 @@ namespace VillagePlebs
                 Chat.instance.AddString("[Mod]", VillagePlebs.Shared.Translations.T("villagepleb_plugin_reloaded", PluginName, PluginVersion), Talker.Type.Normal);
         }
 
-        /// <summary>
-        /// Before this copy unloads (a reload while playing, or quitting): every companion this game runs saves its bag (wear and repairs since
-        /// the last save would be undone) and lets go of a bed or chair (its body held still there would stay frozen under the next copy,
-        /// which doesn't know it was lying down). One riding a ship is left as it is: the next copy boards it again.
-        /// </summary>
         private static void ReleaseForReload()
         {
             foreach (Humanoid c in System.Linq.Enumerable.ToList(Companion.All()))
@@ -103,8 +95,8 @@ namespace VillagePlebs
             Home.Stop();
             Portraits.Stop();
             ReleaseForReload();
-            EpicMmo.Forget();   // (what they earned in the last seconds, into their saves)
-            Idle.Forget();  // (up from its chair, before its brain is forgotten)
+            EpicMmo.Forget();
+            Idle.Forget();
             Brain.Forget();
             Stamina.Forget();
             Food.Forget();
@@ -132,11 +124,11 @@ namespace VillagePlebs
 
         private void Update()
         {
-            VillagePlebs.Shared.Translations.Tick();   // (a translation file changed: read again)
+            VillagePlebs.Shared.Translations.Tick();
             VillagePlebs.Shared.ServerCheck.Tick();
             Player player = Player.m_localPlayer;
             Net.Update(player);
-            Passing.Tick();     // players and companions walk through each other
+            Passing.Tick();
             if (player == null) { if (MenuOpen) CloseMenu(); return; }
             Companion.KeepOwnership(player);
             Home.Tick(player);
@@ -144,16 +136,12 @@ namespace VillagePlebs
             UpdateMenu(player);
             MenuKeyPressed(player);
             if (!MenuOpen && Home.AssignFor == null && !TypingOrBusy() && CommandKey.Value.IsDown()) Pointing.Command(player);
-            Marks.Tick(); // what you pointed it at glows, with a line above it
+            Marks.Tick();
         }
 
         private float _keyDownAt = -1f;
         private bool _keyHeld;
 
-        /// <summary>
-        /// The menu key: a tap opens the menu (on release), holding it half a second calls your companions to you or sends them home. With
-        /// the menu open, it closes it (unless a name is being typed).
-        /// </summary>
         private void MenuKeyPressed(Player player)
         {
             if (MenuOpen) { if (MenuKey.Value.IsDown() && !GameUi.Typing) CloseMenu(); _keyDownAt = -1f; return; }

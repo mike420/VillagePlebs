@@ -7,12 +7,6 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Who a companion is, kept with its player's character (Player.m_customData, saved with the character), one per world: name, settings,
-    /// looks, bed, kills, and whether it has fallen. The companion's own ZDO holds the live copy; this one is what brings it back when it
-    /// falls (the game destroys a dead character's ZDO), so it wakes in its bed like a player, with its name, looks and settings.
-    /// Snapshotted from the ZDO every few seconds while the companion is near its player.
-    /// </summary>
     internal class Profile
     {
         public long Id, World;
@@ -27,33 +21,27 @@ namespace VillagePlebs
         public Vector3 Skin = Vector3.one, HairColor = Vector3.one;
         public int Hair, Beard;
         public float SkinT = 0.3f, HairT = 0.5f, HairL = 0.8f;
-        public string BrLook = "";   // BodyReplacer's look (Looks.BrLookKey)
+        public string BrLook = "";
         public float BrMuscle = -1f;
-        public string BrTattoos = "";   // BodyReplacer's tattoos (Looks.BrTattooKey)
+        public string BrTattoos = "";
         public string Skills = "";
-        public long MmoXp;   // its EpicMMO experience (EpicMmo)
-        public string Kept = "";  // the gear it wore when it fell, from before 0.22.0 (now it stays in its tombstone: Grave.WearAgain)
+        public long MmoXp;
+        public string Kept = "";
         public string JournalText = "", TallyText = "";
-        public int Since = -1;   // the day it joined (Journal)
+        public int Since = -1;
         public bool HasBed;
         public Vector3 Bed, LastSeen;
         public bool Dead, HasGrave;
-        public double DiedAt;     // world time (seconds) when it fell
+        public double DiedAt;
         public Vector3 DiedPos;
 
         private const string Key = "vp_companions";
-
-        // ---- stored with the player's character --------------------------------------------------------------
 
         public static long WorldId => ZNet.instance != null ? ZNet.instance.GetWorldUID() : 0L;
 
         private static string _readJson;
         private static List<Profile> _read = new List<Profile>();
 
-        /// <summary>
-        /// Every profile on the character (copies: change one and Save it). The text is read again only when it changed: it is asked for
-        /// every second, and holds each companion's journal.
-        /// </summary>
         public static List<Profile> All(Player p)
         {
             if (p == null || !p.m_customData.TryGetValue(Key, out string json) || string.IsNullOrEmpty(json)) return new List<Profile>();
@@ -74,10 +62,6 @@ namespace VillagePlebs
 
         public static void Save(Player p, Profile profile) => Save(p, new[] { profile });
 
-        /// <summary>
-        /// Several at once, written once (a snapshot of every companion near you: Home.Tick did the whole list over for each one). Each in
-        /// its place, so nothing changed writes the same words, and isn't written at all.
-        /// </summary>
         public static void Save(Player p, IEnumerable<Profile> profiles)
         {
             List<Profile> all = All(p);
@@ -98,19 +82,16 @@ namespace VillagePlebs
         private static void Write(Player p, List<Profile> all)
         {
             string json = new JArray(all.Select(x => (JToken)x.ToJson())).ToString(Newtonsoft.Json.Formatting.None);
-            if (p.m_customData.TryGetValue(Key, out string had) && had == json) return;   // (nothing changed)
+            if (p.m_customData.TryGetValue(Key, out string had) && had == json) return;
             p.m_customData[Key] = json;
-            _readJson = json;   // (what was just written is what All reads next: no need to read it back)
+            _readJson = json;
             _read = all.Select(x => (Profile)x.MemberwiseClone()).ToList();
         }
 
-        // ---- to and from the companion's ZDO ------------------------------------------------------------------
-
-        /// <summary>The live companion's settings and looks, as a profile.</summary>
         public static Profile Of(Humanoid c)
         {
             ZDO z = Companion.Zdo(c);
-            BookData book = Book.Of(c);   // (its journal, tally and missions: not on its ZDO)
+            BookData book = Book.Of(c);
             return new Profile
             {
                 Id = Companion.IdOf(c), World = WorldId, Name = Companion.NameOf(c),
@@ -125,7 +106,6 @@ namespace VillagePlebs
             };
         }
 
-        /// <summary>Give a freshly made companion this profile's id, name, settings and looks (its game must own it).</summary>
         public void ApplyTo(Humanoid c)
         {
             ZDO z = Companion.Zdo(c);
@@ -136,7 +116,7 @@ namespace VillagePlebs
             z.Set(Keys.Potions, Potions); z.Set(Keys.Protect, Protect); z.Set(Keys.UseJev, UseJev);
             z.Set(Keys.HasBed, HasBed); z.Set(Keys.BedPos, Bed);
             z.Set(Skill.Key, Skills ?? "");
-            if (MmoXp > 0L) z.Set(EpicMmo.XpKey, MmoXp);   // (only with EpicMMO experience: nothing new on its save without it)
+            if (MmoXp > 0L) z.Set(EpicMmo.XpKey, MmoXp);
             z.Set(Grave.HasKey, HasGrave); z.Set(Grave.PosKey, DiedPos);
             z.Set(VillagePlebs.Loot.Key, Loot); z.Set(Keys.Friends, Friends); z.Set(VillagePlebs.Loot.ListKey, PickList); z.Set(Work.PantryKey, Pantry); z.Set(Work.HomeSetKey, HomeSet); z.Set(Work.HomeSpotKey, HomeSpot); z.Set(Duties.Key, DutiesText ?? ""); z.Set(Food.FrugalKey, Frugal); z.Set(Work.RationKey, Ration); z.Set(Duties.DestKey, DutyDest); z.Set(Work.StowKey, Stow); z.Set(Journal.SinceKey, Since); z.Set(Following.AutoHomeKey, AutoHome); z.Set(Talk.ChattyKey, Chatty); z.Set(VillagePlebs.Armory.Key, Armory);
             VisEquipment vis = c.GetComponent<VisEquipment>();
@@ -145,12 +125,10 @@ namespace VillagePlebs
             vis.SetSkinColor(Skin);
             vis.SetHairColor(HairColor);
             z.Set("vp_skin_t", SkinT); z.Set("vp_hair_t", HairT); z.Set("vp_hair_l", HairL);
-            Looks.SetHair(c, Hair);   // (also marks "no hair", or the game would give a bald one random hair)
+            Looks.SetHair(c, Hair);
             Looks.SetBeard(c, Beard);
             if (!string.IsNullOrEmpty(BrLook) || !string.IsNullOrEmpty(BrTattoos)) Looks.SetBrLook(c, BrLook, BrMuscle, BrTattoos);
         }
-
-        // ---- json ---------------------------------------------------------------------------------------------
 
         private static JArray V(Vector3 v) => new JArray(Math.Round(v.x, 3), Math.Round(v.y, 3), Math.Round(v.z, 3));
         private static Vector3 V(JToken t) => t is JArray a && a.Count == 3 ? new Vector3((float)a[0], (float)a[1], (float)a[2]) : Vector3.zero;

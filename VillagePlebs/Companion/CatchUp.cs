@@ -8,24 +8,10 @@ using static VillagePlebs.Words;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Living at home while nobody is there. Valheim only runs the world near players, so a companion left at home is frozen while you are
-    /// away. Instead of keeping its area running (deep in the game's world code, costly, and where lost-item bugs come from), it catches up
-    /// when someone comes back and its area loads: it works out how long it was away (world time) and does that much work at once, on the
-    /// real world around it, then tells you what it did:
-    ///   * something to eat: it cooks its raw food, takes food from its chests (a little from yours when it has none), and stays fed;
-    ///   * hunting (when hungry, or for its goal's hides), felling trees (a stump is left), mining rocks and ore, picking wild berries and
-    ///     mushrooms, at a player's pace with its tools, what its goal needs first; the game's own drop tables decide what it gets;
-    ///   * making and upgrading gear toward its goal (and bronze and the like on the way), and repairs, at its stations;
-    ///   * its food burns down over that time and it eats from its bag, and heals with what it ate, as a player does;
-    ///   * with encounters on (Companion, WhileAway: Mild), it meets the creatures of its biome now and then, more at night and in harder
-    ///     places, fights them off and keeps what they drop (Mild: it never falls while you are away).
-    /// One game does this (the one that runs the companion), once per return.
-    /// </summary>
     internal static class CatchUp
     {
         public const string LastKey = "vp_lastsim";
-        private const float MinAway = 120f, MaxAway = 3f * 1800f; // at most three in-game days of work at once
+        private const float MinAway = 120f, MaxAway = 3f * 1800f;
 
         private static readonly Dictionary<Heightmap.Biome, string[]> Creatures = new Dictionary<Heightmap.Biome, string[]>
         {
@@ -44,7 +30,6 @@ namespace VillagePlebs
             [Heightmap.Biome.Plains] = 2f, [Heightmap.Biome.Mistlands] = 2f, [Heightmap.Biome.AshLands] = 3f,
         };
 
-        // How hard the creatures of each biome are, for Real (compared with its weapon, skill, armour and health).
         private static readonly System.Collections.Generic.Dictionary<Heightmap.Biome, float> Threat = new System.Collections.Generic.Dictionary<Heightmap.Biome, float>
         {
             [Heightmap.Biome.Meadows] = 40f, [Heightmap.Biome.BlackForest] = 90f, [Heightmap.Biome.Swamp] = 160f, [Heightmap.Biome.Mountain] = 200f,
@@ -60,8 +45,6 @@ namespace VillagePlebs
             return weapon + Companion.Armor(me) * 2f + me.GetMaxHealth();
         }
 
-        /// <summary>Real: it lost a fight while you were away. As a player: its things into a tombstone where it fell (near home: it goes back for
-        /// them), its food gone, 5% off its skills; it woke at home.</summary>
         private static Vector3 Fall(Humanoid me, Vector3 center, float radius)
         {
             Vector2 r = UnityEngine.Random.insideUnitCircle * radius * 0.6f;
@@ -69,7 +52,7 @@ namespace VillagePlebs
             if (ZoneSystem.instance != null && ZoneSystem.instance.GetSolidHeight(at, out float h)) at.y = h + 0.5f;
             Inventory inv = me.GetInventory();
             var worn = new HashSet<ItemDrop.ItemData>(inv.GetAllItems().Where(Gear.InSlot));
-            foreach (ItemDrop.ItemData i in inv.GetAllItems()) i.m_equipped = worn.Contains(i); // it keeps its gear slots: the move leaves them out
+            foreach (ItemDrop.ItemData i in inv.GetAllItems()) i.m_equipped = worn.Contains(i);
             bool any = inv.NrOfItems() > worn.Count;
             if (any) Companion.Tomb(me, inv, at, Quaternion.identity);
             foreach (ItemDrop.ItemData i in inv.GetAllItems()) i.m_equipped = false;
@@ -81,14 +64,12 @@ namespace VillagePlebs
             EpicMmo.SetXp(me, EpicMmo.AfterDeath(EpicMmo.Xp(me)));
             Skill.Forget(me);
             Food.Clear(me);
-            if (any) Net.AnnounceFall(me, at, true, lost: true); // (it is still standing: a marker only, no waking)
+            if (any) Net.AnnounceFall(me, at, true, lost: true);
             return at;
         }
 
-        /// <summary>Every few seconds while it lives at home on this game: "it was here and working at this world time".</summary>
         public static void Stamp(Humanoid c) => Companion.Zdo(c)?.Set(LastKey, (long)ZNet.instance.GetTimeSeconds());
 
-        /// <summary>The first time this game runs it after it was away (its area just loaded): catch up, then report.</summary>
         public static void OnArrive(BrainState st)
         {
             Humanoid me = st.Body;
@@ -102,39 +83,32 @@ namespace VillagePlebs
             VillagePlebsPlugin.Instance.StartCoroutine(Run(st, Mathf.Min(away, MaxAway), away));
         }
 
-        internal static string Stage = ""; // the step of a catch-up it is on (for the log, if one goes wrong)
+        internal static string Stage = "";
 
         private static IEnumerator Run(BrainState st, float seconds, float away)
         {
-            yield return new WaitForSeconds(3f); // let the trees, rocks and chests around it finish loading
+            yield return new WaitForSeconds(3f);
             Humanoid me = st.Body;
             if (me == null || me.IsDead()) yield break;
-            // another game took it over meanwhile (its player came near): what it did would go into a bag this game no longer saves, and be lost
             if (me.GetComponent<ZNetView>() is ZNetView v && (!v.IsValid() || !v.IsOwner()))
             {
                 VillagePlebsPlugin.Instance?.Note(Companion.NameOf(me) + "'s catch-up left to the game that runs it now");
                 yield break;
             }
-            Talk.Hush = true; // what it did goes into one report, not a chat line for each thing
+            Talk.Hush = true;
             try { Day(st, seconds, away); }
             catch (Exception e) { VillagePlebsPlugin.Instance?.Warn($"Companion catch-up (at {Stage}): " + e); }
             finally { Talk.Hush = false; }
         }
 
-        /// <summary>
-        /// Its time at home, in the order a player's day would go: something to eat (cook raw food, take food from its chests, a little from
-        /// yours when starving), creatures that came by, hunting, gathering (what its goal needs first, food first when hungry), storing,
-        /// cooking what it hunted, making and upgrading gear toward its goal, repairs, then the time passing: its food burns down, it eats,
-        /// and it heals with what it ate.
-        /// </summary>
         private static void Day(BrainState st, float seconds, float away)
         {
             Humanoid me = st.Body;
             var got = new Dictionary<string, int>();
-            var notes = new List<string>();   // the creatures it fought off ($tokens)
-            bool full = false;                 // its bag and chests filled up
+            var notes = new List<string>();
+            bool full = false;
             var also = new List<string>();
-            var did0 = new List<string>();   // what its duties did (for the report)
+            var did0 = new List<string>();
             float budget = seconds;
             int felled = 0, mined = 0, picked = 0, fights = 0;
             string fellTo = null;
@@ -142,17 +116,15 @@ namespace VillagePlebs
             float radius = Work.RadiusOf(me);
 
             Stage = "food";
-            // 1. Something to eat for the time away.
             int cooked = Kitchen.CookAll(me, center, radius);
             string fromYou = Provision(me, center, radius);
 
             Stage = "creatures";
-            // 2. Creatures that came by (Mild: it always comes through).
             if (VillagePlebsPlugin.WhileAway.Value != AwayMode.Off)
             {
                 Heightmap.Biome biome = WorldGenerator.instance != null ? WorldGenerator.instance.GetBiome(me.transform.position) : Heightmap.Biome.Meadows;
                 float rate = FightsPerHour.TryGetValue(biome, out float r) ? r : 1f;
-                int expected = Mathf.Min(8, Mathf.FloorToInt(Hours(seconds) / 24f * rate * 3f + UnityEngine.Random.value)); // a few a day, more in harder places
+                int expected = Mathf.Min(8, Mathf.FloorToInt(Hours(seconds) / 24f * rate * 3f + UnityEngine.Random.value));
                 for (int i = 0; i < expected; i++)
                 {
                     string prefab = Creatures.TryGetValue(biome, out string[] list) ? list[UnityEngine.Random.Range(0, list.Length)] : null;
@@ -166,9 +138,9 @@ namespace VillagePlebs
                         float power = Power(me);
                         if (UnityEngine.Random.value > power / (power + threat * 0.4f))
                         {
-                            fellTo = go.GetComponent<Character>()?.m_name ?? prefab;   // (its $token: the report is made into words where it is read)
+                            fellTo = go.GetComponent<Character>()?.m_name ?? prefab;
                             Fall(me, center, radius);
-                            budget = 0f; // the rest of the time it was making its way back home
+                            budget = 0f;
                             break;
                         }
                     }
@@ -183,7 +155,6 @@ namespace VillagePlebs
             }
 
             Stage = "hunting";
-            // 3. Hunting: when hungry, or when its goal needs hides and the like (and it has something to hunt with).
             bool hungry = !me.GetInventory().GetAllItems().Any(Food.IsFood);
             st.Goal = fellTo == null ? Goals.Pick(me, center, radius, st) : null;
             Job goalJobs = Goals.JobsFor(st.Goal, out HashSet<string> goalPrey);
@@ -192,9 +163,8 @@ namespace VillagePlebs
                 Hunt(me, got, hunted, goalPrey, ref budget, seconds);
 
             Stage = "gathering";
-            // 4. Gathering, at a player's pace, on what is really there: what its goal needs first, food first when hungry.
             Job jobs = Work.JobsOf(me);
-            if (Duties.Configured(me)) jobs = Duties.OpenJobs(me) | (goalJobs & ~(Job.Loot | Job.Hunt)); // its home duties still short of their stockpile, then its goal
+            if (Duties.Configured(me)) jobs = Duties.OpenJobs(me) | (goalJobs & ~(Job.Loot | Job.Hunt));
             else if (jobs == Job.None) jobs = Work.AutoJobs(me) | (goalJobs & ~(Job.Loot | Job.Hunt));
             ItemDrop.ItemData axe = Work.Axe(me), pick = Work.Pickaxe(me);
             var seen = new HashSet<GameObject>();
@@ -210,7 +180,6 @@ namespace VillagePlebs
             targets = targets.OrderBy(t => hungry && Work.Edible(t) ? 0 : st.Goal != null && Work.Drops(t).Any(st.Goal.Wants) ? 1 : 2)
                              .ThenBy(t => Vector3.Distance(t.transform.position, center)).ToList();
 
-            // One pass over what is around it, with the jobs set in "jobs", until its time is up or "done" says it has enough.
             void Gather(Func<bool> done)
             {
             foreach (Component t in targets)
@@ -239,8 +208,8 @@ namespace VillagePlebs
                         AddTable(got, tree.m_dropWhenDestroyed);
                         TreeLog fallen = tree.m_logPrefab != null ? tree.m_logPrefab.GetComponent<TreeLog>() : null;
                         if (fallen != null) { AddTable(got, fallen.m_dropWhenDestroyed); AddSubLogs(got, fallen.m_subLogPrefab, 3); budget -= 40f; }
-                        if (fallen != null) EpicMmo.WorkedAway(me, fallen.gameObject, EpicMmo.Work.Tree, Mathf.CeilToInt(fallen.m_health / _perHit));   // (its log, chopped up)
-                        if (tree.m_stubPrefab != null) UnityEngine.Object.Instantiate(tree.m_stubPrefab, tree.transform.position, tree.transform.rotation); // the stump it leaves
+                        if (fallen != null) EpicMmo.WorkedAway(me, fallen.gameObject, EpicMmo.Work.Tree, Mathf.CeilToInt(fallen.m_health / _perHit));
+                        if (tree.m_stubPrefab != null) UnityEngine.Object.Instantiate(tree.m_stubPrefab, tree.transform.position, tree.transform.rotation);
                         Remove(tree.gameObject); felled++;
                         break;
                     case MineRock5 rock5 when pick != null && pick.m_shared.m_toolTier >= rock5.m_minToolTier && (jobs & (Work.IsOre(rock5.m_dropItems) ? Job.Ore : Job.Stone)) != 0:
@@ -273,8 +242,6 @@ namespace VillagePlebs
             }
             }
 
-            // Its home duties, in the order you set, each with its share of the time (a stockpile that reaches its target), then its own
-            // life with what is left; without duties, as before. Each one shows progress for the time it was away.
             if (Duties.Configured(me))
             {
                 var open = Duties.OnEntries(me).Where(e => Duties.Have(me, e.Duty) < e.Target).ToList();
@@ -292,20 +259,16 @@ namespace VillagePlebs
             else Gather(null);
 
             Stage = "trip";
-            // 4b. What its goal still needs and nothing near home has: a trip further out, through the saved world (it is not loaded): flint on
-            //     a shore 300 m off, and the like.
             string trip = fellTo == null ? AwayTrip(me, center, radius, got, ref budget) : null;
             if (trip != null) Journal.Trip(me, P("villagepleb_catchup_trip_journal", trip));
 
             Stage = "storing";
-            // 5. Into its chests (and its bag); then it cooks what it hunted and picked.
             int total = got.Values.Sum();
             int stored = Store(me, got);
-            Armory.CatchUp(st, center, radius); // (better gear from your chests, and its old gear back in them)
+            Armory.CatchUp(st, center, radius);
             cooked += Kitchen.CookAll(me, center, radius);
 
             Stage = "crafting";
-            // 6. Making and upgrading gear: what is ready, and its goal's in-between materials (bronze), as long as there is material.
             var made = new List<string>();
             for (int round = 0; round < 12 && fellTo == null; round++)
             {
@@ -324,22 +287,18 @@ namespace VillagePlebs
             }
 
             Stage = "repairs";
-            // 7. Repairs at its stations, as a player would before heading out again; and your base, with its hammer.
             int repaired = Repair.All(me, center, radius);
             int mended = Mending.Hammer(me) != null ? Mending.FixAll(st, center, radius) : 0;
 
             Stage = "time";
-            // 8. The time passing: its food burns down and it eats from its bag; fed, it heals as a player does. Then food on it for later.
             Food.PassTime(me, st, seconds);
             if (Food.Meals(me).Count > 0 && fellTo == null) me.Heal(me.GetMaxHealth(), false);
             string later = Provision(me, center, radius);
             if (fromYou == null) fromYou = later;
-            Companion.SaveBag(me); // its tools' and armour's wear, and what it made
+            Companion.SaveBag(me);
             Portraits.Dirty(me);
 
             Stage = "report";
-            // The report.
-            // (packed text, one sentence a key: its player may read it on another game, in another language)
             var did = new List<string>(did0);
             if (felled > 0) did.Add(P(felled == 1 ? "villagepleb_catchup_felled_one" : "villagepleb_catchup_felled_many", felled));
             if (mined > 0) did.Add(P(mined == 1 ? "villagepleb_catchup_mined_one" : "villagepleb_catchup_mined_many", mined));
@@ -364,19 +323,14 @@ namespace VillagePlebs
             st.Remember(line);
             VillagePlebsPlugin.Instance?.Note(Words.English(line));
             Player master = Companion.Master(me);
-            if (master != null && master == Player.m_localPlayer) master.Message(MessageHud.MessageType.Center, Words.Show(line)); // (its player not here: both were null, and equal)
+            if (master != null && master == Player.m_localPlayer) master.Message(MessageHud.MessageType.Center, Words.Show(line));
             Talk.Tell(me, line);
         }
 
-        /// <summary>
-        /// A trip while you were away for what its goal still needs: the wild pickables that give it (never crops), anywhere within 400 m of
-        /// home in the world as saved, nearest first. Each one picked is marked picked in the world (when its area loads, the game hides or
-        /// removes it, as if picked there). The walk there and back takes its time. What it did ("went 260 m south for 4 flint"), or null.
-        /// </summary>
         private static string AwayTrip(Humanoid me, Vector3 center, float radius, Dictionary<string, int> got, ref float budget)
         {
             if (budget < 300f || ZDOMan.instance == null) return null;
-            Goal g = Goals.Pick(me, center, radius); // (what it still needs, near home or not)
+            Goal g = Goals.Pick(me, center, radius);
             if (g == null || g.Raw.Count == 0) return null;
             var brought = new Dictionary<string, int>();
             float farthest = 0f;
@@ -411,7 +365,7 @@ namespace VillagePlebs
                         }
                         int n = Mathf.Max(1, kind.m_amount);
                         Add(got, item, n);
-                        string name = item.GetComponent<ItemDrop>().m_itemData.m_shared.m_name;   // (its $token)
+                        string name = item.GetComponent<ItemDrop>().m_itemData.m_shared.m_name;
                         brought[name] = (brought.TryGetValue(name, out int had) ? had : 0) + n;
                         left -= n;
                         budget -= 20f;
@@ -421,14 +375,12 @@ namespace VillagePlebs
                 }
             }
             if (brought.Count == 0) return null;
-            budget -= farthest * 2f / 3f; // there and back, at a walk
+            budget -= farthest * 2f / 3f;
             return P(TripKeys[Remote.Dir(farWay)], farthest.ToString("0"), string.Join(", ", brought.Select(kv => Amount(kv, true))));
         }
 
-        /// <summary>"4 wood": how many of a thing ($token), in the reader's language (lower case mid-sentence when <paramref name="low"/>).</summary>
         private static string Amount(KeyValuePair<string, int> kv, bool low) => P("villagepleb_catchup_amount", kv.Value, low ? Words.Low(kv.Key) : kv.Key);
 
-        /// <summary>"a and b and c" (packed text).</summary>
         private static string And(IEnumerable<string> parts) => parts.Aggregate((a, b) => P("villagepleb_home_and", a, b));
 
         private static readonly string[] TripKeys =
@@ -437,9 +389,8 @@ namespace VillagePlebs
             "villagepleb_catchup_trip_s", "villagepleb_catchup_trip_sw", "villagepleb_catchup_trip_w", "villagepleb_catchup_trip_nw",
         };
 
-        private static float Hours(float seconds) => seconds / (EnvMan.instance != null ? EnvMan.instance.m_dayLengthSec / 24f : 75f); // in-game hours
+        private static float Hours(float seconds) => seconds / (EnvMan.instance != null ? EnvMan.instance.m_dayLengthSec / 24f : 75f);
 
-        /// <summary>What a creature drops, by the game's own drop list.</summary>
         private static void Drops(Dictionary<string, int> got, GameObject creature)
         {
             CharacterDrop drops = creature.GetComponent<CharacterDrop>();
@@ -451,7 +402,7 @@ namespace VillagePlebs
         private static void Wear(Humanoid me, float share)
         {
             foreach (ItemDrop.ItemData worn in Companion.Worn(me).Where(w => w.m_shared.m_useDurability))
-                worn.m_durability = Mathf.Max(worn.GetMaxDurability() * 0.1f, worn.m_durability - worn.GetMaxDurability() * share); // wear, never broken
+                worn.m_durability = Mathf.Max(worn.GetMaxDurability() * 0.1f, worn.m_durability - worn.GetMaxDurability() * share);
         }
 
         private static readonly Dictionary<Heightmap.Biome, string[]> Quarry = new Dictionary<Heightmap.Biome, string[]>
@@ -462,10 +413,6 @@ namespace VillagePlebs
             [Heightmap.Biome.Plains] = new[] { "Lox", "Deer" },
         };
 
-        /// <summary>
-        /// Hunting near home: about two kills a day (three with a bow), of its biome's game, or what its goal needs (deer for hides); each takes a
-        /// while and wears its gear a little. The game's own drop lists decide what it brings in.
-        /// </summary>
         private static void Hunt(Humanoid me, Dictionary<string, int> got, Dictionary<string, int> hunted, HashSet<string> goalPrey, ref float budget, float seconds)
         {
             Heightmap.Biome biome = WorldGenerator.instance != null ? WorldGenerator.instance.GetBiome(me.transform.position) : Heightmap.Biome.Meadows;
@@ -483,15 +430,11 @@ namespace VillagePlebs
                 Wear(me, 0.01f);
                 if (weapon != null) Skill.Raise(me, weapon.m_shared.m_skillType, 2f);
                 budget -= 180f;
-                string name = go.GetComponent<Character>()?.m_name ?? go.name;   // (its $token)
+                string name = go.GetComponent<Character>()?.m_name ?? go.name;
                 hunted[name] = (hunted.TryGetValue(name, out int had) ? had : 0) + 1;
             }
         }
 
-        /// <summary>
-        /// Food on it for a while (ten): from its own chests first; with nothing at all to eat, a little from yours at home (when it may: Orders
-        /// tab). Returns what it took from yours ("3 cooked meat"), or null.
-        /// </summary>
         private static string Provision(Humanoid me, Vector3 center, float radius)
         {
             Inventory mine = me.GetInventory();
@@ -499,7 +442,7 @@ namespace VillagePlebs
             foreach (Container chest in Home.Chests(me).Where(c => !Containers.InUse(c)))
             {
                 if (have >= 10) break;
-                if (!Containers.Take(chest)) continue; // (what is really in it, before it looks)
+                if (!Containers.Take(chest)) continue;
                 foreach (ItemDrop.ItemData food in chest.GetInventory().GetAllItems().Where(Food.IsFood).OrderByDescending(i => i.m_shared.m_food + i.m_shared.m_foodStamina).ToList())
                 {
                     if (have >= 10) break;
@@ -512,10 +455,9 @@ namespace VillagePlebs
             return yours != null ? Work.TakeFoodFrom(me, yours, 5) : null;
         }
 
-        private static int _hits;       // the swings the last Chop took, and the damage of each (EpicMMO pays for each hit on a log or rock)
+        private static int _hits;
         private static float _perHit = 1f;
 
-        /// <summary>The time and wear of working one tree or rock with this tool (as a player swings it); false when the tool would break.</summary>
         private static bool Chop(Humanoid me, ItemDrop.ItemData tool, float health, ref float budget)
         {
             float perHit = Mathf.Max(1f, (tool.m_shared.m_damages.m_chop + tool.m_shared.m_damages.m_pickaxe) * Mathf.Lerp(0.4f, 1f, Skill.Get(me, tool.m_shared.m_skillType) / 100f));
@@ -524,7 +466,7 @@ namespace VillagePlebs
             float wear = hits * tool.m_shared.m_useDurabilityDrain;
             if (tool.m_shared.m_useDurability && tool.m_durability - wear <= 0f) return false;
             if (tool.m_shared.m_useDurability) tool.m_durability -= wear;
-            budget -= hits * 1.3f + 20f; // swings, plus walking and picking up
+            budget -= hits * 1.3f + 20f;
             for (int i = 0; i < hits; i++) Skill.Raise(me, tool.m_shared.m_skillType, 1f);
             return true;
         }
@@ -562,10 +504,6 @@ namespace VillagePlebs
         private static int Free(Humanoid me) => me.GetInventory().GetEmptySlots() + Home.Chests(me).Sum(c => c.GetInventory().GetEmptySlots())
                                                 + (Work.Stows(me) ? Work.YourChests(me, Work.Center(me), Work.RadiusOf(me) + 20f).Sum(c => c.GetInventory().GetEmptySlots()) : 0);
 
-        /// <summary>
-        /// As many as fit, up to amount, stack by stack: the game's AddItem(prefab, amount) puts in one stack at most and drops the rest
-        /// (300 wood brought back filled one chest stack and lost 250). Returns how many went in.
-        /// </summary>
         private static int AddUpTo(Inventory inv, GameObject prefab, int amount)
         {
             ItemDrop drop = prefab.GetComponent<ItemDrop>();
@@ -576,13 +514,12 @@ namespace VillagePlebs
                 int before = inv.CountItems(name);
                 inv.AddItem(prefab, Mathf.Min(amount, max));
                 int added = inv.CountItems(name) - before;
-                if (added <= 0) break;   // full
+                if (added <= 0) break;
                 amount -= added; total += added;
             }
             return total;
         }
 
-        /// <summary>What there was no room for anywhere, on the ground at its feet (in stacks).</summary>
         private static void DropAt(Humanoid me, GameObject prefab, int amount)
         {
             int max = Mathf.Max(1, prefab.GetComponent<ItemDrop>().m_itemData.m_shared.m_maxStackSize);
@@ -594,7 +531,6 @@ namespace VillagePlebs
             VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(me)} had no room for all it brought back: the rest is on the ground beside it");
         }
 
-        /// <summary>Into its chests first (stacking onto what is there), then its bag. Returns how many went into chests. The items' $tokens in the report.</summary>
         private static int Store(Humanoid me, Dictionary<string, int> got)
         {
             int stored = 0;
@@ -607,8 +543,6 @@ namespace VillagePlebs
                 int left = kv.Value;
                 List<Container> own = Home.Chests(me).Where(c => !Containers.InUse(c)).ToList();
                 List<Container> yours = Work.Stows(me) ? Work.YourChests(me, Work.Center(me), Work.RadiusOf(me) + 20f).ToList() : new List<Container>();
-                // Its duties work for you: what it brings goes into your chests first (its own keep a little food for itself); without duties,
-                // into its own first, then yours (only put in).
                 bool forYou = Duties.Configured(me) && Duties.ToYours(me) && yours.Count > 0;
                 IEnumerable<Container> chests = forYou ? yours.Concat(own) : own.Concat(yours);
                 if (forYou && Food.IsFood(drop.m_itemData))
@@ -618,7 +552,7 @@ namespace VillagePlebs
                     foreach (Container chest in own)
                     {
                         if (toLarder <= 0) break;
-                        if (!Containers.Take(chest)) continue; // (taken over and loaded fresh before anything goes in)
+                        if (!Containers.Take(chest)) continue;
                         int put = AddUpTo(chest.GetInventory(), prefab, toLarder);
                         toLarder -= put; left -= put; stored += put;
                     }
@@ -626,13 +560,13 @@ namespace VillagePlebs
                 foreach (Container chest in chests)
                 {
                     if (left <= 0) break;
-                    if (!Containers.Take(chest)) continue; // (taken over and loaded fresh before anything goes in)
+                    if (!Containers.Take(chest)) continue;
                     int added = AddUpTo(chest.GetInventory(), prefab, left);
                     left -= added; stored += added;
                 }
                 if (left > 0) left -= AddUpTo(me.GetInventory(), prefab, left);
-                if (left > 0) DropAt(me, prefab, left);   // (no room anywhere: on the ground at its feet, never lost)
-                named[drop.m_itemData.m_shared.m_name] = kv.Value;   // (by $token: the report is made into words where it is read)
+                if (left > 0) DropAt(me, prefab, left);
+                named[drop.m_itemData.m_shared.m_name] = kv.Value;
             }
             got.Clear();
             foreach (var kv in named) got[kv.Key] = kv.Value;

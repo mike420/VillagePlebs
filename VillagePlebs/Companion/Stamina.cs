@@ -5,15 +5,6 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// The companion's stamina, which the game's monsters do not have. The game already asks every character "have you the stamina?" before
-    /// a swing or a block and tells it what one cost; for monsters the answer is always yes. Companions answer from their own pool instead
-    /// (see the patches below), so swings, blocks and guard breaks work exactly as they do for players. Running drains it, and it comes back
-    /// after a short pause; status effects that change stamina (Eikthyr's power, meads) apply through the game's own modifiers.
-    ///
-    /// The pool is kept by the game that runs the companion, and copied into its ZDO on a big change or every few seconds, for the menu on
-    /// other games (and for whoever runs it next).
-    /// </summary>
     internal static class Stamina
     {
         private const string Key = "vp_stamina";
@@ -34,10 +25,8 @@ namespace VillagePlebs
             return p;
         }
 
-        /// <summary>Read again from its save next time (this game just took it over: Brain.TookOver).</summary>
         public static void Reload(Character c) => Pools.Remove(c);
 
-        /// <summary>The current value: from the pool on the game that runs it, from its ZDO elsewhere.</summary>
         public static float Get(Character c)
         {
             ZNetView v = c.GetComponent<ZNetView>();
@@ -61,16 +50,14 @@ namespace VillagePlebs
             p.Value = Mathf.Min(Max(c), p.Value + amount);
         }
 
-        /// <summary>Too tired to run: once emptied, it walks until it has a third back.</summary>
         public static bool CanRun(Character c)
         {
             Pool p = Of(c);
-            if (p.Value <= 5f) p.Winded = true;                           // run out: it walks until a third is back, as a player does
+            if (p.Value <= 5f) p.Winded = true;
             if (p.Winded && p.Value > Max(c) * 0.33f) p.Winded = false;
-            return !p.Winded && p.Value > 5f && !(c is Humanoid h && Carry.Over(h)); // over its carry weight it cannot run, as a player
+            return !p.Winded && p.Value > 5f && !(c is Humanoid h && Carry.Over(h));
         }
 
-        /// <summary>Every frame on the game that runs it: running costs, standing still (after a pause) brings it back.</summary>
         public static void Tick(Humanoid c, float dt)
         {
             Pool p = Of(c);
@@ -78,10 +65,10 @@ namespace VillagePlebs
             Vector3 v = body != null ? body.linearVelocity : Vector3.zero;
             v.y = 0f;
             bool may = CanRun(c);
-            if (!may && c.IsRunning()) c.SetRun(false); // winded: it walks, whatever asked it to run
+            if (!may && c.IsRunning()) c.SetRun(false);
             if (may && c.IsRunning() && v.magnitude > 1f)
             {
-                float drain = RunDrain * Mathf.Lerp(1f, 0.5f, Skill.Get(c, Skills.SkillType.Run) / 100f); // (the run skill halves it at 100, as a player's)
+                float drain = RunDrain * Mathf.Lerp(1f, 0.5f, Skill.Get(c, Skills.SkillType.Run) / 100f);
                 c.GetSEMan().ModifyRunStaminaDrain(drain, ref drain, v.normalized);
                 Use(c, drain * dt);
                 if (c is Humanoid h && p.Value > 0f) Skill.Doing(h, Skills.SkillType.Run, dt);
@@ -98,7 +85,6 @@ namespace VillagePlebs
 
         private static void Save(Character c, Pool p, bool now)
         {
-            // Each write sends its whole save (its bag too) to every player: only a big change at once, else every few seconds while it changes.
             float change = Mathf.Abs(p.Value - p.Saved);
             if (!now && change < 5f && (Time.time - p.LastSave < 3f || change < 0.5f)) return;
             ZNetView v = c.GetComponent<ZNetView>();
@@ -110,8 +96,6 @@ namespace VillagePlebs
 
         public static void Forget() => Pools.Clear();
     }
-
-    // ---- the game's stamina questions, answered for companions ----
 
     [HarmonyPatch(typeof(Character), nameof(Character.HaveStamina))]
     internal static class Character_HaveStamina
@@ -158,10 +142,6 @@ namespace VillagePlebs
         private static void Postfix(Character __instance, ref float __result) { if (Companion.Is(__instance)) __result = Stamina.Get(__instance) / Mathf.Max(1f, Stamina.Max(__instance)); }
     }
 
-    // ---- the boss powers (Forsaken powers) reach companions too ----
-
-    // The game gives a power to every player within 10 m of whoever used it; companions in that range get it as well. (Through the game's
-    // own status-effect message, so it reaches a companion run by another player's game.)
     [HarmonyPatch(typeof(Player), nameof(Player.ActivateGuardianPower))]
     internal static class Player_ActivateGuardianPower
     {
@@ -171,7 +151,7 @@ namespace VillagePlebs
 
         private static void Postfix(Player __instance, bool __state)
         {
-            if (!__state || __instance.m_guardianPowerCooldown <= 0f) return; // it did not fire
+            if (!__state || __instance.m_guardianPowerCooldown <= 0f) return;
             StatusEffect se = Power(__instance);
             foreach (Humanoid c in Companion.All())
             {

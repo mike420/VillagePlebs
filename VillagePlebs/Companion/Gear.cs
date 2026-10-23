@@ -8,20 +8,11 @@ namespace VillagePlebs
 {
     internal enum GearKind { Weapon, Spare, Shield, Bow, Ammo, Axe, Pickaxe, Hammer, Head, Chest, Legs, Cape, Belt, Food }
 
-    /// <summary>
-    /// Its gear in a place of its own: two rows of named slots under its bag (weapon, spare weapon, shield, bow,
-    /// arrows, axe, pickaxe, hammer; helmet, chest, legs, cape, belt). They are cells of its real inventory (the game only lets it wear
-    /// and wield what is in its inventory), kept apart: what it picks up, loots and gathers only ever goes into its bag (the four rows above),
-    /// and its menu shows them apart (Inventory tab), as does its bag panel below your inventory (BagPanel). What is in its gear slots it
-    /// keeps when it falls; the rest goes into its tombstone. It moves the best of what it has into the slots by itself (a better axe it
-    /// made, armour you gave it); you give and take its gear and what is in its bag from its menu (Inventory tab), from anywhere, or in its
-    /// bag panel, beside it.
-    /// </summary>
     internal static class Gear
     {
         public const int BagRows = 4, Rows = 6, Width = 8;
 
-        public class Slot { public GearKind Kind; public string Label; public int X, Y; }   // Label: packed text (Words.P), shown with Words.Show
+        public class Slot { public GearKind Kind; public string Label; public int X, Y; }
 
         public static readonly Slot[] All =
         {
@@ -43,7 +34,6 @@ namespace VillagePlebs
             new Slot { Kind = GearKind.Food,    Label = Words.P("villagepleb_gear_slot_food"),    X = 7, Y = 5 },
         };
 
-        /// <summary>What its worn gear resists (a wolf cape: frost...), as a player's armour does, plus its status effects (meads).</summary>
         public static HitData.DamageModifiers Modifiers(Humanoid c)
         {
             var mods = new HitData.DamageModifiers();
@@ -52,14 +42,11 @@ namespace VillagePlebs
             return mods;
         }
 
-        /// <summary>A companion's inventory (its gear chest's): the one these rules are for.</summary>
-        public static bool IsCompanion(Inventory inv) => inv != null && (inv.GetName() == "$villagepleb_companion" || inv.GetName() == "Companion"); // (before 0.24: "Companion")
+        public static bool IsCompanion(Inventory inv) => inv != null && (inv.GetName() == "$villagepleb_companion" || inv.GetName() == "Companion");
 
         public static Slot At(int x, int y) => All.FirstOrDefault(s => s.X == x && s.Y == y);
         public static bool InSlot(ItemDrop.ItemData i) => i != null && i.m_gridPos.y >= BagRows;
         public static ItemDrop.ItemData In(Humanoid h, Slot s) => h.GetInventory().GetItemAt(s.X, s.Y);
-
-        // ---- what goes where -------------------------------------------------------------------------
 
         private static bool IsAxe(ItemDrop.ItemData i) => i.m_shared.m_damages.m_chop > 0f && i.m_shared.m_skillType == Skills.SkillType.Axes;
         private static bool IsPick(ItemDrop.ItemData i) => i.m_shared.m_damages.m_pickaxe > 0f;
@@ -89,7 +76,6 @@ namespace VillagePlebs
             return false;
         }
 
-        /// <summary>A gear item at all (something one of the slots takes).</summary>
         public static bool IsGear(ItemDrop.ItemData i) => All.Any(s => Fits(s, i));
 
         internal static float Harm(ItemDrop.ItemData i)
@@ -98,7 +84,6 @@ namespace VillagePlebs
             return d.m_damage + d.m_blunt + d.m_slash + d.m_pierce + d.m_fire + d.m_frost + d.m_lightning + d.m_poison + d.m_spirit;
         }
 
-        /// <summary>How good an item is in that slot (higher is better).</summary>
         internal static float Score(Humanoid h, Slot s, ItemDrop.ItemData i)
         {
             switch (s.Kind)
@@ -118,18 +103,11 @@ namespace VillagePlebs
             }
         }
 
-        // ---- keeping the slots filled ----------------------------------------------------------------
-
-        /// <summary>
-        /// The best of what is in its bag goes into its empty or weaker gear slots (the one it had goes into the bag where the new one was).
-        /// Weapons and the spare: not its axes and pickaxes (those have their own slots; you can still put one there yourself). Returns whether
-        /// anything moved.
-        /// </summary>
         public static bool Arrange(Humanoid h)
         {
             Inventory inv = h.GetInventory();
             if (!IsCompanion(inv)) return false;
-            Grow(inv); // (a companion already about when the mod was updated)
+            Grow(inv);
             bool moved = false;
             moved |= ArrangeFood(inv);
             foreach (Slot s in All.Where(x => x.Kind != GearKind.Food).OrderBy(x => x.Kind == GearKind.Weapon ? 1 : x.Kind == GearKind.Spare ? 2 : x.Kind == GearKind.Ammo ? 3 : 0))
@@ -143,7 +121,7 @@ namespace VillagePlebs
                 if (Score(h, s, best) <= Score(h, s, current)) continue;
                 Vector2i was = best.m_gridPos;
                 best.m_gridPos = new Vector2i(s.X, s.Y);
-                current.m_gridPos = was; // (swapped: the old one where the new one was)
+                current.m_gridPos = was;
                 moved = true;
             }
             if (moved) Companion.SaveBag(h);
@@ -153,27 +131,21 @@ namespace VillagePlebs
         private static float Worth(ItemDrop.ItemData i) => i.m_shared.m_food + i.m_shared.m_foodStamina + i.m_shared.m_foodEitr;
         private static IEnumerable<Slot> FoodSlots => All.Where(s => s.Kind == GearKind.Food);
 
-        /// <summary>
-        /// Its three food slots: its three best different foods (as a player keeps three to eat), each stack topped up from the same food in its
-        /// bag; a better food in its bag takes the place of the weakest. It eats from them (the best first) as a player does.
-        /// </summary>
         private static bool ArrangeFood(Inventory inv)
         {
             bool moved = false;
             var slots = FoodSlots.ToList();
-            // Something else in a food slot (moved there by hand): into the bag.
             foreach (Slot s in slots)
             {
                 ItemDrop.ItemData there = inv.GetItemAt(s.X, s.Y);
                 if (there != null && !Food.IsFood(there) && ToBag(inv, there)) moved = true;
             }
-            // The three best different foods it has.
             var best = inv.GetAllItems().Where(Food.IsFood).GroupBy(i => i.m_shared.m_name).OrderByDescending(g => Worth(g.First())).Take(slots.Count).Select(g => g.Key).ToList();
             foreach (Slot s in slots)
             {
                 ItemDrop.ItemData there = inv.GetItemAt(s.X, s.Y);
                 if (there == null || best.Contains(there.m_shared.m_name)) continue;
-                if (ToBag(inv, there)) moved = true; // (a weaker one: out, for a better)
+                if (ToBag(inv, there)) moved = true;
             }
             foreach (string name in best)
             {
@@ -184,7 +156,6 @@ namespace VillagePlebs
                 from.m_gridPos = new Vector2i(free.X, free.Y);
                 moved = true;
             }
-            // Topped up from the bag.
             foreach (Slot s in slots)
             {
                 ItemDrop.ItemData there = inv.GetItemAt(s.X, s.Y);
@@ -202,17 +173,14 @@ namespace VillagePlebs
             return moved;
         }
 
-        /// <summary>Its food slots running low (fewer than three foods, or under five of one): it would take food from its chests.</summary>
         public static bool FoodLow(Humanoid h)
         {
             var food = FoodSlots.Select(s => In(h, s)).Where(i => i != null).ToList();
             return food.Count < 3 || food.Any(i => i.m_stack < 5);
         }
 
-        /// <summary>Less than six food on it (any kind, slots and bag): time for a trip to a chest. (FoodLow is for the errand you send it on.)</summary>
         public static bool FoodShort(Humanoid h) => h.GetInventory().GetAllItems().Where(Food.IsFood).Sum(i => i.m_stack) < 6;
 
-        /// <summary>From its chest: food it would put in its food slots (a food it has too little of, or a new one while a slot is free or weaker).</summary>
         public static bool WantsFood(Humanoid h, ItemDrop.ItemData item)
         {
             if (!Food.IsFood(item)) return false;
@@ -245,10 +213,6 @@ namespace VillagePlebs
             return new Vector2i(-1, -1);
         }
 
-        /// <summary>
-        /// You give it a piece of gear (its menu, from anywhere): into the slot it belongs in (the first free one of its kind, else the main one);
-        /// what was there goes into its bag, or back to you when its bag is full. False (with why) when it cannot.
-        /// </summary>
         public static bool Put(Humanoid c, Player p, ItemDrop.ItemData item, out string why)
         {
             why = null;
@@ -262,7 +226,7 @@ namespace VillagePlebs
             {
                 Slot same = fits.FirstOrDefault(s => In(c, s) is ItemDrop.ItemData f && f.m_shared.m_name == item.m_shared.m_name && f.m_stack + item.m_stack <= f.m_shared.m_maxStackSize);
                 slot = same ?? fits.FirstOrDefault(s => In(c, s) == null);
-                if (slot == null) // its food slots are full of other food: into its bag (it moves the best into its slots itself)
+                if (slot == null)
                 {
                     if (!its.CanAddItem(item)) { why = Words.P("villagepleb_companion_bag_full", Companion.NameOf(c)); return false; }
                     its.MoveItemToThis(mine, item);
@@ -285,21 +249,18 @@ namespace VillagePlebs
             if (p.IsItemEquiped(item)) p.UnequipItem(item, false);
             item.m_equipped = false;
             if (!its.MoveItemToThis(mine, item, item.m_stack, slot.X, slot.Y)) { why = Words.P("villagepleb_gear_no_fit"); Activity.Log(c, $"could not take {Localization.instance.Localize(item.m_shared.m_name)} into its {Words.English(slot.Label).ToLowerInvariant()} slot"); return false; }
-            Brain.Get(c).NextGear = 0f; // wear it now
+            Brain.Get(c).NextGear = 0f;
             Companion.SaveBag(c);
             Activity.Log(c, $"you gave it {Localization.instance.Localize(item.m_shared.m_name)}: into its {Words.English(slot.Label).ToLowerInvariant()} slot");
             return true;
         }
 
-        /// <summary>Old companions (four rows): the gear rows added.</summary>
         public static void Grow(Inventory inv)
         {
             if (inv == null || inv.GetHeight() >= Rows) return;
             AccessTools.Field(typeof(Inventory), "m_height").SetValue(inv, Rows);
         }
     }
-
-    // ---- what it picks up only goes into its bag --------------------------------------------------------------
 
     [HarmonyPatch(typeof(Inventory), "FindEmptySlot")]
     internal static class Inventory_FindEmptySlot_Gear
@@ -343,10 +304,6 @@ namespace VillagePlebs
         }
     }
 
-    /// <summary>
-    /// Its bag and gear below your inventory: the two gear rows a little apart under the bag, each slot labelled,
-    /// the unused cells hidden.
-    /// </summary>
     [HarmonyPatch(typeof(InventoryGrid), "UpdateGui")]
     internal static class InventoryGrid_UpdateGui_Bag
     {
@@ -369,7 +326,6 @@ namespace VillagePlebs
             }
         }
 
-        /// <summary>The slot's name written faintly at the bottom of the cell (made once per cell).</summary>
         private static TMPro.TMP_Text Label(InventoryElement e)
         {
             Transform have = e.transform.Find("CompanionSlotLabel");
@@ -394,7 +350,6 @@ namespace VillagePlebs
         public static void Forget() => Shifted.Clear();
     }
 
-    /// <summary>Into one of its gear slots only what belongs there (a helmet in the helmet slot...).</summary>
     [HarmonyPatch(typeof(InventoryGrid), nameof(InventoryGrid.DropItem))]
     internal static class InventoryGrid_DropItem_Gear
     {
@@ -406,7 +361,6 @@ namespace VillagePlebs
                 Gear.Slot slot = Gear.At(pos.x, pos.y);
                 if (slot == null || !Gear.Fits(slot, item)) return Refuse(item, slot, out __result);
             }
-            // Out of one of its gear slots onto something that would be swapped back into it: that has to belong there too.
             if (Gear.IsCompanion(fromInventory) && item.m_gridPos.y >= Gear.BagRows)
             {
                 Gear.Slot origin = Gear.At(item.m_gridPos.x, item.m_gridPos.y);

@@ -10,17 +10,10 @@ using UnityEngine.Networking;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Talking to a companion in chat: start a message with its name ("Rádvar, follow me", "Rádvar go home", "rádvar: be careful") and it
-    /// does what you ask, and answers above its head. Plain words do (follow, stay, guard, home, come here, aggressive, careful, passive, your things). The message still goes
-    /// to chat as usual. Your own companions, or another player's that lets friends give it orders.
-    /// </summary>
     internal static class Talk
     {
-        // The words a player types stay English (commands); "meaning" is a note for us; the reply is packed text (Words.P), said in the player's language.
         private static readonly (string id, string meaning, string[] words, string reply)[] Intents =
         {
-            // errands first (their words are more particular: "repair your gear" is not "your gear")
             ("e:PutAway", "Put away what it carries into the chests.", new[] { "put away", "put your things away", "store your", "stash", "unload", "empty your bag" }, null),
             ("e:Restock", "Fill its food slots from the chests.", new[] { "restock", "stock up", "get food", "grab food", "get some food" }, null),
             ("e:BetterGear", "Look in the chests for better gear and wear it.", new[] { "gear up", "better gear", "new gear", "check gear", "check your gear", "armour up", "armor up", "upgrade your gear" }, null),
@@ -41,7 +34,6 @@ namespace VillagePlebs
             ("grave", "Go and get its things back from its tombstone.", new[] { "grave", "tombstone", "your stuff", "your things", "your gear" }, Words.P("villagepleb_talk_reply_grave")),
         };
 
-        /// <summary>Called for every chat line the local player sends.</summary>
         public static void Heard(string text)
         {
             Player me = Player.m_localPlayer;
@@ -63,7 +55,7 @@ namespace VillagePlebs
             if (text.Length < name.Length) return false;
             string head = text.Substring(0, name.Length);
             bool same = string.Compare(head, name, StringComparison.OrdinalIgnoreCase) == 0
-                        || string.Compare(Plain(head), Plain(name), StringComparison.OrdinalIgnoreCase) == 0; // "Radvar" works for "Rádvar"
+                        || string.Compare(Plain(head), Plain(name), StringComparison.OrdinalIgnoreCase) == 0;
             return same && (text.Length == name.Length || !char.IsLetterOrDigit(text[name.Length]));
         }
 
@@ -82,9 +74,9 @@ namespace VillagePlebs
             if (intent == null || match.id == null) { Say(c, Words.P("villagepleb_talk_dont_follow")); return; }
             if (intent.StartsWith("e:") && Enum.TryParse(intent.Substring(2), out Errand errand))
             {
-                BrainState st = Brain.Claim(c, out string why);   // (the errand goes into its brain on this game: Brain.Claim)
+                BrainState st = Brain.Claim(c, out string why);
                 if (st == null) { VillagePlebsPlugin.Tell(why); return; }
-                string result = Errands.Run(st, errand); // (it says what it does, or why not)
+                string result = Errands.Run(st, errand);
                 Brain.Get(c)?.Remember(Words.P("villagepleb_talk_you_said", said, errand));
                 VillagePlebsPlugin.Instance?.Note($"{me.GetPlayerName()} told {Companion.NameOf(c)} \"{said}\" -> errand {errand}: {result}");
                 return;
@@ -118,13 +110,10 @@ namespace VillagePlebs
             VillagePlebsPlugin.Instance?.Note($"{me.GetPlayerName()} told {Companion.NameOf(c)} \"{said}\" -> {intent}");
         }
 
-        /// <summary>Words above its head (on this game). Packed text (Words.P) is made into the player's words here.</summary>
         internal static void Say(Humanoid c, string text)
         {
             if (c != null && Chat.instance != null) Chat.instance.SetNpcText(c.gameObject, Vector3.up * 2.3f, 30f, 5f, "", Words.Show(text), false);
         }
-
-        // ---- telling its player what it is up to ----------------------------------------------------------------
 
         public const string ChattyKey = "vp_chatty";
         public static bool Chatty(Component c) => Companion.Zdo(c)?.GetBool(ChattyKey, true) ?? true;
@@ -133,12 +122,7 @@ namespace VillagePlebs
         private static readonly AccessTools.FieldRef<Chat, float> HideTimer =
             AccessTools.Field(typeof(Chat), "m_hideTimer") != null ? AccessTools.FieldRefAccess<Chat, float>("m_hideTimer") : null;
 
-        /// <summary>
-        /// It tells its player something in chat ("Rádvar: my bag is full, I'm taking it home"), and says it above its head. With a topic,
-        /// not again about the same thing for that many minutes. Its player sees it wherever they are (the game running it may be another
-        /// player's: then it goes over the network). Off with "Tells you what it is up to" in its Orders tab.
-        /// </summary>
-        public static bool Hush; // catching up (CatchUp): one report at the end, not a line for each thing
+        public static bool Hush;
 
         public static void Tell(Humanoid c, string text, string topic = null, float minutes = 0f)
         {
@@ -158,11 +142,6 @@ namespace VillagePlebs
             else Net.SendSays(Companion.MasterId(c), Companion.NameOf(c), text);
         }
 
-        /// <summary>
-        /// What it is up to that you need not be told in chat (its goal, a hunting trip, materials made on the way): above its head and in its
-        /// activity log only. Chat is for what needs you (it is out of food, its bag is full, it needs something it cannot get) and the big
-        /// moments (new gear, falling, what it did while you were away).
-        /// </summary>
         public static void Mention(Humanoid c, string text, string topic = null, float minutes = 0f)
         {
             if (c == null || string.IsNullOrEmpty(text)) return;
@@ -177,7 +156,6 @@ namespace VillagePlebs
             Activity.Log(c, "said: " + text);
         }
 
-        /// <summary>A line in the chat window from a companion, shown even when the window was hidden.</summary>
         public static void ToChat(string name, string text)
         {
             if (Chat.instance == null) return;

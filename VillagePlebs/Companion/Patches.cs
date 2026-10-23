@@ -8,10 +8,8 @@ namespace VillagePlebs
 {
     internal static class Patches
     {
-        internal static bool OpeningGear; // set while the menu's "Open its inventory" opens the gear chest
+        internal static bool OpeningGear;
     }
-
-    // ---- the prefab, registered before any saved companion loads (docs/modding-pitfalls.md) ----
 
     [HarmonyPatch(typeof(ZNetScene), "Awake")]
     internal static class ZNetScene_Awake
@@ -25,28 +23,22 @@ namespace VillagePlebs
         private static void Postfix() { if (ZNetScene.instance != null) Prefab.Register(ZNetScene.instance); }
     }
 
-    // ---- its book (journal, tally, missions) into its profile before the character is saved ----
-
     [HarmonyPatch(typeof(Game), nameof(Game.SavePlayerProfile))]
     internal static class Game_SavePlayerProfile_Book
     {
         private static void Prefix()
         {
             if (Player.m_localPlayer != null) Book.SaveProfiles(Player.m_localPlayer);
-            Book.Leaving(); // (another player's companion this game runs: what it did waits on it)
+            Book.Leaving();
         }
     }
 
-    // ---- the body ----
-
-    // Its gear chest and its hands share one inventory.
     [HarmonyPatch(typeof(Container), "Awake")]
     internal static class Container_Awake
     {
         private static void Postfix(Container __instance) { if (Companion.Is(__instance)) Companion.ShareInventory(__instance); }
     }
 
-    // Our brain instead of the game's monster AI, for companions only.
     [HarmonyPatch(typeof(MonsterAI), nameof(MonsterAI.UpdateAI))]
     internal static class MonsterAI_UpdateAI
     {
@@ -59,7 +51,7 @@ namespace VillagePlebs
             {
                 __result = Brain.Update(__instance, dt);
                 Humanoid me = __instance.GetComponent<Humanoid>();
-                if (__instance.GetComponent<ZNetView>().IsOwner()) Steer.Tick(me, Brain.Get(me)); // watching where it walks
+                if (__instance.GetComponent<ZNetView>().IsOwner()) Steer.Tick(me, Brain.Get(me));
             }
             catch (System.Exception e)
             {
@@ -70,20 +62,10 @@ namespace VillagePlebs
         }
     }
 
-    // E on a companion opens its menu; the menu's own button opens the gear (for its owner only).
-    /// <summary>
-    /// A companion's bag (its Container) reloads itself from the save whenever the companion's save data changes at all, and the companion
-    /// writes its status, stamina, skills and food there several times a second: its bag was rebuilt from the last save over and over, new
-    /// copies of every item, so wear and repairs in between were lost and what it held in its hands pointed at old copies (it unequipped and
-    /// re-equipped twice a second, which can cut a swing short). On the game running it, its bag in memory is the truth: it reloads once when
-    /// that game takes the companion over (to take in what changed elsewhere), and not again while it keeps it. Other games load as usual.
-    /// </summary>
     [HarmonyPatch(typeof(Container), "Load")]
     internal static class Container_Load_Companion
     {
         private static readonly AccessTools.FieldRef<Container, uint> LastRevision = AccessTools.FieldRefAccess<Container, uint>("m_lastRevision");
-        // companions' bags this game has been running, and the save's owner count then: a different count means it was another game's
-        // meanwhile (handed there and back between two loads), so it is read again
         private static readonly Dictionary<int, ushort> Owned = new Dictionary<int, ushort>();
 
         private static bool Prefix(Container __instance, ref bool __result)
@@ -91,17 +73,16 @@ namespace VillagePlebs
             ZNetView view = __instance.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || !Companion.Is(__instance)) return true;
             int id = __instance.GetInstanceID();
-            if (!view.IsOwner()) { Owned.Remove(id); return true; }        // someone else runs it: take their changes
+            if (!view.IsOwner()) { Owned.Remove(id); return true; }
             ushort owners = view.GetZDO().OwnerRevision;
-            if (!Owned.TryGetValue(id, out ushort had) || had != owners) { Owned[id] = owners; return true; }   // just took it over: load once
-            LastRevision(__instance) = view.GetZDO().DataRevision;          // ours: memory is the truth
+            if (!Owned.TryGetValue(id, out ushort had) || had != owners) { Owned[id] = owners; return true; }
+            LastRevision(__instance) = view.GetZDO().DataRevision;
             __result = false;
             return false;
         }
 
         internal static void Forget() => Owned.Clear();
 
-        /// <summary>This game just took the companion over: its next load reads the save (Containers.Take).</summary>
         internal static void Fresh(Container c) => Owned.Remove(c.GetInstanceID());
     }
 
@@ -112,7 +93,6 @@ namespace VillagePlebs
         {
             if (Patches.OpeningGear || !Companion.Is(__instance)) return true;
             __result = true;
-            // (not the E that just closed the menu: E closes it as it does a chest, and this may run later in the same frame)
             if (!hold && character is Player p && p == Player.m_localPlayer && VillagePlebsPlugin.Instance != null && Time.unscaledTime > VillagePlebsPlugin.MenuClosedAt + 0.25f)
                 VillagePlebsPlugin.Instance.OpenMenuFor(p, __instance.GetComponent<Humanoid>());
             return false;
@@ -146,7 +126,6 @@ namespace VillagePlebs
         private static void Postfix(Character __instance, ref string __result) { if (Companion.Is(__instance)) __result = Companion.NameOf(__instance); }
     }
 
-    // Its armour counts (the game applies armour to players only), and players' swings never hurt it.
     [HarmonyPatch(typeof(Character), "RPC_Damage")]
     internal static class Character_RPC_Damage
     {
@@ -155,7 +134,7 @@ namespace VillagePlebs
             if (!(__instance is Humanoid h) || !Companion.Is(h)) return true;
             Character attacker = hit.GetAttacker();
             if (attacker != null && attacker.IsPlayer()) return false;
-            if (EpicMmo.On) EpicMmo.Resist(h, hit);   // (its EpicMMO level's Body and Vigour)
+            if (EpicMmo.On) EpicMmo.Resist(h, hit);
             float armor = Companion.Armor(h);
             if (armor > 0f) hit.ApplyArmor(armor);
             return true;
@@ -173,18 +152,17 @@ namespace VillagePlebs
             float lost = __state - h.GetHealth();
             if (lost <= 0.05f) return;
             Character attacker = hit.GetAttacker();
-            string by = attacker != null ? attacker.m_name   // (its token, "$enemy_troll": the journal's tally and Journal.Fell)
+            string by = attacker != null ? attacker.m_name
                       : Time.time - Aoe_OnHit.LastAt < 0.5f && Aoe_OnHit.LastWhat != null ? Aoe_OnHit.LastWhat
                       : hit.m_hitType.ToString().ToLowerInvariant();
             BrainState st = Brain.Get(h);
             st.LastHurtBy = by;
             st.LastHurtAt = Time.time;
-            if (attacker != null) Journal.Count(h, "hurtby:" + by, Mathf.CeilToInt(lost)); // (Tactics.Feared)
+            if (attacker != null) Journal.Count(h, "hurtby:" + by, Mathf.CeilToInt(lost));
             Activity.Log(h, $"hurt {lost:0.#} by {by}  (hp {Mathf.Max(0f, h.GetHealth()):0}/{h.GetMaxHealth():0}, doing: {st.Status})");
         }
     }
 
-    // Damage a companion deals, for its fight summary (counted on the game that runs the enemy, which is usually its own).
     [HarmonyPatch(typeof(Character), "RPC_Damage")]
     internal static class Character_RPC_Damage_Dealt
     {
@@ -199,13 +177,11 @@ namespace VillagePlebs
         }
     }
 
-    // Sharpened stakes and spikes hurt a companion that walks into them (as they hurt any character), but do not wear themselves down on it:
-    // a stake damages itself a little each time it hits something, and a companion pressing against a wall of stakes wore it away.
     [HarmonyPatch(typeof(Aoe), "OnHit")]
     internal static class Aoe_OnHit
     {
         internal static bool HittingCompanion;
-        internal static string LastWhat;   // what hurt a companion last (for its activity log): "piece_sharpstakes"
+        internal static string LastWhat;
         internal static float LastAt;
 
         private static void Prefix(Aoe __instance, Collider collider)
@@ -222,7 +198,6 @@ namespace VillagePlebs
         private static bool Prefix(HitData hit) => !(Aoe_OnHit.HittingCompanion && hit.m_hitType == HitData.HitType.Self);
     }
 
-    // It falls: everything it has goes into a tombstone where it stood. (And a kill of its own is counted, on the game that runs it.)
     [HarmonyPatch(typeof(Character), nameof(Character.OnDeath))]
     internal static class Character_OnDeath
     {
@@ -230,7 +205,7 @@ namespace VillagePlebs
 
         private static void Prefix(Character __instance)
         {
-            Loot.Died(__instance); // a companion near it picks up what it drops
+            Loot.Died(__instance);
             Character killer = LastHit(__instance)?.GetAttacker();
             if (killer != null && killer != __instance && Companion.Is(killer) && killer.GetComponent<ZNetView>().IsOwner())
             {
@@ -250,7 +225,7 @@ namespace VillagePlebs
             {
                 int carried = h.GetInventory().NrOfItems();
                 string by = LastHit(h)?.GetAttacker() is Character k ? k.m_name : st != null && Time.time - st.LastHurtAt < 5f ? st.LastHurtBy : null;
-                if (by == null) // poison, fire, frost: damage over time comes with no attacker
+                if (by == null)
                 {
                     StatusEffect dot = h.GetSEMan().GetStatusEffects().FirstOrDefault(se => se is SE_Poison || se is SE_Burning);
                     by = dot != null ? dot.m_name : LastHit(h) != null ? LastHit(h).m_hitType.ToString().ToLowerInvariant() : "?";
@@ -273,7 +248,6 @@ namespace VillagePlebs
         }
     }
 
-    // The map draws every pin white each frame: give companions' pins their own colour, so they are not taken for players.
     [HarmonyPatch(typeof(Minimap), "UpdatePins")]
     internal static class Minimap_UpdatePins
     {
@@ -288,15 +262,14 @@ namespace VillagePlebs
         }
     }
 
-    // Through a portal with its player: a companion following within 25 m goes too (unless it carries what portals refuse, like ore).
     [HarmonyPatch(typeof(Player), nameof(Player.TeleportTo))]
     internal static class Player_TeleportTo
     {
         private static void Postfix(Player __instance, Vector3 pos, Quaternion rot, bool distantTeleport, bool __result)
         {
             if (!__result || __instance != Player.m_localPlayer) return;
-            bool dungeon = !distantTeleport && pos.y > 3000f; // a crypt or cave entrance: the dungeon is built high above the world
-            int n = 0;   // (each its own spot, side by side behind the player: they pass through each other, and would walk on as one)
+            bool dungeon = !distantTeleport && pos.y > 3000f;
+            int n = 0;
             foreach (Humanoid c in Companion.All().ToList())
             {
                 if (!Companion.IsMine(c, __instance) || Companion.OrderOf(c) != Order.Follow) continue;
@@ -304,31 +277,24 @@ namespace VillagePlebs
                 if (distantTeleport && !c.IsTeleportable(false)) { VillagePlebsPlugin.Tell(Words.P("villagepleb_patches_portal_refuses", Companion.NameOf(c))); continue; }
                 ZNetView view = c.GetComponent<ZNetView>();
                 Container gear = c.GetComponent<Container>();
-                if (gear != null && !Containers.Take(gear)) { VillagePlebsPlugin.Tell(Words.P("villagepleb_patches_portal_gear_open", Companion.NameOf(c))); continue; } // (its bag loaded fresh as it is taken over)
+                if (gear != null && !Containers.Take(gear)) { VillagePlebsPlugin.Tell(Words.P("villagepleb_patches_portal_gear_open", Companion.NameOf(c))); continue; }
                 if (!view.IsOwner()) view.ClaimOwnership();
                 Vector3 to = pos - rot * Vector3.forward * 2f + rot * Vector3.right * ((n % 2 == 0 ? 1f : -1f) * ((n + 1) / 2) * 1.2f);
                 n++;
                 c.transform.position = to;
                 Rigidbody body = c.GetComponent<Rigidbody>();
                 if (body != null) { body.position = to; body.linearVelocity = Vector3.zero; }
-                view.GetZDO().SetPosition(to); // it is unloaded here at once; it appears there when you arrive
+                view.GetZDO().SetPosition(to);
                 Brain.Get(c)?.Remember(Words.P(dungeon ? "villagepleb_patches_into_dungeon" : pos.y > 3000f || c.transform.position.y > 3000f ? "villagepleb_patches_came_out" : "villagepleb_patches_through_portal"));
                 VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(c)} goes {(dungeon ? "into the dungeon" : "through")} with {__instance.GetPlayerName()}");
                 if (dungeon) { Journal.Place(c, "dungeon", true); Banter.Dungeon(c); }
             }
         }
     }
-
-    // While the menu is open the game ignores clicks, keys and the wheel, Escape closes only the menu, and a name being typed keeps the
-    // game's keys (the map, the inventory) off it: the patches at the bottom of GameUi.cs, on while GameUi.IsOpen / GameUi.Typing.
 }
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// A swing of a companion's that missed what it was working on (its activity log, at most every 2 s): where the swing started and pointed,
-    /// and what it hit instead (a bush in the way), or "nothing". For finding out why its swings at a tree or a rock do no harm.
-    /// </summary>
     [HarmonyLib.HarmonyPatch(typeof(Attack), "DoMeleeAttack")]
     internal static class Attack_DoMeleeAttack_Log
     {
@@ -369,7 +335,6 @@ namespace VillagePlebs
 
 namespace VillagePlebs
 {
-    /// <summary>A companion's pickaxe never digs the ground (a swing that misses a low rock would dig holes, in your base too). Players' do.</summary>
     [HarmonyLib.HarmonyPatch(typeof(Attack), nameof(Attack.SpawnOnHitTerrain))]
     internal static class Attack_SpawnOnHitTerrain_Companion
     {

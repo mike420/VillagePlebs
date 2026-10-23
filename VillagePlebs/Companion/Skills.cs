@@ -3,12 +3,6 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// The skills the game only trains for players, trained for companions at the same moments. The game raises Jump in Character.Jump
-    /// only through the Skills a player has (a companion has none), and Run, Swim, Dodge and Sneak in Player's own code; cooking and crafting
-    /// credit the local player. Running, sneaking, rolling, cooking and crafting are raised where the companion does them (Stamina, Brain,
-    /// Tactics, Kitchen, Upgrades, Repair); jumping, swimming and the perfect dodge here.
-    /// </summary>
     internal static class SkillMoments
     {
         public static bool Mine(Character c, out Humanoid h)
@@ -18,7 +12,6 @@ namespace VillagePlebs
         }
     }
 
-    // A jump: the game's jump went off (it left the ground, upward).
     [HarmonyPatch(typeof(Character), nameof(Character.Jump))]
     internal static class Character_Jump_Skill
     {
@@ -31,7 +24,6 @@ namespace VillagePlebs
         }
     }
 
-    // Swimming: every second it swims somewhere raises Swim (Player.OnSwimming's timer).
     [HarmonyPatch(typeof(Character), "OnSwimming")]
     internal static class Character_OnSwimming_Skill
     {
@@ -41,7 +33,6 @@ namespace VillagePlebs
         }
     }
 
-    // A perfect dodge: a hit that came while it was rolling through it (Player.HitWhileDodging), once a roll.
     [HarmonyPatch(typeof(Character), "RPC_Damage")]
     internal static class Character_RPC_Damage_Dodge
     {

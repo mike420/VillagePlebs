@@ -5,11 +5,6 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Repairing your base, a job at home: walls, floors, roofs and the rest that something damaged (a raid, the weather), within its home,
-    /// repaired as you would with a hammer, by the game's own rule (a station of the piece's kind in range, as for you: WearNTear.Repair,
-    /// which costs nothing). Without a hammer it makes one when it has the wood and stone, else it asks you for one. Also while catching up.
-    /// </summary>
     internal static class Mending
     {
         private static readonly int Pieces = LayerMask.GetMask("piece", "piece_nonsolid");
@@ -17,15 +12,13 @@ namespace VillagePlebs
         public static ItemDrop.ItemData Hammer(Humanoid h) =>
             h.GetInventory().GetAllItems().FirstOrDefault(i => IsHammer(i) && (!i.m_shared.m_useDurability || i.m_durability > 0f));
 
-        /// <summary>The building hammer (its own build menu), not the hoe or the cultivator.</summary>
         public static bool IsHammer(ItemDrop.ItemData i) => i.m_shared.m_buildPieces != null && i.m_shared.m_buildPieces.name.IndexOf("Hammer", StringComparison.OrdinalIgnoreCase) >= 0;
 
-        /// <summary>A damaged piece you built within range of the spot that the game lets it repair (a station of its kind near it), the nearest.</summary>
         public static WearNTear Damaged(Humanoid me, Vector3 at, float range, Func<Component, bool> allowed)
         {
             return Physics.OverlapSphere(at, range, Pieces).Select(c => c.GetComponentInParent<WearNTear>()).Where(w => w != null).Distinct()
                 .Where(w => w.GetHealthPercentage() < 0.9f && Repairable(w))
-                .OrderBy(w => Vector3.Distance(w.transform.position, me.transform.position)).Take(3).FirstOrDefault(w => allowed(w)); // (the nearest three: the reach check costs; the rest next time)
+                .OrderBy(w => Vector3.Distance(w.transform.position, me.transform.position)).Take(3).FirstOrDefault(w => allowed(w));
         }
 
         private static bool Repairable(WearNTear w)
@@ -35,7 +28,6 @@ namespace VillagePlebs
             return p.m_craftingStation == null || CraftingStation.HaveBuildStationInRange(p.m_craftingStation.m_name, w.transform.position) != null;
         }
 
-        /// <summary>One piece back to full health (the hammer swing, the game's repair and its sound). False if it could not.</summary>
         public static bool Fix(BrainState st, WearNTear w)
         {
             Humanoid me = st.Body;
@@ -50,13 +42,11 @@ namespace VillagePlebs
             return true;
         }
 
-        /// <summary>The hammer's swing (its animation).</summary>
         public static void Swing(Humanoid me, ItemDrop.ItemData hammer)
         {
             if (hammer?.m_shared.m_attack != null && !string.IsNullOrEmpty(hammer.m_shared.m_attack.m_attackAnimation)) GameFields.Anim(me)?.SetTrigger(hammer.m_shared.m_attack.m_attackAnimation);
         }
 
-        /// <summary>Catching up: every damaged piece in its home repaired at once. How many.</summary>
         public static int FixAll(BrainState st, Vector3 center, float radius)
         {
             int n = 0;
@@ -69,7 +59,6 @@ namespace VillagePlebs
             return n;
         }
 
-        /// <summary>A hammer of its own (wood and stone, no workbench needed), from its bag and its chests near it.</summary>
         public static void MakeHammer(BrainState st)
         {
             GameObject prefab = ObjectDB.instance?.GetItemPrefab("Hammer");

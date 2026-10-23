@@ -10,46 +10,27 @@ using static VillagePlebs.Shared.Translations;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// The companion menu for other mods: Close() closes it, as Escape does. (Inside this mod the game's own Menu class is global::Menu.)
-    /// </summary>
     public static class Menu
     {
         public static bool IsOpen => VillagePlebsPlugin.MenuOpen;
         public static void Close() => VillagePlebsPlugin.CloseFromEscape();
     }
 
-    /// <summary>
-    /// The companion's menu (J, or E on it), in the game's own look (GameUi.cs: the crafting panel's wood, its buttons and tabs, the
-    /// inventory's item cells and tooltips, the game's fonts), in seven tabs (an eighth, Companions, when more than one is allowed):
-    ///   Status - what it is doing, its health, food and rest, effects and recent events;
-    ///   Stats  - all its numbers: health, stamina, healing, carry weight, armour, block, weapon damage, resistances, record, every skill;
-    ///   Orders - come with me or go home (and stay, guard, come here), errands, how it fights, its habits, sending it away;
-    ///   Home   - its bed and chests, missions, living at home, home duties (in order), its food, jobs, what it gathered, while you are away;
-    ///   Gear   - shown as "Inventory": what it wears, its bag, giving it things, and what it picks up off the ground;
-    ///   Looks  - gender, skin, hair, beard and hair colour, chosen on a preview and given with Apply (LooksPanel);
-    ///   Journal - its life so far: days with you, kills, parries, bosses, deaths, gear made, and the moments worth remembering.
-    /// With no companion of yours nearby it shows your companions (also those far away) and the summon panel.
-    ///
-    /// How it is drawn: the same drawing code runs in two ways. A few times a second it only writes down what the window would show (a
-    /// signature); when that differs from what is on screen, it runs again and builds the window. Numbers that change all the time (health,
-    /// stamina, timers, skill bars, the portrait) are not in the signature: they are changed in place ten times a second.
-    /// </summary>
     public partial class VillagePlebsPlugin
     {
         private enum Tab { Status, Stats, Orders, Home, Gear, Looks, Journal, Companions }
 
         internal static bool MenuOpen;
-        internal static float MenuClosedAt = -1f;   // (the E that closes it must not open it again at once: Container_Interact)
-        private Humanoid _shown;          // null: your companions and the summon panel
+        internal static float MenuClosedAt = -1f;
+        private Humanoid _shown;
         private Tab _tab = Tab.Status;
         private bool _renaming, _focusField, _menuWarned;
-        private Action _pending;          // button actions run in Update, never while the window is being built or clicked
+        private Action _pending;
         private string _nameField = "", _note = "";
-        private long _forgetArmed;        // "Forget" pressed once (a second press forgets)
-        private int _hirePrice = -1;      // bought at a trader (Trading): what it costs, paid when it's hired; below 0: not hiring
-        private string _hireCoin;         // the coin item that trader takes
-        private LooksPanel _looks;        // the Looks tab's editor, kept while the window is made again (DrawLooks)
+        private long _forgetArmed;
+        private int _hirePrice = -1;
+        private string _hireCoin;
+        private LooksPanel _looks;
 
         private const float WindowW = 720f, Pad = 26f, CardPad = 14f, CardGap = 10f;
         private static readonly Color HealthRed = new Color(0.9f, 0.25f, 0.18f), StaminaYellow = new Color(1f, 0.78f, 0.22f), EitrPurple = new Color(0.62f, 0.46f, 1f);
@@ -57,41 +38,39 @@ namespace VillagePlebs
         private RectTransform _window, _list, _card;
         private TMP_InputField _field;
         private string _drawn = "", _scrollKey = "";
-        private readonly Dictionary<string, float> _scrolls = new Dictionary<string, float>();   // where each list was scrolled to (RestoreScrolls)
+        private readonly Dictionary<string, float> _scrolls = new Dictionary<string, float>();
         private bool _restoreAgain;
         private float _nextCheck, _nextLive, _openedAt;
-        private readonly List<Action> _live = new List<Action>();   // things changed in place
-        // while drawing: making the window (true) or only writing its signature (false), where things go and the next free line there
+        private readonly List<Action> _live = new List<Action>();
         private bool _make;
         private readonly StringBuilder _sig = new StringBuilder();
         private Transform _in;
         private float _y, _left, _width, _listY, _cardW;
 
-        /// <summary>A companion bought at a trader: the hire card (its name), first in your companions' list. Nothing is paid until it's hired.</summary>
         internal void OpenHire(Player player, int price, string coin) => OpenMenuFor(player, null, price, coin);
 
         internal void OpenMenuFor(Player player, Humanoid companion, int hirePrice = -1, string hireCoin = null)
         {
-            if (!GameUi.Ready()) return;   // (the window is made from the inventory screen's parts: not there outside a world)
+            if (!GameUi.Ready()) return;
             if (InventoryGui.IsVisible()) InventoryGui.instance.Hide();
             if (!MenuOpen) _openedAt = Time.unscaledTime;
             _shown = companion;
             _hirePrice = companion == null ? hirePrice : -1;
             _hireCoin = hireCoin;
-            _nameField = companion != null ? Companion.NameOf(companion) : _hirePrice >= 0 ? Trading.FreeName(player)   // (a name none of theirs has)
+            _nameField = companion != null ? Companion.NameOf(companion) : _hirePrice >= 0 ? Trading.FreeName(player)
                 : (player.m_customData.TryGetValue("vp_name", out string n) ? n : "Rádvar");
             _note = companion == null ? "" : (Companion.IsMine(companion, player) ? "" : T("villagepleb_menu_others", Companion.Zdo(companion).GetString(Keys.MasterName, "") is string m && m.Length > 0 ? m : T("villagepleb_menu_someone")));
             _renaming = false;
             MenuOpen = true;
-            GameUi.IsOpen = () => MenuOpen;            // the input patches in GameUi.cs: no walking, attacking or zooming under it
+            GameUi.IsOpen = () => MenuOpen;
             GameUi_EscapeCloses.Close = CloseFromEscape;
             try { Rebuild(); }
-            catch (Exception e) { MenuFailed(e); }   // (never into the game's Interact, which called this)
+            catch (Exception e) { MenuFailed(e); }
         }
 
         private void MenuFailed(Exception e)
         {
-            if (!_menuWarned) { _menuWarned = true; Warn("Companion menu: " + e); }   // (once: not every frame)
+            if (!_menuWarned) { _menuWarned = true; Warn("Companion menu: " + e); }
             CloseMenu();
         }
 
@@ -123,12 +102,11 @@ namespace VillagePlebs
             _pending = null;
             run?.Invoke();
             if (!MenuOpen) return;
-            if (_window == null) { CloseMenu(); return; }   // the game rebuilt its interface (a world change)
+            if (_window == null) { CloseMenu(); return; }
             if (_shown != null && (_shown.IsDead() || Vector3.Distance(_shown.transform.position, player.transform.position) > 100f)) { CloseMenu(); return; }
             else if (global::Menu.IsVisible() || InventoryGui.IsVisible()) { CloseMenu(); return; }
-            // E closes it again, as it does a chest (not the E that opened it, nor one typed into a name)
             if (!GameUi.Typing && Time.unscaledTime > _openedAt + 0.2f && ZInput.GetButtonDown("Use")) { CloseMenu(); return; }
-            if (_restoreAgain) { _restoreAgain = false; RestoreScrolls(); }   // (the frame after a rebuild: see RestoreScrolls)
+            if (_restoreAgain) { _restoreAgain = false; RestoreScrolls(); }
             TickMenu();
             TickLooks();
         }
@@ -142,16 +120,11 @@ namespace VillagePlebs
             if (!Companion.Write(_shown, change)) _note = T("villagepleb_menu_busy");
         }
 
-        /// <summary>A name field in the menu has the keyboard: the game's keys (M for the map, Tab for the inventory) must not act on what you type.</summary>
         internal static bool TypingInMenu => MenuOpen && GameUi.Typing;
-
-        // ==== keeping it up to date ========================================================================
 
         private void TickMenu()
         {
             float now = Time.unscaledTime;
-            // not while a name is being typed, a slider dragged or the mouse button held (a click half done): building again would take the
-            // field, slider or button from under the keyboard or the mouse
             if (now >= _nextCheck && !GameUi.Typing && !Input.GetMouseButton(0))
             {
                 _nextCheck = now + 0.25f;
@@ -166,7 +139,7 @@ namespace VillagePlebs
             {
                 _nextLive = now + 0.1f;
                 try { foreach (Action a in _live) a(); }
-                catch (Exception) { _nextCheck = 0f; }   // (its companion just went: the window is built again without it)
+                catch (Exception) { _nextCheck = 0f; }
             }
         }
 
@@ -178,13 +151,12 @@ namespace VillagePlebs
             _drawn = sig;
         }
 
-        /// <summary>The whole window: built when <paramref name="make"/>, else only its signature written.</summary>
         private void Draw(bool make)
         {
             _make = make;
             _sig.Length = 0;
             if (_tab == Tab.Companions && Trading.MostCompanions <= 1) _tab = Tab.Status;
-            Humanoid c = _shown;   // (Unity's null: a companion just remade or unloaded shows your companions instead)
+            Humanoid c = _shown;
             bool companion = c != null;
             Vector2 screen = GameUi.ScreenSize;
             float w = Mathf.Min(WindowW, screen.x - 20f), h = Mathf.Min(companion ? 900f : 680f, screen.y - 40f);
@@ -194,7 +166,6 @@ namespace VillagePlebs
             _sig.Append("|N").Append(message);
             if (make)
             {
-                // where every list in it is scrolled to: kept, unless the tab or companion changed
                 _scrolls.Clear();
                 if (_window != null && key == _scrollKey)
                     foreach (ScrollRect s in _window.GetComponentsInChildren<ScrollRect>(true))
@@ -212,7 +183,7 @@ namespace VillagePlebs
 
             float top = companion ? Header(c, w) : ListHeader(w);
             Vector2 area = new Vector2(w - Pad * 2f + 12f, h - top - Pad + 8f);
-            bool looks = companion && _tab == Tab.Looks;   // (its look editor fills the area itself: LooksPanel)
+            bool looks = companion && _tab == Tab.Looks;
             if (make && !looks)
             {
                 RectTransform box = GameUi.Rect(_window, "List", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(Pad - 6f, -top), area);
@@ -235,25 +206,18 @@ namespace VillagePlebs
                 }
             if (make && _list != null)
             {
-                float content = Mathf.Max(0f, _listY - CardGap);   // (no gap after the last card: it would scroll for nothing)
+                float content = Mathf.Max(0f, _listY - CardGap);
                 _list.sizeDelta = new Vector2(_list.sizeDelta.x, content);
             }
             if (make) { RestoreScrolls(); _restoreAgain = true; }
             if (make)
             {
-                // (its buttons shown in their colours at once: the tabs' and greyed-out ones', set after making them, would fade there
-                // from the colour before, and every click builds the window again)
                 MagicMike.ModSettings.Widgets.SnapAll(_window);
                 if (_focusField && _field != null) { _field.Select(); _field.ActivateInputField(); }
                 _focusField = false;
             }
         }
 
-        /// <summary>
-        /// Every list back where it was scrolled to before the window was built again (its tab's list, the Looks tab's choices and words).
-        /// Laid out first: a list that Unity hasn't laid out yet puts itself back at the top as it does (its new scrollbar starts there), so
-        /// it is also done once more the next frame (UpdateMenu).
-        /// </summary>
         private void RestoreScrolls()
         {
             if (_window == null || _scrolls.Count == 0) return;
@@ -268,7 +232,6 @@ namespace VillagePlebs
             }
         }
 
-        /// <summary>Where something is in the window, the same each time it is built (names and places among siblings).</summary>
         private static string PathIn(Transform root, Transform t)
         {
             var path = new StringBuilder();
@@ -276,10 +239,6 @@ namespace VillagePlebs
             return path.ToString();
         }
 
-        /// <summary>
-        /// What it says to you (a warning, why something didn't happen) in a panel of its own under the window, in the window's look. The
-        /// window gives up height for it when the screen is short, and both are centred together. Returns the window's height now.
-        /// </summary>
         private float MessagePanel(string message, float w, float h, float screenH)
         {
             const float gap = 8f, padX = 18f, padY = 12f;
@@ -290,9 +249,9 @@ namespace VillagePlebs
             float textH = t.GetPreferredValues(message, w - padX * 2f, 0f).y;
             ((RectTransform)t.transform).sizeDelta = new Vector2(w - padX * 2f, textH);
             float panelH = textH + padY * 2f;
-            h = Mathf.Max(Mathf.Min(h, screenH - 40f - panelH - gap), Mathf.Min(h, 360f));   // (a long message never squeezes the window to nothing)
+            h = Mathf.Max(Mathf.Min(h, screenH - 40f - panelH - gap), Mathf.Min(h, 360f));
             _window.sizeDelta = new Vector2(w, h);
-            _window.anchoredPosition = new Vector2(0f, (panelH + gap) / 2f);   // (the two together centred)
+            _window.anchoredPosition = new Vector2(0f, (panelH + gap) / 2f);
             r.anchoredPosition = new Vector2(0f, -h - gap);
             r.sizeDelta = new Vector2(w, panelH);
             return h;
@@ -304,8 +263,6 @@ namespace VillagePlebs
             _sig.Append("|T").Append(text);
             if (_make) GameUi.TitleBar(_window, text, () => _pending = CloseMenu);
         }
-
-        // ==== your companions, and summoning =================================================================
 
         private float ListHeader(float w)
         {
@@ -319,7 +276,7 @@ namespace VillagePlebs
             Player me = Player.m_localPlayer;
             List<Profile> mine = me != null ? Profile.Here(me) : new List<Profile>();
             bool hiring = _hirePrice >= 0;
-            if (hiring) HireCard(mine);   // (first: it's what the trader's Buy opened the window for)
+            if (hiring) HireCard(mine);
 
             foreach (Profile prof in mine)
             {
@@ -335,7 +292,6 @@ namespace VillagePlebs
                     string doing = Companion.StatusOf(here);
                     string whereNow = d <= 15f ? T("villagepleb_menu_here_with_you") : Words.Show(Remote.Where(here.transform.position, me.transform.position));
                     Note(string.IsNullOrEmpty(doing) ? whereNow + "." : T("villagepleb_menu_where_doing", whereNow, Words.Show(doing)), GameUi.Good);
-                    // release it for good: pressed twice, and only with its gear taken out (Companion.Dismiss)
                     long hid = prof.Id;
                     bool armed = _forgetArmed == hid;
                     if (armed) Note(T("villagepleb_menu_release_hint"), GameUi.Warn);
@@ -364,7 +320,6 @@ namespace VillagePlebs
                 }
                 else
                 {
-                    // Away (its area not loaded here): what the world knows of it, and calling it to you.
                     ZDO z = Remote.Find(prof.Id);
                     if (z != null) HeadingRow(prof.Name, (T("villagepleb_menu_call"), true, () => { ZDO z2 = z; _pending = () => { _note = Remote.Call(z2, Player.m_localPlayer, out string why) ? T("villagepleb_menu_on_the_way", prof.Name) : Words.Show(why ?? ""); }; }));
                     else Heading(prof.Name);
@@ -381,7 +336,6 @@ namespace VillagePlebs
                     }
                     else if (Remote.InWorld(prof.Id) == false)
                     {
-                        // Lost: nothing of them is in the world, yet they never woke (their fall was not kept). They come back as they were.
                         Vector3? tomb = Remote.TombOf(prof.Id);
                         Note(T(prof.HasBed ? "villagepleb_menu_lost_bed" : "villagepleb_menu_lost_you", prof.Name) + " "
                              + (tomb != null && me != null ? T("villagepleb_menu_lost_tomb_at", Words.Show(Remote.Where(tomb.Value, me.transform.position))) : T("villagepleb_menu_lost_tomb")), GameUi.Warn);
@@ -404,7 +358,6 @@ namespace VillagePlebs
             BeginCard();
             if (mine.Count >= MaxCompanions.Value)
             {
-                // the free ones all summoned: more from any trader (Trading), while there's room
                 if (mine.Count < Trading.MostCompanions) Note(T("villagepleb_menu_buy_more", MaxCompanions.Value, CompanionPrice.Value, Trading.MostCompanions - mine.Count), GameUi.Dim);
                 else Note(T("villagepleb_menu_most_allowed", mine.Count), GameUi.Dim);
                 EndCard();
@@ -418,7 +371,6 @@ namespace VillagePlebs
             WideBtn(T(mine.Count == 0 ? "villagepleb_menu_summon" : "villagepleb_menu_summon_new"), true, () =>
                 _pending = () =>
                 {
-                    // Not a second one by the same name: someone looking for theirs pressed this, and got a new one called the same.
                     string wanted = string.IsNullOrEmpty(_nameField?.Trim()) ? "Rádvar" : _nameField.Trim();
                     Profile same = Profile.Here(Player.m_localPlayer).FirstOrDefault(pr => string.Equals(pr.Name, wanted, StringComparison.OrdinalIgnoreCase));
                     if (same != null) { _note = T("villagepleb_menu_same_name", same.Name); return; }
@@ -433,10 +385,6 @@ namespace VillagePlebs
             EndCard();
         }
 
-        /// <summary>
-        /// Hiring one bought at a trader (Trading): its name, then Hire. The coins are taken when it comes (Trading.Hire), so closing the
-        /// window costs nothing; then its Looks tab opens, as after a free summon.
-        /// </summary>
         private void HireCard(List<Profile> mine)
         {
             _sig.Append("|hire").Append(_hirePrice);
@@ -456,7 +404,7 @@ namespace VillagePlebs
                     Player p = Player.m_localPlayer;
                     string why = null;
                     Humanoid c = p != null ? Trading.Hire(p, wanted, _hireCoin, _hirePrice, out why) : null;
-                    if (c == null) { _note = why ?? ""; return; }   // (it stays open, saying why: coins dropped meanwhile, or no room)
+                    if (c == null) { _note = why ?? ""; return; }
                     _hirePrice = -1;
                     _tab = Tab.Looks;
                     OpenMenuFor(p, c);
@@ -466,10 +414,9 @@ namespace VillagePlebs
             EndCard();
         }
 
-        /// <summary>The name field of the summon panel: "Name" and the game's own text field.</summary>
         private void NameField(Action submit)
         {
-            _sig.Append("|f");   // (not what is typed: the window isn't built again while typing anyway)
+            _sig.Append("|f");
             if (_make)
             {
                 GameUi.Label(_in, Loc("$menu_name"), new Vector2(_left, -_y - 8f), new Vector2(84f, 24f), 17f, GameUi.Text).fontStyle = FontStyles.Bold;
@@ -478,8 +425,6 @@ namespace VillagePlebs
             }
             _y += 46f;
         }
-
-        // ==== the companion: the top of the window ==========================================================
 
         private float Header(Humanoid c, float w)
         {
@@ -490,7 +435,6 @@ namespace VillagePlebs
             float x = Pad + 94f, closeX = w - Pad - 110f;
             _sig.Append("|H").Append(name).Append(_renaming).Append(Mine).Append(owner);
 
-            // its face (its initial until there is a picture), name (or renaming it), what it is doing, close: on a header bar
             if (_make)
             {
                 GameUi.HeaderBox(_window, new Vector2(12f, -10f), new Vector2(w - 24f, 112f));
@@ -535,7 +479,7 @@ namespace VillagePlebs
             if (owner)
             {
                 BrainState js = Brain.Get(c);
-                Work.JobText(js, out float jobDone);   // (only whether it has a progress bar: the words change in place)
+                Work.JobText(js, out float jobDone);
                 bool stoppable = js.Area != null || js.PickQueue.Count > 0 || js.Task != null && js.Task.Ordered;
                 _sig.Append("|J").Append(jobDone >= 0f).Append(stoppable && Mine);
                 float jobW = closeX - x - (stoppable && Mine ? 180f : 8f) + 110f;
@@ -552,7 +496,6 @@ namespace VillagePlebs
                 if (stoppable && Mine) Btn(T("villagepleb_menu_stop_job"), w - Pad - 170f, 84f, 170f, 30f, () => _pending = () => { BrainState bs = Brain.Claim(_shown, out string why); if (bs != null) Work.StopJob(bs); else _note = Words.Show(why); }, size: 15f);
             }
 
-            // health, stamina, eitr
             _y = 128f;
             LiveBar(() => c.GetHealth() / Mathf.Max(1f, c.GetMaxHealth()), () => $"{Loc("$se_health")}  {c.GetHealth():0} / {c.GetMaxHealth():0}", HealthRed);
             LiveBar(() => Stamina.Get(c) / Mathf.Max(1f, Stamina.Max(c)), () => $"{Loc("$se_stamina")}  {Stamina.Get(c):0} / {Stamina.Max(c):0}", StaminaYellow);
@@ -560,7 +503,6 @@ namespace VillagePlebs
             _sig.Append(eitr);
             if (eitr) LiveBar(() => Eitr.Get(c) / Mathf.Max(1f, Eitr.Max(c)), () => $"{Loc("$se_eitr")}  {Eitr.Get(c):0} / {Eitr.Max(c):0}", EitrPurple);
 
-            // your other companions near you
             var yours = Companion.All().Where(h => Companion.IsMine(h, pl) && Vector3.Distance(h.transform.position, pl.transform.position) < 100f).ToList();
             if (yours.Count > 1)
             {
@@ -573,7 +515,6 @@ namespace VillagePlebs
                 _y += 38f;
             }
 
-            // the tabs, and the braid under them
             _y += 4f;
             var tabs = ((Tab[])Enum.GetValues(typeof(Tab))).Where(t => t != Tab.Companions || Trading.MostCompanions > 1).ToArray();
             float tw = (_width - 6f * (tabs.Length - 1)) / tabs.Length;
@@ -594,13 +535,11 @@ namespace VillagePlebs
             _pending = () => { Change(z => z.Set(Keys.Name, n)); Player.m_localPlayer.m_customData["vp_name"] = n; _renaming = false; };
         }
 
-        // ==== Status =======================================================================================
-
         private void DrawStatus(Humanoid c)
         {
             BrainState st = Brain.Get(c);
             Decision d = st.Current;
-            bool here = c.GetComponent<ZNetView>().IsOwner(); // its brain runs on this game, so the details are here
+            bool here = c.GetComponent<ZNetView>().IsOwner();
 
             BeginCard(T("villagepleb_menu_now"));
             if (!here) Note(T("villagepleb_menu_brain_elsewhere"), GameUi.Dim);
@@ -619,7 +558,6 @@ namespace VillagePlebs
             if (!here) Note(T("villagepleb_menu_shows_elsewhere"), GameUi.Dim);
             else
             {
-                // its three meals in the inventory's own cells: minutes left, and the bar how much of it is left
                 List<Food.Meal> meals = Food.Meals(c);
                 float s = GameUi.CellSpace, top = _y;
                 for (int i = 0; i < 3; i++)
@@ -676,7 +614,6 @@ namespace VillagePlebs
             EndCard();
         }
 
-        /// <summary>The two orders that matter (come with me, go home), big; stay, guard and come here smaller beneath them.</summary>
         private void OrderButtons(Humanoid c)
         {
             Order order = Companion.OrderOf(c);
@@ -699,8 +636,6 @@ namespace VillagePlebs
             if (!Commandable) { _note = T("villagepleb_menu_owner_orders"); return; }
             if (!order(_shown)) _note = T("villagepleb_menu_busy");
         }
-
-        // ==== Stats ========================================================================================
 
         private void DrawStats(Humanoid c)
         {
@@ -769,7 +704,7 @@ namespace VillagePlebs
             Note(T("villagepleb_menu_skills_about"), GameUi.Dim);
             var skills = Skill.Types().Select(t => new KeyValuePair<Skills.SkillType, float>(t, Skill.Get(c, t)))
                 .OrderByDescending(kv => kv.Value).ThenBy(kv => Loc("$skill_" + kv.Key.ToString().ToLower())).ToList();
-            foreach (var kv in skills) _sig.Append('|').Append((int)kv.Key).Append(kv.Value >= 1f ? '+' : '-');   // (the order and which are known: the numbers change in place)
+            foreach (var kv in skills) _sig.Append('|').Append((int)kv.Key).Append(kv.Value >= 1f ? '+' : '-');
             if (_make)
             {
                 const float rowH = 44f, gap = 24f;
@@ -803,7 +738,6 @@ namespace VillagePlebs
             EndCard();
         }
 
-        /// <summary>Its EpicMMO level (with EpicMMO System installed): experience, points and what they give. Made again at each new level.</summary>
         private void DrawLevel(Humanoid c)
         {
             EpicMmo.Bonus b = EpicMmo.Of(c);
@@ -817,7 +751,6 @@ namespace VillagePlebs
             EndCard();
         }
 
-        /// <summary>"14": a hit's damage with its skill (40% of the weapon's at skill 0, all of it at 100, the player's rule).</summary>
         private static string Damage(Humanoid c, ItemDrop.ItemData w) =>
             $"{w.GetDamage().GetTotalDamage() * Mathf.Lerp(0.4f, 1f, Skill.Get(c, w.m_shared.m_skillType) / 100f):0}";
 
@@ -828,8 +761,6 @@ namespace VillagePlebs
             GiveOrder(h => Home.Follow(h));
             if (Commandable && Vector3.Distance(p.transform.position, _shown.transform.position) > 15f && _shown.GetComponent<ZNetView>().IsOwner()) Brain.TeleportBehind(_shown, p);
         }
-
-        // ==== Orders =======================================================================================
 
         private void DrawOrders(Humanoid c)
         {
@@ -910,8 +841,6 @@ namespace VillagePlebs
                 EndCard();
             }
         }
-
-        // ==== Home =========================================================================================
 
         private void DrawHome(Humanoid c)
         {
@@ -1018,7 +947,6 @@ namespace VillagePlebs
             Stepper(T("villagepleb_menu_goes_as_far"), T("villagepleb_menu_metres", radius), () => Change(cz => cz.Set(Keys.Radius, Mathf.Clamp(radius - 5, 10, 80))), () => Change(cz => cz.Set(Keys.Radius, Mathf.Clamp(radius + 5, 10, 80))));
             EndCard();
 
-            // Home duties: a short list in the order it does them, each with a stockpile it keeps in its chest.
             List<Duties.Entry> duties = Duties.Read(z);
             Duties.Entry working = Duties.Active(c);
             BeginCard(T("villagepleb_menu_duties"));
@@ -1028,12 +956,11 @@ namespace VillagePlebs
             if (duties.Any(x => x.On) && !Duties.HasPlace(c))
                 Note(T(toYours ? (Work.Stows(c) ? "villagepleb_menu_duties_no_chest" : "villagepleb_menu_duties_stow_off") : "villagepleb_menu_duties_no_own_chest"), GameUi.Warn);
             else if (toYours) Note(T("villagepleb_menu_duties_counts"), GameUi.Dim);
-            const float sub = 30f;   // (what belongs to a duty is set in under it)
+            const float sub = 30f;
             for (int di = 0; di < duties.Count; di++)
             {
                 Duties.Entry e = duties[di];
                 Duty dd = e.Duty;
-                // its place in the list, on or off, and moving it up or down
                 _sig.Append("|#").Append(di);
                 if (_make) GameUi.Label(_in, (di + 1).ToString(), new Vector2(_left, -_y - 4f), new Vector2(24f, 24f), 18f, GameUi.Gold);
                 float rowH = CheckAt(Duties.Label(dd), e.On, () => { if (Commandable) _pending = () => Change(cz => { var l = Duties.Read(cz); var x = l.First(a => a.Duty == dd); x.On = !x.On; Duties.Write(cz, l); }); },
@@ -1115,14 +1042,11 @@ namespace VillagePlebs
 
         private static string JobNames(Job j) => string.Join(", ", ((Job[])Enum.GetValues(typeof(Job))).Where(x => x != Job.None && (j & x) != 0).Select(x => Named("villagepleb_menu_jobname_", x)));
 
-        // ==== Gear =========================================================================================
-
         private void DrawGear(Humanoid c)
         {
             Player p = Player.m_localPlayer;
             float space = GameUi.CellSpace;
 
-            // Its gear: slots of their own (Gear), kept when it falls; changed from here, wherever it is. The game's tooltip tells what each is.
             BeginCard(T("villagepleb_menu_its_gear"));
             bool mine = Mine;
             foreach (int row in new[] { 4, 5 })
@@ -1138,7 +1062,6 @@ namespace VillagePlebs
                     if (inSlot == null) GameUi.EmptyCell(_in, pos);
                     else GameUi.Cell(_in, pos, inSlot, null, false, mine ? () =>
                     {
-                        // (what is in the slot when clicked: on a game that doesn't run it, its items are fresh copies every moment)
                         _pending = () => { ItemDrop.ItemData now = _shown != null ? Gear.In(_shown, slot) : null; if (now != null && !Companion.Take(_shown, Player.m_localPlayer, now, out string why) && why != null) _note = Words.Show(why); };
                         _nextCheck = 0f;
                     } : (Action)null);
@@ -1164,7 +1087,6 @@ namespace VillagePlebs
                     if (item == null) GameUi.EmptyCell(_in, pos);
                     else GameUi.Cell(_in, pos, item, null, false, mine ? () =>
                     {
-                        // (what is in the cell when clicked, as for its gear slots)
                         _pending = () => { ItemDrop.ItemData now = _shown != null ? _shown.GetInventory().GetItemAt(cx, cy) : null; if (now != null && !Companion.Take(_shown, Player.m_localPlayer, now, out string why) && why != null) _note = Words.Show(why); };
                         _nextCheck = 0f;
                     } : (Action)null);
@@ -1175,7 +1097,7 @@ namespace VillagePlebs
 
             if (mine && p != null)
             {
-                var giveable = p.GetInventory().GetAllItems().Where(i => !p.IsItemEquiped(i) && !i.m_equipped).ToList();   // (gear goes into its slot, the rest into its bag: Companion.Give)
+                var giveable = p.GetInventory().GetAllItems().Where(i => !p.IsItemEquiped(i) && !i.m_equipped).ToList();
                 BeginCard(T("villagepleb_menu_give_gear"));
                 if (giveable.Count == 0) Note(T("villagepleb_menu_give_gear_none"), GameUi.Dim);
                 else
@@ -1229,9 +1151,6 @@ namespace VillagePlebs
             CloseMenu();
         }
 
-        // ==== Looks ========================================================================================
-
-        // False: not changed (the note says why)
         private bool LooksChange(Action<Humanoid> change)
         {
             if (!Mine) { _note = T("villagepleb_menu_owner_looks"); return false; }
@@ -1241,10 +1160,6 @@ namespace VillagePlebs
             return false;
         }
 
-        /// <summary>
-        /// Its look editor (LooksPanel), filling the area under the header. What is being chosen and the preview are kept while the window is
-        /// made again; the companion is changed only by Apply.
-        /// </summary>
         private void DrawLooks(Humanoid c, Vector2 pos, Vector2 size)
         {
             _sig.Append("|looks").Append(Mine);
@@ -1259,11 +1174,9 @@ namespace VillagePlebs
             Humanoid c = _shown;
             if (_looks == null || c == null || _looks.Id != Companion.IdOf(c)) return;
             Looks.Look look = _looks.Current;
-            // done with: the window closes (and a different body, which makes it again, needs no showing again); not done, it stays, saying why
             if (LooksChange(h => Looks.Set(h, look))) CloseMenu();
         }
 
-        /// <summary>Each frame: the look editor's preview while its tab shows; let go of it when the tab or the companion changes.</summary>
         private void TickLooks()
         {
             if (_looks == null) return;
@@ -1271,15 +1184,12 @@ namespace VillagePlebs
             _looks.UpdatePerFrame();
         }
 
-        // ==== Journal ======================================================================================
-
         private void DrawJournal(Humanoid c)
         {
             var tally = Journal.Tally(c);
             int Tally(string k) => tally.TryGetValue(k, out int n) ? n : 0;
             BeginCard(T("villagepleb_menu_saga"));
             Stats((T("villagepleb_menu_days_with_you"), Journal.DaysWithYou(c).ToString(), null), (T("villagepleb_menu_kills"), Tally("kills").ToString(), null), (T("villagepleb_menu_parries"), Tally("parries").ToString(), null), (T("villagepleb_menu_falls"), Tally("deaths").ToString(), null));
-            // (the names in the tally: old saves have the name in the language it was played in, newer ones the game's "$enemy_..." token)
             var slain = new Dictionary<string, int>();
             foreach (var kv in tally.Where(x => x.Key.StartsWith("kill:"))) { string who = Words.Mid(Thing(OldCreature(kv.Key.Substring(5)))); slain[who] = (slain.TryGetValue(who, out int had) ? had : 0) + kv.Value; }
             var kills = slain.OrderByDescending(kv => kv.Value).Take(6).Select(kv => $"{kv.Value} {kv.Key}").ToList();
@@ -1305,10 +1215,6 @@ namespace VillagePlebs
             EndCard();
         }
 
-        // ==== pieces =======================================================================================
-        // Each writes what it shows into the signature, and makes it only when the window is being made. Positions: x from the left of where
-        // things go now (the window or a card), y downward from its top.
-
         private void BeginCard(string title = null)
         {
             _sig.Append("\n[").Append(title);
@@ -1331,7 +1237,6 @@ namespace VillagePlebs
             _listY += h + CardGap;
         }
 
-        /// <summary>A card's title: the settings panel's section header (a dark bar with an accent strip).</summary>
         private void Heading(string title, float indent = 0f, bool advance = true, float width = -1f)
         {
             title = Words.Show(title);
@@ -1340,7 +1245,6 @@ namespace VillagePlebs
             if (advance) _y += 40f;
         }
 
-        /// <summary>A title with buttons on the right of it (a companion in the list: "Call to me", "Open").</summary>
         private void HeadingRow(string title, params (string label, bool lit, Action click)[] buttons)
         {
             float x = _left + _width;
@@ -1354,7 +1258,6 @@ namespace VillagePlebs
             _y += 38f;
         }
 
-        /// <summary>Text that wraps to the width it has; what comes next goes under it.</summary>
         private void Note(string text, Color color, float size = 17f, float indent = 0f, bool bold = false)
         {
             text = Words.Show(text);
@@ -1368,7 +1271,6 @@ namespace VillagePlebs
             _y += h + 5f;
         }
 
-        /// <summary>One line whose words change all the time (a countdown): changed in place, not in the signature.</summary>
         private void LiveNote(Func<string> text, Color color, float size = 17f)
         {
             _sig.Append("|l");
@@ -1380,10 +1282,9 @@ namespace VillagePlebs
             _y += size * 1.35f + 5f;
         }
 
-        /// <summary>A text on one line (cut short with "..." if it doesn't fit), its words set later.</summary>
         private static TMP_Text Line(Transform parent, float x, float y, float w, float size, Color color, TextAlignmentOptions align = TextAlignmentOptions.TopLeft)
         {
-            TMP_Text t = GameUi.Label(parent, "", new Vector2(x, -y), new Vector2(w, size * 1.8f), size, color, null, align);   // (taller than the line: see GameUi.Line)
+            TMP_Text t = GameUi.Label(parent, "", new Vector2(x, -y), new Vector2(w, size * 1.8f), size, color, null, align);
             t.textWrappingMode = TextWrappingModes.NoWrap;
             t.overflowMode = TextOverflowModes.Ellipsis;
             return t;
@@ -1401,14 +1302,12 @@ namespace VillagePlebs
             return b;
         }
 
-        /// <summary>A button as wide as where it is.</summary>
         private void WideBtn(string label, bool lit, Action click, float h = 34f, Color? color = null)
         {
             Btn(label, _left, _y, _width, h, click, lit, color: color);
             _y += h + 6f;
         }
 
-        /// <summary>The game's tab button: the chosen one pressed in (not clickable), its label gold.</summary>
         private void TabBtn(string label, float x, float y, float w, float h, bool chosen, Action click, float size = 17f)
         {
             label = Words.Show(label);
@@ -1416,7 +1315,6 @@ namespace VillagePlebs
             if (_make) GameUi.Tab(_in, label, new Vector2(x, -y), new Vector2(w, h), chosen, () => { click(); _nextCheck = 0f; }, size);
         }
 
-        /// <summary>One of a row of choices (sharing the width), as tabs: the chosen one pressed in.</summary>
         private void Choices(string[] labels, int chosen, Action<int> pick, float h = 34f)
         {
             float bw = (_width - 6f * (labels.Length - 1)) / labels.Length;
@@ -1428,10 +1326,6 @@ namespace VillagePlebs
             _y += h + 6f;
         }
 
-        /// <summary>
-        /// A setting that is on or off: the settings panel's tick box, its words beside it (clicking them switches it too). Returns the height
-        /// it took.
-        /// </summary>
         private float CheckAt(string label, bool on, Action toggle, float x, float y, float w)
         {
             label = Words.Show(label);
@@ -1459,7 +1353,6 @@ namespace VillagePlebs
             _y += h + 6f;
         }
 
-        /// <summary>A number with - and + beside it. The buttons' actions run in Update.</summary>
         private void Stepper(string label, string value, Action down, Action up, float indent = 0f)
         {
             label = Words.Show(label); value = Words.Show(value);
@@ -1477,7 +1370,6 @@ namespace VillagePlebs
             _y += 36f;
         }
 
-        /// <summary>A row of big numbers with their names under them; a live one is read again ten times a second.</summary>
         private void Stats(params (string label, string value, Func<string> live)[] stats)
         {
             for (int i = 0; i < stats.Length; i++) stats[i] = (Words.Show(stats[i].label), Words.Show(stats[i].value), stats[i].live);
@@ -1496,7 +1388,6 @@ namespace VillagePlebs
             _y += 62f;
         }
 
-        /// <summary>A bar (health, stamina) whose fill and words change in place.</summary>
         private void LiveBar(Func<float> fraction, Func<string> text, Color color, float height = 24f)
         {
             _sig.Append("|r");
@@ -1508,10 +1399,6 @@ namespace VillagePlebs
             _y += height + 5f;
         }
 
-        /// <summary>
-        /// An item (or an empty place) in the signature: what it is, how many, how worn, whether worn. Not which object: on a game that
-        /// doesn't run the companion its items are fresh copies every time its ZDO changes (several times a second).
-        /// </summary>
         private StringBuilder AppendItem(ItemDrop.ItemData i)
         {
             if (i == null) return _sig.Append("|-");
@@ -1519,14 +1406,10 @@ namespace VillagePlebs
                 .Append(',').Append((int)(i.GetDurabilityPercentage() * 20f)).Append(',').Append(i.m_equipped);
         }
 
-        /// <summary>The words for one of a set of choices: the key is the prefix and the choice's name in lower case ("villagepleb_menu_tab_" + "orders").</summary>
         private static string Named(string prefix, Enum value) => T(prefix + value.ToString().ToLowerInvariant());
 
         private static string Loc(string s) => Localization.instance.Localize(s);
 
-        /// <summary>A name that may be packed text, a game "$token" (a creature's, with a number: "$enemy_greyling 2") or plain (an old save's): in the player's language.</summary>
-        /// <summary>A creature counted before 0.24 under its English name ("Boar"): the game's token when it has one ("$enemy_boar"), so it
-        /// shows in the player's language and joins the newer count. Other names (another language then) are shown as they were saved.</summary>
         private static string OldCreature(string s)
         {
             if (string.IsNullOrEmpty(s) || s.IndexOf('$') >= 0 || Words.Packed(s) || Localization.instance == null) return s;
@@ -1535,7 +1418,6 @@ namespace VillagePlebs
             return shown.StartsWith("[") ? s : token;
         }
 
-        /// <summary>A land counted before 0.24 under the word the journal used then ("forest"): the game's token for it.</summary>
         private static string OldLand(string s) => s switch
         {
             "place" => "$biome_meadows", "forest" => "$biome_blackforest", "swamp" => "$biome_swamp", "mountain" => "$biome_mountain",
@@ -1544,13 +1426,11 @@ namespace VillagePlebs
         };
 
         private static string Thing(string s) { string t = Words.Show(s); return t != null && t.IndexOf('$') >= 0 ? Loc(t) : t; }
-        /// <summary>"copper and tin", "copper, tin and iron": the words of a list in the player's language.</summary>
         private static string And(IList<string> items) =>
             items.Count == 0 ? "" : items.Count == 1 ? items[0] : T("villagepleb_menu_and", string.Join(", ", items.Take(items.Count - 1)), items[items.Count - 1]);
 
         private static string Capital(string s) => string.IsNullOrEmpty(s) ? s : char.ToUpper(s[0]) + s.Substring(1);
 
-        /// <summary>The menu's interface, at unload (a hot reload): the window and its canvas.</summary>
         private void DestroyMenuResources() => GameUi.Destroy();
     }
 }

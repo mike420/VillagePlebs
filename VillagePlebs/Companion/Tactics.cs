@@ -6,48 +6,25 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Fighting the way a good player fights:
-    ///   - with you: it joins in on what you are hitting, gets round to the other side of it (so it cannot face you both), and when you are
-    ///     badly hurt it goes for whatever is on you first;
-    ///   - sneaking: a creature that has not noticed it, it walks up to from behind (not running: that is heard) and strikes, for the game's
-    ///     backstab bonus;
-    ///   - its weapon's special attack (the secondary attack): a sweep or slam into a bunch of enemies, and every few blows a stagger on a
-    ///     tough one; never a throw (it would lose its weapon);
-    ///   - hit and run against heavy hitters (a big hit for its health, or a creature that has hurt or killed it before): a blow, then a step
-    ///     back out of reach while the creature swings at nothing, then in again;
-    ///   - meads at the right moment: stamina mead when it runs out mid-fight, poison, frost or fire resistance against that kind of harm, eitr
-    ///     for a staff;
-    ///   - remembering what hurt it (the journal's tally): it opens with the bow on those, keeps its distance, and warns you;
-    ///   - a bow that kites: it backs off while something closes in, and draws its blade only when cornered.
-    /// </summary>
     internal static class Tactics
     {
-        // ---- with you ----------------------------------------------------------------------------------------
-
         public static Character YourTarget;
         public static float YourTargetAt;
 
-        /// <summary>What you hit lately (the last few seconds) and is still alive.</summary>
         public static Character Yours() => YourTarget != null && !YourTarget.IsDead() && Time.time - YourTargetAt < 6f ? YourTarget : null;
 
-        /// <summary>To get round to the far side of the creature you are fighting: where to stand, or null when it is there already (or need not).</summary>
         public static Vector3? Pincer(Humanoid me, Player master, Character target, float reach)
         {
             if (master == null || target != Yours() || Brain.TargetOf(target) != master) return null;
             Vector3 fromYou = target.transform.position - master.transform.position; fromYou.y = 0f;
             Vector3 fromMe = me.transform.position - target.transform.position; fromMe.y = 0f;
             if (fromYou.sqrMagnitude < 0.01f || fromYou.magnitude > 6f) return null;
-            if (Vector3.Angle(fromYou, fromMe) < 80f) return null; // on the far side already
+            if (Vector3.Angle(fromYou, fromMe) < 80f) return null;
             return target.transform.position + fromYou.normalized * (target.GetRadius() + reach * 0.7f);
         }
 
-        // ---- sneaking ----------------------------------------------------------------------------------------
-
-        /// <summary>It has not noticed anyone (the game gives a backstab against such a creature).</summary>
         public static bool Unaware(Character c) => c.GetBaseAI() is BaseAI ai && !ai.IsAlerted() && Brain.TargetOf(c) == null && !c.IsBoss();
 
-        /// <summary>Behind it, or null when it is behind it already.</summary>
         public static Vector3? Behind(Humanoid me, Character target, float reach)
         {
             Vector3 fromIt = me.transform.position - target.transform.position; fromIt.y = 0f;
@@ -55,30 +32,20 @@ namespace VillagePlebs
             return target.transform.position - target.transform.forward * (target.GetRadius() + reach * 0.6f);
         }
 
-        // ---- combos ----------------------------------------------------------------------------------------
-
         private static readonly AccessTools.FieldRef<Humanoid, Attack> CurrentAttack = AccessTools.FieldRefAccess<Humanoid, Attack>("m_currentAttack");
         private static readonly AccessTools.FieldRef<Attack, int> NextChain = AccessTools.FieldRefAccess<Attack, int>("m_nextAttackChainLevel");
 
-        /// <summary>
-        /// Mid-combo: its last swing was not the last of its weapon's chain (a sword's three, an axe's...), whose last blow hits twice as hard.
-        /// The game carries a combo on only when the next swing starts within a fifth of a second of the last one ending (Attack.Start).
-        /// </summary>
         public static bool MidCombo(Humanoid me)
         {
             Attack last = CurrentAttack(me);
             return last != null && NextChain(last) > 0 && me.GetTimeSinceLastAttack() < 0.18f;
         }
 
-        /// <summary>The swing just started leads on to more of its combo (not the last blow, nor a weapon without one).</summary>
         public static bool MidComboStarted(Humanoid me) { Attack a = CurrentAttack(me); return a != null && NextChain(a) > 0; }
 
-        // ---- the weapon's special --------------------------------------------------------------------------
-
-        /// <summary>Its secondary attack now? A sweep or slam into three or more, or every third blow on a tough one to stagger it. Never a throw.</summary>
         public static bool Special(BrainState st, ItemDrop.ItemData weapon, Character target, float dist)
         {
-            if (weapon == null || !weapon.HaveSecondaryAttack() || MidCombo(st.Body)) return false; // (a combo first: a special would break it)
+            if (weapon == null || !weapon.HaveSecondaryAttack() || MidCombo(st.Body)) return false;
             Attack special = weapon.m_shared.m_secondaryAttack;
             if (special == null || special.m_attackType == Attack.AttackType.Projectile || special.m_attackProjectile != null) return false;
             if (Stamina.Get(st.Body) < special.m_attackStamina + 15f || dist > Mathf.Max(1.2f, special.m_attackRange * 0.9f)) return false;
@@ -88,26 +55,20 @@ namespace VillagePlebs
             return !target.IsStaggering() && target.GetMaxHealth() >= 100f && st.Blows % 3 == 2;
         }
 
-        // ---- heavy hitters and what hurt it before ------------------------------------------------------------
-
-        /// <summary>Has hurt it badly or killed it before (its journal): it is careful with those.</summary>
         public static bool Feared(Humanoid me, Character c)
         {
             var tally = Journal.Tally(me);
             return Journal.Tallied(tally, "killedby:", c.m_name) > 0 || Journal.Tallied(tally, "hurtby:", c.m_name) > me.GetMaxHealth() * 2f;
         }
 
-        /// <summary>One of its blows is a big part of its health (a quarter or more), or it is feared: hit and run against it.</summary>
         public static bool Heavy(Humanoid me, Character c)
         {
             if (c.IsBoss() || Feared(me, c)) return true;
             return HitOf(c) >= me.GetMaxHealth() * 0.25f;
         }
 
-        /// <summary>A blow's harm (not its chop or pickaxe part, which only trees and rocks feel).</summary>
         private static float Harm(HitData.DamageTypes d) => d.m_damage + d.m_blunt + d.m_slash + d.m_pierce + d.m_fire + d.m_frost + d.m_lightning + d.m_poison + d.m_spirit;
 
-        /// <summary>A creature's hardest blow (its attacks are its items), with its stars (half again for each).</summary>
         public static float HitOf(Character c)
         {
             if (!(c is Humanoid h)) return 0f;
@@ -117,10 +78,6 @@ namespace VillagePlebs
             return best * (1f + (Mathf.Max(1, c.GetLevel()) - 1) * 0.5f);
         }
 
-        /// <summary>
-        /// Clearly too strong for it: at its health and with its weapon it would fall several times over before the creature did (a bear
-        /// against a stone axe and 25 health). Then it gets clear instead of trading blows.
-        /// </summary>
         public static bool TooStrong(Humanoid me, Character c)
         {
             if (c == null || c.IsDead()) return false;
@@ -132,12 +89,8 @@ namespace VillagePlebs
             return blowsToFell > blowsToFall * 3f;
         }
 
-        /// <summary>Nothing eaten (it is at its bare health), or just up after a fall: it does not pick fights, and gets clear early.</summary>
         public static bool Careful(BrainState st) => Food.Meals(st.Body).Count == 0 || Time.time - st.WokeAt < 90f;
 
-        // ---- meads -----------------------------------------------------------------------------------------
-
-        /// <summary>A mead it carries whose effect fits, and that is not on it already: drunk. True if it drank. <paramref name="what"/>: the key of "drank a ... mead".</summary>
         private static bool Drink(Humanoid h, Func<SE_Stats, bool> fits, string what, BrainState st)
         {
             SEMan seman = h.GetSEMan();
@@ -158,7 +111,6 @@ namespace VillagePlebs
         private static bool Resists(SE_Stats se, HitData.DamageType type) =>
             se.m_mods != null && se.m_mods.Any(m => m.m_type == type && (m.m_modifier == HitData.DamageModifier.Resistant || m.m_modifier == HitData.DamageModifier.VeryResistant || m.m_modifier == HitData.DamageModifier.Immune));
 
-        /// <summary>Once a second in a fight: the mead the moment calls for, if it has one.</summary>
         public static void Meads(BrainState st)
         {
             if (Time.time < st.NextMeadLook) return;
@@ -176,18 +128,11 @@ namespace VillagePlebs
             if (frost) Drink(me, se => Resists(se, HitData.DamageType.Frost), "villagepleb_tactics_drank_frost", st);
         }
 
-        // ---- the dodge -------------------------------------------------------------------------------------
-
         private static Player _playerPrefab;
         private static Player PlayerPrefab => _playerPrefab != null ? _playerPrefab : _playerPrefab = ZNetScene.instance?.GetPrefab("Player")?.GetComponent<Player>();
 
-        /// <summary>A player's dodge cost (10).</summary>
         public static float DodgeCost => PlayerPrefab != null ? PlayerPrefab.m_dodgeStaminaUsage : 10f;
 
-        /// <summary>
-        /// A roll as a player rolls: it turns to the way it goes, the game's roll (the "dodge" animation and its sound), the stamina it costs,
-        /// and a moment no hit lands (the game's own dodge window, which every game checks: melee, area attacks, arrows).
-        /// </summary>
         public static void Roll(BrainState st, Vector3 dir)
         {
             Humanoid me = st.Body;
@@ -203,26 +148,22 @@ namespace VillagePlebs
             Journal.Count(me, "dodges");
         }
 
-        /// <summary>Every frame on the game running it: the roll's moment over.</summary>
         public static void Tick(BrainState st)
         {
             if (st.InvulnUntil > 0f && Time.time >= st.InvulnUntil) { st.InvulnUntil = 0f; Companion.Zdo(st.Body)?.Set(ZDOVars.s_dodgeinv, false); }
         }
     }
 
-    /// <summary>A companion mid-roll cannot be hit (the game's own check, as for a rolling player), on every game.</summary>
     [HarmonyPatch(typeof(Character), nameof(Character.IsDodgeInvincible))]
     internal static class Character_IsDodgeInvincible_Companion
     {
         private static void Postfix(Character __instance, ref bool __result)
         {
             if (__result || !(__instance is Humanoid h) || !Companion.Is(h)) return;
-            // Its own game: the roll's live timer (a flag left set by a brain that stopped mid-roll must not make it unhittable); others: the save.
             __result = h.GetComponent<ZNetView>().IsOwner() ? Brain.Get(h).InvulnUntil > Time.time : Companion.Zdo(h)?.GetBool(ZDOVars.s_dodgeinv, false) ?? false;
         }
     }
 
-    /// <summary>What you hit (for it to join in), on your own game.</summary>
     [HarmonyPatch(typeof(Character), "RPC_Damage")]
     internal static class Character_RPC_Damage_YourTarget
     {

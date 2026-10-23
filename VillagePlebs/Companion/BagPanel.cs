@@ -9,18 +9,6 @@ using static VillagePlebs.Shared.Translations;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Its bag with your inventory: whenever your inventory is open and one of your companions is within 30 m (Reach), its bag shows below yours,
-    /// in a copy of the game's own chest panel and grid in the game's own look (so dragging, splitting stacks and tooltips are the game's),
-    /// titled with its name and weight. Drag between the two as with a chest; right-click one of its items to take it. It is not "opened"
-    /// like a chest, so the companion carries on meanwhile. Where it goes: under your inventory, where a chest's panel goes; with a chest
-    /// open as well, under the chest, or right of your inventory when there is no room on the screen (under the crafting panel when that
-    /// is in the way).
-    ///
-    /// With a controller it is a panel of its own (LB/RB to it, as to a chest): the chest panel it is copied from brings the chest's
-    /// gamepad group, which the game never switched off for a copy, so its grid took every A press along with yours and dropped what you
-    /// picked up straight into its bag (0.24.7 and older). It has its own group now, in the game's list while it shows, off until you tab to it.
-    /// </summary>
     internal static class BagPanel
     {
         private static readonly AccessTools.FieldRef<InventoryGui, InventoryGrid> ContainerGrid = AccessTools.FieldRefAccess<InventoryGui, InventoryGrid>("m_containerGrid");
@@ -32,12 +20,12 @@ namespace VillagePlebs
         private static TMP_Text _name, _weight;
         private static Humanoid _shown;
         private static (Vector2 screen, bool crafting, bool chest) _placedFor;
-        private static UIGroupHandler _group;   // its gamepad group (Join, Leave)
+        private static UIGroupHandler _group;
         private static InventoryGui _gui;
         private static readonly AccessTools.FieldRef<InventoryGui, int> ActiveGroup = AccessTools.FieldRefAccess<InventoryGui, int>("m_activeGroup");
         private static readonly System.Reflection.MethodInfo SetActiveGroup = AccessTools.Method(typeof(InventoryGui), "SetActiveGroup", new[] { typeof(int), typeof(bool) });
         private static bool _warned, _saidWhy, _buildWarned;
-        private const float Reach = 30f;   // how near a companion is for its bag to show (across your base: at its chest or a bench)
+        private const float Reach = 30f;
 
         public static void Tick(InventoryGui gui)
         {
@@ -45,7 +33,7 @@ namespace VillagePlebs
             {
                 Humanoid c = Pick(gui);
                 if (!InventoryGui.IsVisible()) _saidWhy = false;
-                else if (c == null && !_saidWhy)   // (once each time the inventory opens, and only with one of yours about: not in everyday play)
+                else if (c == null && !_saidWhy)
                 {
                     _saidWhy = true;
                     string why = WhyNot(gui);
@@ -64,18 +52,16 @@ namespace VillagePlebs
                 _grid.UpdateInventory(c.GetInventory(), null, DragItem(gui));
                 if (_name != null) _name.text = T("villagepleb_bagpanel_title", Companion.NameOf(c));
                 if (_weight != null) _weight.text = $"{Carry.Weight(c):0}/{Carry.Max(c):0}";
-                // Placed again when the screen size changes, or the crafting panel or a chest comes or goes.
                 var now = (new Vector2(Screen.width, Screen.height), gui.m_crafting != null && gui.m_crafting.gameObject.activeInHierarchy, ChestOpen(gui));
                 if (_placedFor != now) { Place(gui); _placedFor = now; }
             }
             catch (Exception e)
             {
-                if (!_warned) { _warned = true; VillagePlebsPlugin.Instance?.Warn("Companion bag panel: " + e); } // (once, with where: not every frame)
+                if (!_warned) { _warned = true; VillagePlebsPlugin.Instance?.Warn("Companion bag panel: " + e); }
                 Hide();
             }
         }
 
-        /// <summary>Your nearest companion within reach that runs on your game (only then are changes to its bag kept), unless its bag is the chest you have open.</summary>
         private static Humanoid Pick(InventoryGui gui)
         {
             Player p = Player.m_localPlayer;
@@ -86,10 +72,6 @@ namespace VillagePlebs
                 .OrderBy(c => Vector3.Distance(c.transform.position, p.transform.position)).FirstOrDefault();
         }
 
-        /// <summary>
-        /// For the log: why no companion's bag shows (the nearest of yours, and what keeps it out). Null when none of yours is within 100 m:
-        /// nothing worth saying (you are out and about without one).
-        /// </summary>
         private static string WhyNot(InventoryGui gui)
         {
             Player p = Player.m_localPlayer;
@@ -103,7 +85,6 @@ namespace VillagePlebs
             return $"your nearest companion, {Companion.NameOf(c)}, is {d:0} m away: {why}";
         }
 
-        /// <summary>A copy of the game's chest panel (background, title, weight, grid), without its buttons, wired to the game's own drag and drop.</summary>
         private static bool Build(InventoryGui gui)
         {
             InventoryGrid source = ContainerGrid(gui);
@@ -111,20 +92,16 @@ namespace VillagePlebs
             GameObject copy = UnityEngine.Object.Instantiate(gui.m_container.gameObject, gui.m_container.parent, false);
             copy.name = "VillagePlebs_Bag";
             _panel = copy.GetComponent<RectTransform>();
-            foreach (Button b in copy.GetComponentsInChildren<Button>(true)) UnityEngine.Object.Destroy(b.gameObject); // Take all, Stack...: not for its bag
+            foreach (Button b in copy.GetComponentsInChildren<Button>(true)) UnityEngine.Object.Destroy(b.gameObject);
             _grid = copy.GetComponentInChildren<InventoryGrid>(true);
             if (_grid == null) { UnityEngine.Object.Destroy(copy); _panel = null; return false; }
-            if (_grid.m_gridRoot != null) foreach (Transform cell in _grid.m_gridRoot) UnityEngine.Object.Destroy(cell.gameObject); // the chest's cells come along: the grid makes its own
-            // The game wires its chest grid to the inventory screen in code (InventoryGui.Awake), and a copy keeps none of that: wired here the
-            // same way. Without the drop check the game's grid update throws for every item in the bag (the panel hid itself at once), and
-            // without the release nothing dropped on it would land.
+            if (_grid.m_gridRoot != null) foreach (Transform cell in _grid.m_gridRoot) UnityEngine.Object.Destroy(cell.gameObject);
             _grid.m_onSelected = Wire<Action<InventoryGrid, ItemDrop.ItemData, Vector2i, InventoryGrid.Modifier>>(gui, "OnSelectedItem");
             _grid.m_onReleased = Wire<Action<InventoryGrid, ItemDrop.ItemData, Vector2i>>(gui, "OnReleasedItem");
             _grid.m_onEnter = Wire<Action<InventoryGrid, Vector2i>>(gui, "OnEnterElement");
             _grid.OnSetTouchSelection = Wire<Action<InventoryGrid>>(gui, "SetTouchSelection");
             _grid.CanDropDragOntoItem = Wire<Func<ItemDrop.ItemData, bool>>(gui, "CanDropDragOntoItem") ?? (item => true);
             _grid.m_onRightClick = TakeToYou;
-            // Its own gamepad group (the chest's, copied with it, or a new one), off until you tab to it: see the summary.
             UIGroupHandler group = _grid.m_uiGroup;
             if (group == null || !group.transform.IsChildOf(copy.transform))
             {
@@ -136,7 +113,6 @@ namespace VillagePlebs
             _group = group;
             _name = Find(copy, gui.m_container, gui.m_containerName);
             _weight = Find(copy, gui.m_container, gui.m_containerWeight);
-            // Room for its two gear rows (and the gap above them) under the bag: the chest panel is made for four rows.
             float extra = (Gear.Rows - Gear.BagRows) * _grid.m_elementSpace + InventoryGrid_UpdateGui_Bag.Gap;
             _panel.sizeDelta += new Vector2(0f, extra);
             InventoryGrid_UpdateGui_Bag.Forget();
@@ -145,14 +121,12 @@ namespace VillagePlebs
             return true;
         }
 
-        /// <summary>The inventory screen's own handler, as the game hooks it to its chest grid (null when this game version has no such method).</summary>
         private static T Wire<T>(InventoryGui gui, string method) where T : Delegate
         {
             System.Reflection.MethodInfo m = AccessTools.Method(typeof(InventoryGui), method);
             return m != null ? (T)Delegate.CreateDelegate(typeof(T), gui, m, false) : null;
         }
 
-        /// <summary>The copy's counterpart of a text in the game's panel (by its path under the panel).</summary>
         private static TMP_Text Find(GameObject copy, RectTransform original, TMP_Text text)
         {
             if (text == null) return null;
@@ -171,18 +145,14 @@ namespace VillagePlebs
 
         private static bool ChestOpen(InventoryGui gui) => CurrentContainer(gui) != null && gui.m_container != null && gui.m_container.gameObject.activeInHierarchy;
 
-        /// <summary>
-        /// Under your inventory, where a chest's panel goes. With a chest open there as well: under the chest when it fits on the screen,
-        /// else right of your inventory (top aligned, past its armour and weight readout), or under the crafting panel when that would overlap it.
-        /// </summary>
         private static void Place(InventoryGui gui)
         {
             var player = new Vector3[4];
-            gui.m_player.GetWorldCorners(player);           // 0 bottom-left, 1 top-left, 2 top-right, 3 bottom-right
+            gui.m_player.GetWorldCorners(player);
             var mine = new Vector3[4];
             _panel.GetWorldCorners(mine);
             float width = mine[2].x - mine[1].x, height = mine[1].y - mine[0].y;
-            float gap = (player[2].x - player[1].x) * 0.13f;  // room for the armour and weight readout beside your inventory
+            float gap = (player[2].x - player[1].x) * 0.13f;
             Rect chest = WorldRect(gui.m_container);
             Vector2 topLeft = new Vector2(chest.xMin, chest.yMax);
             if (ChestOpen(gui))
@@ -205,7 +175,6 @@ namespace VillagePlebs
             return Rect.MinMaxRect(c[0].x, c[0].y, c[2].x, c[2].y);
         }
 
-        /// <summary>Its gamepad group into the game's list (LB/RB reach it) while it shows, off until you tab to it.</summary>
         private static void Join(InventoryGui gui)
         {
             if (_group == null || Array.IndexOf(gui.m_uiGroups, _group) >= 0) return;
@@ -213,7 +182,6 @@ namespace VillagePlebs
             _group.SetActive(false);
         }
 
-        /// <summary>Out of the list when it hides; if it was the one in use, back to your inventory (the game's group 1).</summary>
         private static void Leave(InventoryGui gui)
         {
             if (gui == null || ReferenceEquals(_group, null)) return;
@@ -223,7 +191,7 @@ namespace VillagePlebs
             gui.m_uiGroups = gui.m_uiGroups.Where((g, n) => n != i).ToArray();
             if (_group != null) _group.SetActive(false);
             if (active == i) SetActiveGroup?.Invoke(gui, new object[] { 1, false });
-            else if (active > i) ActiveGroup(gui) = active - 1;   // (a group another mod put after it moved down one)
+            else if (active > i) ActiveGroup(gui) = active - 1;
         }
 
         private static void Hide()
@@ -238,7 +206,7 @@ namespace VillagePlebs
 
         public static void Destroy()
         {
-            try { Leave(_gui); } catch { }   // (a reload: never leave a destroyed group in the game's list)
+            try { Leave(_gui); } catch { }
             if (_panel != null) UnityEngine.Object.Destroy(_panel.gameObject);
             _panel = null; _grid = null; _name = _weight = null; _shown = null; _group = null; _gui = null;
         }
@@ -253,10 +221,6 @@ namespace VillagePlebs
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Ctrl-click (the game's quick move) with its bag below your inventory: from its bag into yours, from yours to it (gear into its slot,
-    /// the rest into its bag), as with an open chest. Without its panel showing, the game's own (drop on the ground).
-    /// </summary>
     [HarmonyPatch(typeof(InventoryGui), "OnSelectedItem")]
     internal static class InventoryGui_OnSelectedItem_QuickMove
     {
@@ -278,11 +242,6 @@ namespace VillagePlebs
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// Dragging out of its bag: the inventory screen cancels, every frame, any drag that is not from your own inventory when no chest is open
-    /// (InventoryGui.UpdateContainer), so an item picked up in its bag panel was dropped again at once and nothing could be taken out. That one
-    /// check is let off for a drag from its bag while its panel shows; closing the inventory, a right-click and the rest still cancel.
-    /// </summary>
     [HarmonyPatch(typeof(InventoryGui), "UpdateContainer")]
     internal static class InventoryGui_UpdateContainer_Bag
     {
@@ -300,7 +259,7 @@ namespace VillagePlebs
         {
             if (item != null || !InventoryGui_UpdateContainer_Bag.Inside) return true;
             Inventory from = DragFrom(__instance);
-            return !(BagPanel.Shown != null && from != null && from == BagPanel.Shown.GetInventory()); // (its bag, its panel showing: keep the drag)
+            return !(BagPanel.Shown != null && from != null && from == BagPanel.Shown.GetInventory());
         }
     }
 }

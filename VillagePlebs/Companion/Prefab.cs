@@ -4,15 +4,6 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// The companion's body: a copy of the game's Player prefab without the parts that make it *the* player (input, profile, skills,
-    /// talking), with the game's own humanoid and monster AI in their place and a chest-like inventory for its gear. Only game components,
-    /// so a reload never leaves old code running on a companion.
-    ///
-    /// Registered like a piece (see docs/modding-pitfalls.md): from ZNetScene.Awake and ObjectDB.Awake, and on a hot reload, so a saved
-    /// companion always finds its prefab when its zone loads. Without the mod a saved companion (and the gear it carries) is deleted by the
-    /// host, so everyone in a world with companions needs it, the host (or dedicated server) included.
-    /// </summary>
     internal static class Prefab
     {
         public const string PrefabName = "villagepleb";
@@ -31,11 +22,10 @@ namespace VillagePlebs
                 GameObject player = scene.GetPrefab("Player");
                 if (player == null) { VillagePlebsPlugin.Instance?.Warn("The Player prefab was not found, so no companion can be made"); return; }
                 _holder = new GameObject(VillagePlebsPlugin.PluginName + "Prefabs");
-                _holder.SetActive(false); // the copy must not wake up as a real object
+                _holder.SetActive(false);
                 Object.DontDestroyOnLoad(_holder);
                 _prefab = Make(player, scene);
             }
-            // A hot reload: the old copy left its prefab registered (Unregister) so no companion is ever without one; ours replaces it.
             Dictionary<int, GameObject> named = Named(scene);
             if (named.TryGetValue(Hash, out GameObject old) && old != null && old != _prefab && old.name == PrefabName)
             {
@@ -46,11 +36,6 @@ namespace VillagePlebs
             named[Hash] = _prefab;
         }
 
-        /// <summary>
-        /// Unloading (a hot reload, or the game closing): the prefab stays registered. ScriptEngine destroys the old copy a frame before the
-        /// new one registers, and a host that loads an area in that frame deletes every companion there with everything it carries
-        /// ("Destroyed invalid prefab ZDO"). The prefab is only the game's own components, so leaving it is safe; the new copy replaces it.
-        /// </summary>
         public static void Unregister()
         {
             _prefab = null;
@@ -80,10 +65,10 @@ namespace VillagePlebs
                 h.m_backstabHitEffects = original.m_backstabHitEffects;
                 h.m_deathEffects = original.m_deathEffects;
             }
-            h.m_name = "$villagepleb_companion"; // (translated by the game: translations/*.json)
+            h.m_name = "$villagepleb_companion";
             h.m_group = "villagepleb";
             h.m_faction = Character.Faction.Players;
-            h.m_health = VillagePlebsPlugin.BaseHealth.Value; // food adds to it (Food)
+            h.m_health = VillagePlebsPlugin.BaseHealth.Value;
             h.m_regenAllHPTime = 300f;
             h.m_walkSpeed = 1.6f; h.m_runSpeed = 7f; h.m_speed = 4f; h.m_crouchSpeed = 2f;
             h.m_turnSpeed = 300f; h.m_runTurnSpeed = 300f; h.m_acceleration = 1f;
@@ -98,7 +83,6 @@ namespace VillagePlebs
                 m_chop = HitData.DamageModifier.Immune, m_pickaxe = HitData.DamageModifier.Immune, m_spirit = HitData.DamageModifier.Immune,
             };
 
-            // The animation events (footsteps, the moment a swing hits) were wired to the Player we removed.
             CharacterAnimEvent anim = go.GetComponentInChildren<CharacterAnimEvent>(true);
             if (anim != null) AccessTools.Field(typeof(CharacterAnimEvent), "m_character")?.SetValue(anim, h);
 
@@ -121,11 +105,9 @@ namespace VillagePlebs
             Rigidbody body = go.GetComponent<Rigidbody>();
             if (body != null) body.mass = 50f;
 
-            // Its gear lives in a chest-like inventory (saved with it, opened with the game's own chest screen); the humanoid uses that same
-            // inventory (Patches: Container_Awake), so what you put in is what it can wear and wield.
             Container gear = go.AddComponent<Container>();
-            gear.m_name = "$villagepleb_companion"; // (its inventory's name: Gear.IsCompanion)
-            gear.m_width = Gear.Width; gear.m_height = Gear.Rows; // its bag (four rows) and its gear slots (two: Gear)
+            gear.m_name = "$villagepleb_companion";
+            gear.m_width = Gear.Width; gear.m_height = Gear.Rows;
             gear.m_privacy = Container.PrivacySetting.Public;
             gear.m_checkGuardStone = false;
             gear.m_autoDestroyEmpty = false;

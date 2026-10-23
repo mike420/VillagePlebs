@@ -23,7 +23,6 @@ namespace VillagePlebs
         private static Action<GameObject, string, float> _applyLook;
         private static Action<GameObject> _treatAsCreature;
         private static Type _visualType;
-        // (a newer BodyReplacer's, found by name: the game's hairstyles fitted to its bodies, and tattoos; null with an older one)
         private static Func<int, string[]> _gameHairs, _gameHairNames, _tattooDesignNames;
         private static int _gameHairStyle = -1;
         private static Func<string[]> _tattooAreas, _tattooInkNames;
@@ -72,7 +71,6 @@ namespace VillagePlebs
             }
         }
 
-        // What a newer BodyReplacer adds (an older one lacks them: those parts of the Looks tab don't show)
         private static void FindNewer(Type api)
         {
             _gameHairs = TryBind<Func<int, string[]>>(api, "GameHairs");
@@ -92,7 +90,7 @@ namespace VillagePlebs
         {
             MethodInfo method = api.GetMethod(name, BindingFlags.Public | BindingFlags.Static);
             try { return method == null ? null : (T)Delegate.CreateDelegate(typeof(T), method); }
-            catch (ArgumentException) { return null; }   // (there, but not as this expects)
+            catch (ArgumentException) { return null; }
         }
 
         private static T Bind<T>(Type api, string name) where T : Delegate
@@ -101,36 +99,27 @@ namespace VillagePlebs
             return (T)Delegate.CreateDelegate(typeof(T), method);
         }
 
-        /// <summary>Whether BodyReplacer draws its body on a companion with this model (0 male, 1 female).</summary>
         public static bool Replaces(int model) => Available && _replaces(model, false);
 
         public static int[] HairStyleIds(int model) => Available ? _hairStyleIds(model) : Array.Empty<int>();
         public static string[] HairStyleNames(int model) => Available ? _hairStyleNames(model) : Array.Empty<string>();
-        /// <summary>The hairstyle that body shows for a stored one (one it doesn't have shows its default).</summary>
         public static int ShownHairStyle(int model, int style) => Available ? _shownHairStyle(model, style) : style;
         public static bool HasMuscle(int model) => Available && _hasMuscle(model);
         public static float MuscleDefault(int model) => Available ? _muscleDefault(model) : 50f;
-        /// <summary>Bust and hip size, on a body that has them.</summary>
         public static bool HasBodyShape(int model) => Available && _hasBodyShape(model);
         public static string DefaultLook() => Available ? _defaultLook() : "";
         public static float Get(string look, string field) => Available ? _getField(look, field) : 0f;
         public static string Set(string look, string field, float value) => Available ? _setField(look, field, value) : look;
 
-        /// <summary>The Looks tab's preview is built from the Player prefab: drawn like a companion, not like a player.</summary>
         public static void TreatAsCreature(GameObject character) { if (Available) _treatAsCreature(character); }
 
-        /// <summary>Gives a character its look (muscle below 0: the body's default). On a companion only its owner can.</summary>
         public static void Apply(GameObject character, string look, float muscle)
         {
             if (Available && !string.IsNullOrEmpty(look)) _applyLook(character, look, muscle);
         }
 
-        // ---- the game's hairstyles on its body, and tattoos (a newer BodyReplacer) ---------------------------------
-
-        /// <summary>Its bodies can wear the game's hairstyles: its look's HairStyle <see cref="GameHairStyle"/> shows the hair item, fitted.</summary>
         public static bool HasGameHair { get { Find(); return _gameHairs != null && _gameHairNames != null && _gameHairStyle >= 0; } }
         public static int GameHairStyle => _gameHairStyle;
-        /// <summary>The game's hairstyles that body is fitted for: their item prefab names, and their names to show.</summary>
         public static string[] GameHairs(int model) => HasGameHair ? _gameHairs(model) : Array.Empty<string>();
         public static string[] GameHairNames(int model) => HasGameHair ? _gameHairNames(model) : Array.Empty<string>();
 
@@ -143,19 +132,15 @@ namespace VillagePlebs
             }
         }
 
-        /// <summary>The tattoo areas' names (face, chest...); an area's designs' names, for designs 1 on (0 is none); the inks' names.</summary>
         public static string[] TattooAreas() => HasTattoos ? _tattooAreas() : Array.Empty<string>();
         public static string[] TattooDesignNames(int area) => HasTattoos ? _tattooDesignNames(area) : Array.Empty<string>();
         public static string[] TattooInkNames() => HasTattoos ? _tattooInkNames() : Array.Empty<string>();
         public static int TattooDesign(string tattoos, int area) => HasTattoos ? _getTattooDesign(tattoos, area) : 0;
         public static int TattooInk(string tattoos, int area) => HasTattoos ? _getTattooInk(tattoos, area) : 0;
-        /// <summary>The tattoos (BodyReplacer's text: empty for none) with one area's design and ink changed.</summary>
         public static string SetTattoo(string tattoos, int area, int design, int ink) => HasTattoos ? _setTattoo(tattoos, area, design, ink) : tattoos;
 
-        /// <summary>Gives a character its tattoos (empty: none). On a companion only its owner can.</summary>
         public static void ApplyTattoos(GameObject character, string tattoos) { if (HasTattoos) _applyTattoos(character, tattoos ?? ""); }
 
-        /// <summary>BodyReplacer's body is on it now (it is put on when the game updates the model's equipment, so asked each frame).</summary>
         public static bool Drawn(GameObject character)
         {
             if (!Available || _visualType == null || character == null) return false;

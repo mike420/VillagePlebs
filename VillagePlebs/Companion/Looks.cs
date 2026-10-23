@@ -5,24 +5,12 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    /// <summary>
-    /// How a companion looks, chosen like a player's character: body, hair and beard styles (the game's own, from the character creator's
-    /// list), skin tone, and hair colour and shade (the creator's two sliders). Stored in its ZDO as the game stores a player's looks (so
-    /// every player sees the same), plus the slider positions, and kept in its Profile so it wakes looking the same.
-    ///
-    /// The game gives a player-like NPC with no hair or beard a random one when it is made; "none" is therefore saved as "no hair" /
-    /// "no beard" too, or a bald companion would wake with hair.
-    /// </summary>
     internal static class Looks
     {
         private const string SkinT = "vp_skin_t", HairT = "vp_hair_t", HairL = "vp_hair_l";
-        // BodyReplacer's look for its body (its hairstyle, hair and eye colour...: the text it stores; empty: its default) and muscle (below 0:
-        // the body's default), kept here too so it wakes with them (Profile) and the Looks tab starts from them
         public const string BrLookKey = "vp_brlook", BrMuscleKey = "vp_brmuscle";
-        // and its tattoos (the text it stores; empty: none)
         public const string BrTattooKey = "vp_brtattoos";
 
-        // The creator's ranges (PlayerCustomizaton): skin from fair to dark, hair from fair to dark brown, then a shade multiplier.
         private static readonly Color Skin0 = new Color(1f, 1f, 1f), Skin1 = new Color(0.32f, 0.23f, 0.17f);
         private static readonly Color Hair0 = new Color(1f, 0.86f, 0.55f), Hair1 = new Color(0.45f, 0.24f, 0.11f);
         private const float HairMin = 0.1f, HairMax = 1f;
@@ -50,7 +38,6 @@ namespace VillagePlebs
         public static float BrMuscle(Component c) => Companion.Zdo(c)?.GetFloat(BrMuscleKey, -1f) ?? -1f;
         public static string BrTattoos(Component c) => Companion.Zdo(c)?.GetString(BrTattooKey, "") ?? "";
 
-        /// <summary>BodyReplacer's look and tattoos (with BodyReplacer installed: <see cref="BodyReplacerLook"/>).</summary>
         public static void SetBrLook(Humanoid c, string look, float muscle, string tattoos)
         {
             ZDO z = Companion.Zdo(c);
@@ -64,33 +51,24 @@ namespace VillagePlebs
 
         public static string StyleName(int hash, List<ItemDrop> styles)
         {
-            if (hash == 0) return Localization.instance.Localize("$menu_none");   // (the game's own word)
+            if (hash == 0) return Localization.instance.Localize("$menu_none");
             int i = styles.FindIndex(s => s.name.GetStableHashCode() == hash);
             return i < 0 ? "?" : VillagePlebs.Shared.Translations.T("villagepleb_looks_style_of", i + 1, styles.Count);
         }
 
-        // ---- changing (on the game that owns it: callers go through Companion.Write) ---------------------------
-
         private static VisEquipment Vis(Humanoid c) => c.GetComponent<VisEquipment>();
 
-        /// <summary>
-        /// A different body: swapping the body mesh on a character already drawn breaks it (Unity stops rendering it: "mesh data size and
-        /// vertex stride"), so the new body is written to its ZDO and the companion is made again from it at once, as the game does when it
-        /// comes back into range. A body set as it is made (summoning, waking) is fine.
-        /// </summary>
         public static void SetModel(Humanoid c, int model)
         {
             ZDO z = Companion.Zdo(c);
             if (z == null || z.GetInt(ZDOVars.s_modelIndex, 0) == model) return;
             z.Set(ZDOVars.s_modelIndex, model);
-            if (model == 1) { z.Set(ZDOVars.s_beardItem, 0); z.Set(ZDOVars.s_noBeard, true); } // the second body has no beard
-            // (the companion is then made again on every game that sees the new body: VisEquipment_UpdateBaseModel)
+            if (model == 1) { z.Set(ZDOVars.s_beardItem, 0); z.Set(ZDOVars.s_noBeard, true); }
         }
 
         private static readonly HarmonyLib.AccessTools.FieldRef<ZNetScene, Dictionary<ZDO, ZNetView>> Instances =
             HarmonyLib.AccessTools.FieldRefAccess<ZNetScene, Dictionary<ZDO, ZNetView>>("m_instances");
 
-        /// <summary>Let the game make this companion again from its ZDO next frame (its bag, looks and settings are all in the ZDO).</summary>
         public static void Remake(Humanoid c)
         {
             ZNetView view = c.GetComponent<ZNetView>();
@@ -103,7 +81,6 @@ namespace VillagePlebs
             VillagePlebsPlugin.Instance?.Note("A companion was remade with a different body");
         }
 
-        /// <summary>For a new companion, while it is being made (before it is ever drawn): set the body directly.</summary>
         public static void SetModelNow(Humanoid c, int model)
         {
             Vis(c)?.SetModel(model);
@@ -147,14 +124,12 @@ namespace VillagePlebs
         public static Vector3 SkinColor(float t) => Utils.ColorToVec3(Color.Lerp(Skin0, Skin1, t));
         public static Vector3 HairColor(float tone, float shade) => Utils.ColorToVec3(Color.Lerp(Hair0, Hair1, tone) * Mathf.Lerp(HairMin, HairMax, shade));
 
-        /// <summary>Where the skin slider sits for a colour: its point along the fair to dark line.</summary>
         public static float SkinOf(Vector3 colour)
         {
             Vector3 from = Utils.ColorToVec3(Skin0), line = Utils.ColorToVec3(Skin1) - from;
             return Mathf.Clamp01(Vector3.Dot(colour - from, line) / Mathf.Max(0.0001f, line.sqrMagnitude));
         }
 
-        /// <summary>Where the hair tone and shade sliders sit for a colour: the pair that makes the nearest one.</summary>
         public static Vector2 HairOf(Vector3 colour)
         {
             Vector2 best = new Vector2(0.5f, 0.8f);
@@ -168,7 +143,6 @@ namespace VillagePlebs
             return best;
         }
 
-        /// <summary>The next or previous style in the list ("none" sits at the start).</summary>
         public static int Step(int current, List<ItemDrop> styles, int by)
         {
             var hashes = new List<int> { 0 };
@@ -177,16 +151,13 @@ namespace VillagePlebs
             return hashes[(i + by + hashes.Count) % hashes.Count];
         }
 
-        // ---- a whole look at once -------------------------------------------------------------------------------
-
-        /// <summary>Everything that makes a companion's look (the colours as their slider positions), to choose before it is given.</summary>
         internal struct Look
         {
             public int Model, Hair, Beard;
             public float Skin, HairTone, HairShade;
-            public string BrLook;      // BodyReplacer's (empty: its default)
-            public float BrMuscle;     // (below 0: the body's default)
-            public string BrTattoos;   // BodyReplacer's tattoos (empty: none)
+            public string BrLook;
+            public float BrMuscle;
+            public string BrTattoos;
         }
 
         public static Look Of(Component c) =>
@@ -201,7 +172,6 @@ namespace VillagePlebs
             return l;
         }
 
-        /// <summary>A player's looks (body, colours, hair and beard), from what the game keeps for them.</summary>
         public static Look Like(Player p)
         {
             ZDO pz = p != null ? p.GetComponent<ZNetView>()?.GetZDO() : null;
@@ -214,27 +184,20 @@ namespace VillagePlebs
             };
         }
 
-        /// <summary>Gives it a look. <paramref name="fresh"/>: it is being made right now (summoning), so the body can be set directly.</summary>
         public static void Set(Humanoid c, Look l, bool fresh = false)
         {
             if (fresh) SetModelNow(c, l.Model);
             SetSkin(c, l.Skin);
             SetHairColor(c, l.HairTone, l.HairShade);
             SetHair(c, l.Hair);
-            SetBeard(c, l.Model == 0 ? l.Beard : 0); // (the second body has no beard)
+            SetBeard(c, l.Model == 0 ? l.Beard : 0);
             if (!string.IsNullOrEmpty(l.BrLook) || !string.IsNullOrEmpty(l.BrTattoos)) SetBrLook(c, l.BrLook, l.BrMuscle, l.BrTattoos);
-            if (!fresh) SetModel(c, l.Model); // last: a different body makes it again
+            if (!fresh) SetModel(c, l.Model);
         }
 
-        /// <summary>A random look for a companion being made right now (summoning).</summary>
         public static void Randomise(Humanoid c, bool fresh) => Set(c, Random(), fresh);
     }
 
-    /// <summary>
-    /// A small picture of each companion's face, for its menu. A hidden camera with its own light looks at the face of
-    /// companions loaded here, a couple of times a second, seeing only the companion's own layers. Companions not loaded here have no picture
-    /// (the menu shows their initial), unless one was taken earlier this session.
-    /// </summary>
     internal static class Portraits
     {
         private class Shot { public RenderTexture Tex; public float At = -99f; public string Sig = ""; public float ChangedAt = -99f; }
@@ -255,11 +218,8 @@ namespace VillagePlebs
                 z.GetInt(ZDOVars.s_rightItem, 0), z.GetInt(ZDOVars.s_leftItem, 0));
         }
 
-        /// <summary>One companion per frame at most, each about twice a second (sooner when its looks just changed).</summary>
         public static void Tick()
         {
-            // Only companions near you: far away the game stops drawing a character in full, and the picture comes out empty. The last good
-            // picture stays until it is near again.
             Player me = Player.m_localPlayer;
             List<Humanoid> all = Companion.All().Where(c => !c.IsDead() && me != null && Vector3.Distance(c.transform.position, me.transform.position) < 40f).ToList();
             if (all.Count == 0) return;
@@ -267,11 +227,9 @@ namespace VillagePlebs
             Humanoid c = all[_next];
             long id = Companion.IdOf(c);
             if (!Shots.TryGetValue(id, out Shot shot)) Shots[id] = shot = new Shot();
-            // A new picture only when its looks or what it wears change (then a moment later, once the new gear shows), not every moment.
             string sig = Signature(c);
             if (sig != shot.Sig) { shot.Sig = sig; shot.ChangedAt = Time.time; return; }
             if (shot.ChangedAt < 0f || Time.time - shot.ChangedAt < 0.6f) return;
-            // A proper front-on face: only while it stands still, not swinging, not in a fight (else it waits; the old picture stays).
             Rigidbody body = c.GetComponent<Rigidbody>();
             if ((body != null && body.linearVelocity.magnitude > 0.3f) || c.InAttack() || (c.GetComponent<ZNetView>().IsOwner() && Brain.Get(c).InCombat)) return;
             shot.ChangedAt = -99f;
@@ -330,8 +288,6 @@ namespace VillagePlebs
 
 namespace VillagePlebs
 {
-    // Any game about to swap a companion's body mesh after it has been drawn (its body was changed, here or on another player's game) makes it
-    // again from its ZDO instead: swapping the mesh of a drawn character stops Unity rendering it. The first body (as it is made) is set as usual.
     [HarmonyLib.HarmonyPatch(typeof(VisEquipment), "UpdateBaseModel")]
     internal static class VisEquipment_UpdateBaseModel
     {
@@ -342,7 +298,7 @@ namespace VillagePlebs
         {
             if (!Companion.Is(__instance)) return true;
             int wanted = Companion.Zdo(__instance).GetInt(ZDOVars.s_modelIndex, 0);
-            if (Drawn.Add(__instance)) { if (Drawn.Count > 64) Drawn.RemoveWhere(v => v == null); return true; } // its first body
+            if (Drawn.Add(__instance)) { if (Drawn.Count > 64) Drawn.RemoveWhere(v => v == null); return true; }
             if (wanted == Current(__instance)) return true;
             Looks.Remake(__instance.GetComponent<Humanoid>());
             return false;

@@ -9,24 +9,14 @@ namespace VillagePlebs
 {
     public enum Duty { Food, Wood, Mining }
 
-    /// <summary>
-    /// Its home duties: a short list in the order you set (Home tab), each with a stockpile it keeps up in its own chests: collect wood,
-    /// hunt and forage food, mine stone and ore. The stockpile is kept in your chests at home (it works for you; what is there already counts),
-    /// or in a chest of its own. At home it works the first duty that is switched on and whose stockpile is below what you
-    /// asked for, carrying what it gathers to its chest. A duty with nothing to find near home rests a minute and the next one is worked.
-    /// Every duty full (or none switched on), it goes back to living its own life: its gear goals, repairs, the fire, a stroll.
-    /// Kept in its ZDO as "Wood:1:100,Food:0:40,Mining:0:100" (duty, on, stockpile), in priority order.
-    /// </summary>
     internal static class Duties
     {
         public const string Key = "vp_duties", DestKey = "vp_dutydest";
 
-        /// <summary>Where the stockpile is: in your chests at home (the default: it works for you) or in a chest of its own.</summary>
         public static bool ToYours(Component c) => (Companion.Zdo(c)?.GetInt(DestKey, 0) ?? 0) == 0;
 
         private static readonly Dictionary<long, KeyValuePair<float, bool>> Places = new Dictionary<long, KeyValuePair<float, bool>>();
 
-        /// <summary>There is somewhere to put it: a chest of yours near home it may use (putting things in yours allowed), or a chest of its own. Looked up every few seconds.</summary>
         public static bool HasPlace(Humanoid me)
         {
             long id = Companion.IdOf(me);
@@ -45,17 +35,12 @@ namespace VillagePlebs
             public Job Jobs => Duty == Duty.Wood ? Job.Wood : Duty == Duty.Food ? Job.Forage | Job.Hunt | Job.Cook : Job.Stone | Job.Ore;
         }
 
-        /// <summary>Its name in the menu (packed text: Words.Show makes the words).</summary>
         public static string Label(Duty d) => P("villagepleb_duties_label_" + d.ToString().ToLowerInvariant());
-        /// <summary>A stockpile's size in its unit ("100 wood", "40 good meals"), packed.</summary>
         public static string Amount(Duty d, int n) => P("villagepleb_duties_amount_" + d.ToString().ToLowerInvariant(), n);
         public static int Step(Duty d) => d == Duty.Food ? 10 : 20;
         public static int Max(Duty d) => d == Duty.Food ? 300 : 600;
         private static int Default(Duty d) => d == Duty.Food ? 60 : 100;
 
-        // ---- the saved list ---------------------------------------------------------------------------------------
-
-        /// <summary>A fresh copy of its duties, in priority order (always all of them), to change and Write.</summary>
         public static List<Entry> Read(ZDO z)
         {
             var list = new List<Entry>();
@@ -74,7 +59,6 @@ namespace VillagePlebs
 
         private static readonly Dictionary<string, List<Entry>> Parsed = new Dictionary<string, List<Entry>>();
 
-        /// <summary>Its duties for reading often (every frame): parsed once per saved value. Never change what it returns.</summary>
         private static List<Entry> Cached(Component c)
         {
             ZDO z = Companion.Zdo(c);
@@ -88,13 +72,9 @@ namespace VillagePlebs
             return list;
         }
 
-        /// <summary>Any duty switched on and a chest to keep the stockpile in: then these, not the plain job ticks, say what it does at home.</summary>
         public static bool Configured(Humanoid c) => Cached(c).Any(e => e.On) && HasPlace(c);
 
-        /// <summary>Any gathering duty switched on (for its menu).</summary>
         public static bool AnyOn(Component c) => Cached(c).Any(e => e.On);
-
-        // ---- what counts toward a stockpile -------------------------------------------------------------------------
 
         private static readonly HashSet<string> WoodNames = new HashSet<string>
             { "$item_wood", "$item_finewood", "$item_corewood", "$item_elderbark", "$item_yggdrasilwood", "$item_blackwood", "$item_ashwood" };
@@ -111,10 +91,6 @@ namespace VillagePlebs
             }
         }
 
-        /// <summary>
-        /// How much of a meal one of this food is: cooked meat and the like (50 health and stamina between them or more) a whole one, a berry or a
-        /// mushroom a third, raw food still to cook half. So a larder of mushrooms never counts as stocked, and it goes on hunting and cooking.
-        /// </summary>
         public static float MealWeight(ItemDrop.ItemData i) =>
             Food.IsFood(i) ? Mathf.Clamp((i.m_shared.m_food + i.m_shared.m_foodStamina) / 50f, 0.2f, 1f) : 0.5f;
 
@@ -124,7 +100,6 @@ namespace VillagePlebs
         private static readonly Dictionary<long, int[]> Strikes = new Dictionary<long, int[]>();
         private static readonly Dictionary<long, float> LastDelivery = new Dictionary<long, float>();
 
-        /// <summary>How much of the duty's stock the chests it keeps it in hold (yours at home, or its own), and what it carries to put there (not its food: that is its own to eat). Looked up every few seconds.</summary>
         public static int Have(Humanoid me, Duty d)
         {
             long id = Companion.IdOf(me);
@@ -139,22 +114,18 @@ namespace VillagePlebs
                         foreach (Duty each in Enum.GetValues(typeof(Duty)))
                             if (each == Duty.Food) { if (Counts(each, i)) kinds[i.m_shared.m_name] = (kinds.TryGetValue(i.m_shared.m_name, out float k) ? k : 0f) + i.m_stack * MealWeight(i); }
                             else if (Counts(each, i)) have[(int)each] += i.m_stack;
-                // Food is counted in good meals: a mushroom is a fraction of a meal, and no one food counts for more than 60% of the target (variety).
                 float cap = Mathf.Max(1f, (Cached(me).FirstOrDefault(e => e.Duty == Duty.Food)?.Target ?? 40) * 0.6f);
                 have[(int)Duty.Food] = Mathf.FloorToInt(kinds.Values.Sum(v => Mathf.Min(v, cap)));
                 foreach (ItemDrop.ItemData i in me.GetInventory().GetAllItems())
                     if (!Work.Keeps(me, i))
                         foreach (Duty each in Enum.GetValues(typeof(Duty)))
-                            if (each != Duty.Food && Counts(each, i)) have[(int)each] += i.m_stack; // (what it carries is on its way to the chest)
+                            if (each != Duty.Food && Counts(each, i)) have[(int)each] += i.m_stack;
             }
             return have[(int)d];
         }
 
-        // ---- which one it works now -----------------------------------------------------------------------------------
-
         public static bool Resting(Humanoid me, Duty d) => Idle.TryGetValue(Companion.IdOf(me), out float[] until) && until[(int)d] > Time.time;
 
-        /// <summary>The first duty switched on whose stockpile is below its target and that is not resting. Null: its own life.</summary>
         public static Entry Active(Humanoid me)
         {
             foreach (Entry e in Cached(me))
@@ -165,10 +136,6 @@ namespace VillagePlebs
             return null;
         }
 
-        /// <summary>
-        /// It found nothing to gather for this duty near home: the next one for a minute, and each time in a row twice as long (five minutes at most).
-        /// How many times in a row.
-        /// </summary>
         public static int Rest(Humanoid me, Entry e)
         {
             long id = Companion.IdOf(me);
@@ -180,19 +147,15 @@ namespace VillagePlebs
             return k;
         }
 
-        /// <summary>It found something to do for this duty: its rests start from a minute again.</summary>
         public static void Worked(Humanoid me, Entry e)
         {
             if (Strikes.TryGetValue(Companion.IdOf(me), out int[] strikes)) strikes[(int)e.Duty] = 0;
         }
 
-        /// <summary>Whether some duty not yet stocked is on, even if resting (for catching up while you were away).</summary>
         public static bool Open(Humanoid me, Duty d) => Cached(me).Any(e => e.Duty == d && e.On && Have(me, d) < e.Target);
 
-        /// <summary>The duties switched on, in the order you set (for catching up).</summary>
         public static List<Entry> OnEntries(Humanoid me) => Cached(me).Where(e => e.On).ToList();
 
-        /// <summary>How much of the duty's stock these gathered items (prefab name to number) come to (food in good meals).</summary>
         public static int Accrued(Duty d, Dictionary<string, int> got)
         {
             float total = 0f;
@@ -204,7 +167,6 @@ namespace VillagePlebs
             return Mathf.FloorToInt(total);
         }
 
-        /// <summary>The jobs of every duty still short of its stockpile.</summary>
         public static Job OpenJobs(Humanoid me)
         {
             Job j = Job.None;
@@ -212,24 +174,16 @@ namespace VillagePlebs
             return j;
         }
 
-        // ---- the stockpile in its chests ------------------------------------------------------------------------------
-
-        /// <summary>The food duty is on and stocks your chests: its own chests then keep only a little food for itself (Work.StockCap), the rest is for you.</summary>
         public static bool FoodForYou(Humanoid me) => ToYours(me) && Cached(me).Any(e => e.Duty == Duty.Food && e.On);
 
-        /// <summary>How many of this item its own chests keep for a duty (0 when it is none of its duties, or it has no chest of its own).</summary>
         public static int Cap(Humanoid me, ItemDrop.ItemData i)
         {
             List<Entry> list = Cached(me);
-            if (!list.Any(e => e.On) || ToYours(me) || Home.Chests(me).Count == 0) return 0; // (stock in your chests is just yours: Work delivers it there)
+            if (!list.Any(e => e.On) || ToYours(me) || Home.Chests(me).Count == 0) return 0;
             foreach (Entry e in list) if (e.On && Counts(e.Duty, i)) return e.Target;
             return 0;
         }
 
-        /// <summary>
-        /// Time to carry it to its chest: it has a load of what a duty gathers (20), or what it carries would fill the stockpile, or it carries
-        /// some of what another duty (not the one it works now) gathers. No more than once a minute, and food it keeps for itself (10) does not count.
-        /// </summary>
         public static bool Deliver(Humanoid me, Entry active)
         {
             long id = Companion.IdOf(me);
@@ -246,9 +200,6 @@ namespace VillagePlebs
             return false;
         }
 
-        // ---- for its menu ---------------------------------------------------------------------------------------------
-
-        /// <summary>How the duty stands, for its menu (packed text).</summary>
         public static string Status(Humanoid me, Entry e, Entry active)
         {
             if (!e.On) return Localization.instance.Localize("$hud_off");
