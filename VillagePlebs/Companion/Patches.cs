@@ -240,7 +240,7 @@ namespace VillagePlebs
                     Home.MarkDead(master, Companion.IdOf(h), h.transform.position, h, carried > 0);
                     bool bed = Companion.Zdo(h).GetBool(Keys.HasBed, false);
                     VillagePlebsPlugin.Tell(Words.P(carried > 0 ? (bed ? "villagepleb_patches_fallen_tomb_bed" : "villagepleb_patches_fallen_tomb") : (bed ? "villagepleb_patches_fallen_bed" : "villagepleb_patches_fallen"),
-                        Companion.NameOf(h), $"{VillagePlebsPlugin.RespawnSeconds.Value:0}"));
+                        Companion.NameOf(h), $"{MainConfig.respawnSeconds.Value:0}"));
                 }
                 Net.AnnounceFall(h, h.transform.position, carried > 0);
             }

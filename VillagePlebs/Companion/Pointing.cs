@@ -178,7 +178,7 @@ namespace VillagePlebs
                 w.ManualOrderAt = Time.time;
                 Marks.PutSpot(spot, who, P("villagepleb_pointing_mark_waiting"), () => who != null && Companion.OrderOf(who) == Order.Guard && Vector3.Distance(Companion.Zdo(who).GetVec3(Keys.Post, Vector3.zero), spot) < 0.5f);
                 Talk.Say(who, P("villagepleb_pointing_will_wait"));
-                VillagePlebsPlugin.Tell(P("villagepleb_pointing_waits_there", Companion.NameOf(who), VillagePlebsPlugin.CommandKey.Value));
+                VillagePlebsPlugin.Tell(P("villagepleb_pointing_waits_there", Companion.NameOf(who), MainConfig.commandKey.Value));
             }
             return true;
         }

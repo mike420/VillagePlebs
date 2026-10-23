@@ -120,7 +120,7 @@ namespace VillagePlebs
             string fromYou = Provision(me, center, radius);
 
             Stage = "creatures";
-            if (VillagePlebsPlugin.WhileAway.Value != AwayMode.Off)
+            if (MainConfig.whileAway.Value != AwayMode.Off)
             {
                 Heightmap.Biome biome = WorldGenerator.instance != null ? WorldGenerator.instance.GetBiome(me.transform.position) : Heightmap.Biome.Meadows;
                 float rate = FightsPerHour.TryGetValue(biome, out float r) ? r : 1f;
@@ -132,7 +132,7 @@ namespace VillagePlebs
                     if (go == null) continue;
                     fights++;
                     budget -= 60f;
-                    if (VillagePlebsPlugin.WhileAway.Value == AwayMode.Real)
+                    if (MainConfig.whileAway.Value == AwayMode.Real)
                     {
                         float threat = Threat.TryGetValue(biome, out float th) ? th : 100f;
                         float power = Power(me);

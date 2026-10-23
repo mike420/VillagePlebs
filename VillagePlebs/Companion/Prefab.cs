@@ -68,7 +68,7 @@ namespace VillagePlebs
             h.m_name = "$villagepleb_companion";
             h.m_group = "villagepleb";
             h.m_faction = Character.Faction.Players;
-            h.m_health = VillagePlebsPlugin.BaseHealth.Value;
+            h.m_health = MainConfig.baseHealth.Value;
             h.m_regenAllHPTime = 300f;
             h.m_walkSpeed = 1.6f; h.m_runSpeed = 7f; h.m_speed = 4f; h.m_crouchSpeed = 2f;
             h.m_turnSpeed = 300f; h.m_runTurnSpeed = 300f; h.m_acceleration = 1f;

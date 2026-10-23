@@ -38,15 +38,15 @@ namespace VillagePlebs
 
         private static float Curve(Meal m) => Mathf.Pow(m.Fraction, 0.3f);
 
-        public static float MaxHealth(Humanoid c) => VillagePlebsPlugin.BaseHealth.Value + EpicMmo.Health(c) + Of(c).Meals.Sum(m => m.Item.m_shared.m_food * Curve(m));
+        public static float MaxHealth(Humanoid c) => MainConfig.baseHealth.Value + EpicMmo.Health(c) + Of(c).Meals.Sum(m => m.Item.m_shared.m_food * Curve(m));
 
         public static float MaxEitr(Humanoid c) => Of(c).Meals.Sum(m => m.Item.m_shared.m_foodEitr * Curve(m));
 
         public static float MaxStamina(Character c)
         {
             ZNetView v = c.GetComponent<ZNetView>();
-            if (v != null && v.IsValid() && !v.IsOwner()) return v.GetZDO().GetFloat(MaxStaminaKey, VillagePlebsPlugin.BaseStamina.Value);
-            return VillagePlebsPlugin.BaseStamina.Value + EpicMmo.Stamina(c) + (c is Humanoid h ? Of(h).Meals.Sum(m => m.Item.m_shared.m_foodStamina * Curve(m)) : 0f);
+            if (v != null && v.IsValid() && !v.IsOwner()) return v.GetZDO().GetFloat(MaxStaminaKey, MainConfig.baseStamina.Value);
+            return MainConfig.baseStamina.Value + EpicMmo.Stamina(c) + (c is Humanoid h ? Of(h).Meals.Sum(m => m.Item.m_shared.m_foodStamina * Curve(m)) : 0f);
         }
 
         public static void Tick(Humanoid c, BrainState st)
@@ -92,7 +92,7 @@ namespace VillagePlebs
 
         private static void TryEat(Humanoid c, State s, BrainState st)
         {
-            float below = VillagePlebsPlugin.EatBelow.Value / 100f;
+            float below = MainConfig.eatBelow.Value / 100f;
             bool calm = Frugal(c) && Companion.OrderOf(c) == Order.Gather && !st.InCombat && Time.time - st.LastHurtAt > 60f;
             float hp = c.GetHealthPercentage();
             int want = !calm ? 3 : hp < 0.7f ? 2 : st.Asleep ? 0 : st.Task != null ? 2 : 1;
@@ -183,7 +183,7 @@ namespace VillagePlebs
         public static float Get(Character c, Skills.SkillType type)
         {
             if (!(c is Humanoid h)) return 0f;
-            return Of(h).TryGetValue(type, out Level l) ? l.Value : VillagePlebsPlugin.StartingSkill.Value;
+            return Of(h).TryGetValue(type, out Level l) ? l.Value : MainConfig.startingSkill.Value;
         }
 
         public static IEnumerable<Skills.SkillType> Types()
@@ -210,7 +210,7 @@ namespace VillagePlebs
         {
             if (type == Skills.SkillType.None || Companion.Zdo(c) == null || !c.GetComponent<ZNetView>().IsOwner()) return;
             Dictionary<Skills.SkillType, Level> map = Of(c);
-            if (!map.TryGetValue(type, out Level l)) map[type] = l = new Level { Value = VillagePlebsPlugin.StartingSkill.Value };
+            if (!map.TryGetValue(type, out Level l)) map[type] = l = new Level { Value = MainConfig.startingSkill.Value };
             if (l.Value >= 100f) return;
             l.Progress += (Def(type)?.m_increseStep ?? 1f) * factor * Game.m_skillGainRate;
             float need = Mathf.Pow(Mathf.Floor(l.Value + 1f), 1.5f) * 0.5f + 0.5f;

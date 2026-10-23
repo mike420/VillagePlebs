@@ -43,7 +43,7 @@ namespace VillagePlebs
             if (homeNear)
             {
                 if (!Home.GoHome(me, true, false)) return;
-                string key = VillagePlebsPlugin.MenuKey.Value.ToString();
+                string key = MainConfig.menuKey.Value.ToString();
                 Talk.Tell(me, item != null ? P("villagepleb_needs_" + topic + "_home", item, key) : P("villagepleb_needs_" + topic + "_home", key), "need:" + topic, 3f);
                 st.Remember(item != null ? P("villagepleb_needs_" + topic + "_went", item) : P("villagepleb_needs_" + topic + "_went"));
             }

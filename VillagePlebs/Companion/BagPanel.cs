@@ -178,7 +178,7 @@ namespace VillagePlebs
 
         private static Vector2? Saved()
         {
-            string[] parts = (VillagePlebsPlugin.BagPanelSpot?.Value ?? "").Split(',');
+            string[] parts = (MainConfig.bagPanelSpot?.Value ?? "").Split(',');
             if (parts.Length != 2) return null;
             var ci = System.Globalization.CultureInfo.InvariantCulture;
             var any = System.Globalization.NumberStyles.Float;
@@ -207,12 +207,12 @@ namespace VillagePlebs
             var mine = new Vector3[4];
             _panel.GetWorldCorners(mine);
             var ci = System.Globalization.CultureInfo.InvariantCulture;
-            VillagePlebsPlugin.BagPanelSpot.Value = (mine[1].x / Screen.width).ToString("0.####", ci) + ", " + (mine[1].y / Screen.height).ToString("0.####", ci);
+            MainConfig.bagPanelSpot.Value = (mine[1].x / Screen.width).ToString("0.####", ci) + ", " + (mine[1].y / Screen.height).ToString("0.####", ci);
         }
 
         internal static void ResetSpot()
         {
-            VillagePlebsPlugin.BagPanelSpot.Value = "";
+            MainConfig.bagPanelSpot.Value = "";
             _placedFor = default;
         }
 

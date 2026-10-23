@@ -15,10 +15,10 @@ namespace VillagePlebs
 
         private static readonly string[] Names = { "Rádvar", "Sigrid", "Halvar", "Astrid", "Gunnar", "Ingrid", "Leif", "Ragna", "Torvald", "Ylva", "Eirik", "Solveig" };
 
-        public static int MostCompanions => VillagePlebsPlugin.MaxCompanions.Value + VillagePlebsPlugin.MaxBought.Value;
+        public static int MostCompanions => MainConfig.maxCompanions.Value + MainConfig.maxBought.Value;
 
         public static bool ForSale(Player p) =>
-            p != null && VillagePlebsPlugin.MaxBought.Value > 0 && Profile.Here(p).Count < MostCompanions;
+            p != null && MainConfig.maxBought.Value > 0 && Profile.Here(p).Count < MostCompanions;
 
         public static bool IsOffered(Trader.TradeItem item) => item != null && item == _offered;
 
@@ -36,8 +36,8 @@ namespace VillagePlebs
                 };
             if (_offered.m_icon == null)
                 _offered.m_icon = Icon() ?? ObjectDB.instance?.GetItemPrefab("ArmorRagsChest")?.GetComponent<ItemDrop>()?.m_itemData.GetIcon();
-            _offered.m_price = VillagePlebsPlugin.CompanionPrice.Value;
-            int free = VillagePlebsPlugin.MaxCompanions.Value - Profile.Here(p).Count;
+            _offered.m_price = MainConfig.companionPrice.Value;
+            int free = MainConfig.maxCompanions.Value - Profile.Here(p).Count;
             _offered.m_tooltip = T("villagepleb_trade_tooltip") + (free > 0 ? "\n\n<color=orange>" + T("villagepleb_trade_free_left", free) + "</color>" : "");
             return _offered;
         }

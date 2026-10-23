@@ -138,7 +138,7 @@ namespace VillagePlebs
         public static void ToggleAll(Player p)
         {
             var near = Companion.All().Where(c => Companion.IsMine(c, p) && !c.IsDead() && Vector3.Distance(c.transform.position, p.transform.position) < 100f).ToList();
-            if (near.Count == 0) { VillagePlebsPlugin.Tell(T("villagepleb_home_none_near", VillagePlebsPlugin.MenuKey.Value)); return; }
+            if (near.Count == 0) { VillagePlebsPlugin.Tell(T("villagepleb_home_none_near", MainConfig.menuKey.Value)); return; }
             bool home = near.Any(c => Companion.OrderOf(c) == Order.Follow);
             foreach (Humanoid c in near)
             {
@@ -147,7 +147,7 @@ namespace VillagePlebs
             }
             string names = near.Select(Companion.NameOf).Aggregate((a, b) => T("villagepleb_home_and", a, b));
             bool one = near.Count == 1;
-            VillagePlebsPlugin.Tell(home ? T(one ? "villagepleb_home_go_home_one" : "villagepleb_home_go_home_many", names, VillagePlebsPlugin.MenuKey.Value)
+            VillagePlebsPlugin.Tell(home ? T(one ? "villagepleb_home_go_home_one" : "villagepleb_home_go_home_many", names, MainConfig.menuKey.Value)
                              : T(one ? "villagepleb_home_come_one" : "villagepleb_home_come_many", names));
         }
 
@@ -217,8 +217,8 @@ namespace VillagePlebs
         {
             if (AssignFor != null)
             {
-                if (AssignFor == null || AssignFor.IsDead() || Input.GetKeyDown(KeyCode.Escape) || VillagePlebsPlugin.MenuKey.Value.IsDown()) StopAssign(T("villagepleb_home_done_assigning"));
-                else if (Time.time >= _nextHint) { _nextHint = Time.time + 6f; VillagePlebsPlugin.Tell(T("villagepleb_home_assigning", Companion.NameOf(AssignFor), VillagePlebsPlugin.MenuKey.Value)); }
+                if (AssignFor == null || AssignFor.IsDead() || Input.GetKeyDown(KeyCode.Escape) || MainConfig.menuKey.Value.IsDown()) StopAssign(T("villagepleb_home_done_assigning"));
+                else if (Time.time >= _nextHint) { _nextHint = Time.time + 6f; VillagePlebsPlugin.Tell(T("villagepleb_home_assigning", Companion.NameOf(AssignFor), MainConfig.menuKey.Value)); }
             }
             if (Time.time < _nextTick) return;
             _nextTick = Time.time + 1f;
@@ -237,7 +237,7 @@ namespace VillagePlebs
             }
 
             double now = ZNet.instance.GetTimeSeconds();
-            foreach (Profile prof in Profile.Here(p).Where(x => x.Dead && now - x.DiedAt >= VillagePlebsPlugin.RespawnSeconds.Value).ToList())
+            foreach (Profile prof in Profile.Here(p).Where(x => x.Dead && now - x.DiedAt >= MainConfig.respawnSeconds.Value).ToList())
                 Respawn(p, prof);
 
             UpdateBedPins(p);
@@ -258,7 +258,7 @@ namespace VillagePlebs
             Remote.Forget(id);
             if (kept != null) prof.Kept = kept;
             Profile.Save(p, prof);
-            VillagePlebsPlugin.Instance?.Note($"{prof.Name} will wake {(prof.HasBed ? "in their bed" : "beside you")} in {VillagePlebsPlugin.RespawnSeconds.Value:0} s");
+            VillagePlebsPlugin.Instance?.Note($"{prof.Name} will wake {(prof.HasBed ? "in their bed" : "beside you")} in {MainConfig.respawnSeconds.Value:0} s");
         }
 
         public static Humanoid Respawn(Player p, Profile prof)

@@ -21,7 +21,7 @@ namespace VillagePlebs
 
         public static bool Installed { get { if (!_checked) Detect(); return _have; } }
 
-        public static bool On => Installed && VillagePlebsPlugin.MmoExp.Value > 0f;
+        public static bool On => Installed && MainConfig.mmoExp.Value > 0f;
 
         private static void Detect()
         {
@@ -217,7 +217,7 @@ namespace VillagePlebs
         private static void Earn(Humanoid c, int xp)
         {
             if (xp <= 0 || Companion.Zdo(c) == null || !c.GetComponent<ZNetView>().IsOwner()) return;
-            long gained = (long)Math.Round(xp * F("rateExp", 1f) * VillagePlebsPlugin.MmoExp.Value);
+            long gained = (long)Math.Round(xp * F("rateExp", 1f) * MainConfig.mmoExp.Value);
             if (gained <= 0L) return;
             long before = Xp(c);
             int was = LevelOf(before, out _, out _), now = LevelOf(before + gained, out _, out _);

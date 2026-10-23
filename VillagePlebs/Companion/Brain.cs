@@ -623,7 +623,7 @@ namespace VillagePlebs
         private static void ScanEnemies(BrainState st, Player master)
         {
             Humanoid me = st.Body;
-            float range = VillagePlebsPlugin.EngageRange.Value;
+            float range = MainConfig.engageRange.Value;
             Style style = Companion.StyleOf(me);
             bool careful = st.Weak || Tactics.Careful(st);
             st.Enemies.Clear();
@@ -779,7 +779,7 @@ namespace VillagePlebs
             string line = d.Describe(st.Label);
             if (changed || d.Drink) st.Remember(line + (string.IsNullOrEmpty(d.Note) ? "" : "  (" + d.Note + ")"));
             SetStatus(st, line);
-            if (changed && VillagePlebsPlugin.ShowDecisions.Value && Chat.instance != null)
+            if (changed && MainConfig.showDecisions.Value && Chat.instance != null)
                 Chat.instance.SetNpcText(st.Body.gameObject, Vector3.up * 2.3f, 25f, 2.5f, "", Words.Show(line), false);
         }
 

@@ -314,7 +314,7 @@ namespace VillagePlebs
                 {
                     Heading(prof.Name);
                     Profile p0 = prof;
-                    LiveNote(() => T(p0.HasBed ? "villagepleb_menu_fallen_bed" : "villagepleb_menu_fallen_you", Mathf.Max(0f, (float)(p0.DiedAt + RespawnSeconds.Value - ZNet.instance.GetTimeSeconds())).ToString("0")), GameUi.Warn);
+                    LiveNote(() => T(p0.HasBed ? "villagepleb_menu_fallen_bed" : "villagepleb_menu_fallen_you", Mathf.Max(0f, (float)(p0.DiedAt + MainConfig.respawnSeconds.Value - ZNet.instance.GetTimeSeconds())).ToString("0")), GameUi.Warn);
                     Note(T("villagepleb_menu_things_in_tomb"), GameUi.Warn);
                     WideBtn(T("villagepleb_menu_wake_now", prof.Name), true, () => { Profile p2 = prof; _pending = () => { Humanoid c = Home.Respawn(Player.m_localPlayer, p2); if (c != null) OpenMenuFor(Player.m_localPlayer, c); else if (p2.Dead || Remote.InWorld(p2.Id) == null) _note = T("villagepleb_menu_asking_host", p2.Name); }; });
                 }
@@ -356,9 +356,9 @@ namespace VillagePlebs
 
             if (hiring) return;
             BeginCard();
-            if (mine.Count >= MaxCompanions.Value)
+            if (mine.Count >= MainConfig.maxCompanions.Value)
             {
-                if (mine.Count < Trading.MostCompanions) Note(T("villagepleb_menu_buy_more", MaxCompanions.Value, CompanionPrice.Value, Trading.MostCompanions - mine.Count), GameUi.Dim);
+                if (mine.Count < Trading.MostCompanions) Note(T("villagepleb_menu_buy_more", MainConfig.maxCompanions.Value, MainConfig.companionPrice.Value, Trading.MostCompanions - mine.Count), GameUi.Dim);
                 else Note(T("villagepleb_menu_most_allowed", mine.Count), GameUi.Dim);
                 EndCard();
                 return;
@@ -393,7 +393,7 @@ namespace VillagePlebs
             Note(T("villagepleb_menu_summon_about"), GameUi.Dim);
             _y += 4f;
             NameField(null);
-            int free = MaxCompanions.Value - mine.Count;
+            int free = MainConfig.maxCompanions.Value - mine.Count;
             if (free > 0) Note(T("villagepleb_trade_free_left", free), GameUi.Warn);
             WideBtn(T("villagepleb_menu_hire", _hirePrice), true, () =>
                 _pending = () =>
@@ -549,7 +549,7 @@ namespace VillagePlebs
                 Note(Capital(Words.Show(d.Describe(st.Label))), GameUi.Good);
                 if (!string.IsNullOrEmpty(d.Note)) Note(Capital(Words.Show(d.Note)), GameUi.Dim);
             }
-            else Note(T("villagepleb_menu_not_fighting", EngageRange.Value.ToString("0")), GameUi.Dim);
+            else Note(T("villagepleb_menu_not_fighting", MainConfig.engageRange.Value.ToString("0")), GameUi.Dim);
             _y += 4f;
             OrderButtons(c);
             EndCard();
@@ -574,7 +574,7 @@ namespace VillagePlebs
                     Show();
                     _live.Add(Show);
                 }
-                if (meals.Count == 0) Note(T("villagepleb_menu_hungry", BaseHealth.Value.ToString("0"), BaseStamina.Value.ToString("0")), GameUi.Warn, indent: 3f * s + 10f);
+                if (meals.Count == 0) Note(T("villagepleb_menu_hungry", MainConfig.baseHealth.Value.ToString("0"), MainConfig.baseStamina.Value.ToString("0")), GameUi.Warn, indent: 3f * s + 10f);
                 else Note(T("villagepleb_menu_meals", string.Join(", ", meals.Select(m => T("villagepleb_menu_meal", Loc(m.Item.m_shared.m_name), Mathf.CeilToInt(m.Time / 60f))))), GameUi.Text, indent: 3f * s + 10f);
                 _y = Mathf.Max(_y, top + 64f) + 8f;
                 if (Rest.IsRested(c)) Note(T("villagepleb_menu_rested", Mathf.CeilToInt(Rest.Left(c) / 60f)), GameUi.Good);
@@ -628,7 +628,7 @@ namespace VillagePlebs
                 () => _pending = () => Change(z => { z.Set(Keys.Order, (int)VillagePlebs.Order.Guard); z.Set(Keys.Post, c.transform.position); }), order == Order.Guard, size: 16f);
             Btn(T("villagepleb_menu_come_here"), bx + (third + 6f) * 2f, _y, third, 32f, () => _pending = ComeHere, size: 16f);
             _y += 38f;
-            Note(T("villagepleb_menu_hold_key", MenuKey.Value), GameUi.Dim);
+            Note(T("villagepleb_menu_hold_key", MainConfig.menuKey.Value), GameUi.Dim);
         }
 
         private void GiveOrder(Func<Humanoid, bool> order)
@@ -649,7 +649,7 @@ namespace VillagePlebs
                   (Loc("$se_eitr"), null, () => Eitr.Max(c) > 0f ? $"{Eitr.Get(c):0}/{Eitr.Max(c):0}" : "-"),
                   (T("villagepleb_menu_carrying"), null, () => $"{Carry.Weight(c):0}/{Carry.Max(c):0}"));
             float regen = meals.Sum(m => m.Item.m_shared.m_foodRegen) * (Rest.IsRested(c) ? 1.5f : 1f);
-            Note(T("villagepleb_menu_before_food", BaseHealth.Value.ToString("0"), BaseStamina.Value.ToString("0")), GameUi.Dim);
+            Note(T("villagepleb_menu_before_food", MainConfig.baseHealth.Value.ToString("0"), MainConfig.baseStamina.Value.ToString("0")), GameUi.Dim);
             Note(regen > 0f ? T(Rest.IsRested(c) ? "villagepleb_menu_heals_rested" : "villagepleb_menu_heals", regen.ToString("0.#")) : T("villagepleb_menu_heals_nothing"), regen > 0f ? GameUi.Text : GameUi.Warn);
             EndCard();
 
@@ -809,8 +809,8 @@ namespace VillagePlebs
             int retreat = Companion.RetreatOf(c);
             Stepper(T("villagepleb_menu_falls_back"), T("villagepleb_menu_percent_health", retreat), () => Change(z => z.Set(Keys.Retreat, Mathf.Clamp(retreat - 5, 0, 90))), () => Change(z => z.Set(Keys.Retreat, Mathf.Clamp(retreat + 5, 0, 90))));
             Note(T("villagepleb_menu_runs_below_half"), GameUi.Dim);
-            Stepper(T("villagepleb_menu_fights_within"), T("villagepleb_menu_metres", EngageRange.Value.ToString("0")), () => { EngageRange.Value = Mathf.Clamp(EngageRange.Value - 2f, 4f, 50f); SaveSettings(); },
-                    () => { EngageRange.Value = Mathf.Clamp(EngageRange.Value + 2f, 4f, 50f); SaveSettings(); });
+            Stepper(T("villagepleb_menu_fights_within"), T("villagepleb_menu_metres", MainConfig.engageRange.Value.ToString("0")), () => { MainConfig.engageRange.Value = Mathf.Clamp(MainConfig.engageRange.Value - 2f, 4f, 50f); SaveSettings(); },
+                    () => { MainConfig.engageRange.Value = Mathf.Clamp(MainConfig.engageRange.Value + 2f, 4f, 50f); SaveSettings(); });
             Note(T("villagepleb_menu_fights_within_about"), GameUi.Dim);
             bool potions = Companion.Potions(c), protect = Companion.Protect(c);
             Check(T("villagepleb_menu_check_potions"), potions, () => _pending = () => Change(z => z.Set(Keys.Potions, !potions)));
@@ -822,7 +822,7 @@ namespace VillagePlebs
             Check(T("villagepleb_menu_check_loot"), loot, () => _pending = () => Change(z => z.Set(Loot.Key, !loot)));
             bool autoHome = Following.AutoHome(c);
             Check(T("villagepleb_menu_check_autohome"), autoHome, () => _pending = () => Change(z => z.Set(Following.AutoHomeKey, !autoHome)));
-            Check(T("villagepleb_menu_check_decisions"), ShowDecisions.Value, () => _pending = () => { ShowDecisions.Value = !ShowDecisions.Value; SaveSettings(); });
+            Check(T("villagepleb_menu_check_decisions"), MainConfig.showDecisions.Value, () => _pending = () => { MainConfig.showDecisions.Value = !MainConfig.showDecisions.Value; SaveSettings(); });
             bool chatty = Talk.Chatty(c);
             Check(T("villagepleb_menu_check_chatty"), chatty, () => _pending = () => Change(z => z.Set(Talk.ChattyKey, !chatty)));
             if (Mine) Check(T("villagepleb_menu_check_friends"), friends, () => _pending = () => Companion.Write(c, z => z.Set(Keys.Friends, !friends)));
@@ -873,7 +873,7 @@ namespace VillagePlebs
                 Btn(T("villagepleb_menu_choose_bed"), _left, _y, _width - (bed ? letGo + 6f : 0f), 34f, () => _pending = () => { Home.StartAssign(c); CloseMenu(); });
                 if (bed) Btn(T("villagepleb_menu_let_bed_go"), _left + _width - letGo, _y, letGo, 34f, () => _pending = () => { Bed b = Home.BedOf(c); if (b != null) Home.ToggleBed(b, c); else Change(cz => cz.Set(Keys.HasBed, false)); });
                 _y += 40f;
-                Note(T("villagepleb_menu_choosing_about", Companion.NameOf(c), MenuKey.Value), GameUi.Dim);
+                Note(T("villagepleb_menu_choosing_about", Companion.NameOf(c), MainConfig.menuKey.Value), GameUi.Dim);
             }
             EndCard();
 
@@ -1026,17 +1026,17 @@ namespace VillagePlebs
             EndCard();
 
             BeginCard(T("villagepleb_menu_away"));
-            Note(WhileAway.Value switch
+            Note(MainConfig.whileAway.Value switch
             {
                 AwayMode.Off => T("villagepleb_menu_away_off"),
                 AwayMode.Real => T("villagepleb_menu_away_real"),
                 _ => T("villagepleb_menu_away_mild"),
             }, GameUi.Text);
-            Note(T("villagepleb_menu_away_setting", WhileAway.Value), GameUi.Dim);
+            Note(T("villagepleb_menu_away_setting", MainConfig.whileAway.Value), GameUi.Dim);
             EndCard();
 
             BeginCard(T("villagepleb_menu_if_falls"));
-            Note(T("villagepleb_menu_if_falls_about", RespawnSeconds.Value.ToString("0")), GameUi.Text);
+            Note(T("villagepleb_menu_if_falls_about", MainConfig.respawnSeconds.Value.ToString("0")), GameUi.Text);
             EndCard();
         }
 
