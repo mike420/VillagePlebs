@@ -4,6 +4,7 @@ using System.Linq;
 using HarmonyLib;
 using TMPro;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using UnityEngine.UI;
 using static VillagePlebs.Shared.Translations;
 
@@ -116,6 +117,7 @@ namespace VillagePlebs
             float extra = (Gear.Rows - Gear.BagRows) * _grid.m_elementSpace + InventoryGrid_UpdateGui_Bag.Gap;
             _panel.sizeDelta += new Vector2(0f, extra);
             InventoryGrid_UpdateGui_Bag.Forget();
+            copy.AddComponent<BagPanelDrag>();
             copy.SetActive(true);
             VillagePlebsPlugin.Instance?.Note("Companion bag panel made below the inventory");
             return true;
@@ -152,6 +154,12 @@ namespace VillagePlebs
             var mine = new Vector3[4];
             _panel.GetWorldCorners(mine);
             float width = mine[2].x - mine[1].x, height = mine[1].y - mine[0].y;
+            if (Saved() is Vector2 spot)
+            {
+                Vector2 to = Clamp(new Vector2(spot.x * Screen.width, spot.y * Screen.height), width, height);
+                _panel.position += new Vector3(to.x, to.y, mine[1].z) - mine[1];
+                return;
+            }
             float gap = (player[2].x - player[1].x) * 0.13f;
             Rect chest = WorldRect(gui.m_container);
             Vector2 topLeft = new Vector2(chest.xMin, chest.yMax);
@@ -166,6 +174,46 @@ namespace VillagePlebs
                 }
             }
             _panel.position += new Vector3(topLeft.x, topLeft.y, mine[1].z) - mine[1];
+        }
+
+        private static Vector2? Saved()
+        {
+            string[] parts = (VillagePlebsPlugin.BagPanelSpot?.Value ?? "").Split(',');
+            if (parts.Length != 2) return null;
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            var any = System.Globalization.NumberStyles.Float;
+            return float.TryParse(parts[0].Trim(), any, ci, out float x) && float.TryParse(parts[1].Trim(), any, ci, out float y) ? new Vector2(x, y) : (Vector2?)null;
+        }
+
+        private static Vector2 Clamp(Vector2 topLeft, float width, float height) =>
+            new Vector2(Mathf.Clamp(topLeft.x, 0f, Mathf.Max(0f, Screen.width - width)), Mathf.Clamp(topLeft.y, Mathf.Min(height, Screen.height), Screen.height));
+
+        internal static bool CanDrag(PointerEventData e)
+        {
+            if (_panel == null || _grid == null || (_gui != null && DragItem(_gui) != null)) return false;
+            return !RectTransformUtility.RectangleContainsScreenPoint((RectTransform)_grid.transform, e.pressPosition, e.pressEventCamera);
+        }
+
+        internal static void Move(Vector2 delta)
+        {
+            var mine = new Vector3[4];
+            _panel.GetWorldCorners(mine);
+            Vector2 to = Clamp(new Vector2(mine[1].x, mine[1].y) + delta, mine[2].x - mine[1].x, mine[1].y - mine[0].y);
+            _panel.position += new Vector3(to.x, to.y, mine[1].z) - mine[1];
+        }
+
+        internal static void SaveSpot()
+        {
+            var mine = new Vector3[4];
+            _panel.GetWorldCorners(mine);
+            var ci = System.Globalization.CultureInfo.InvariantCulture;
+            VillagePlebsPlugin.BagPanelSpot.Value = (mine[1].x / Screen.width).ToString("0.####", ci) + ", " + (mine[1].y / Screen.height).ToString("0.####", ci);
+        }
+
+        internal static void ResetSpot()
+        {
+            VillagePlebsPlugin.BagPanelSpot.Value = "";
+            _placedFor = default;
         }
 
         private static Rect WorldRect(RectTransform r)
@@ -209,6 +257,26 @@ namespace VillagePlebs
             try { Leave(_gui); } catch { }
             if (_panel != null) UnityEngine.Object.Destroy(_panel.gameObject);
             _panel = null; _grid = null; _name = _weight = null; _shown = null; _group = null; _gui = null;
+        }
+    }
+
+    internal sealed class BagPanelDrag : MonoBehaviour, IBeginDragHandler, IDragHandler, IEndDragHandler, IPointerClickHandler
+    {
+        private bool _dragging;
+
+        public void OnBeginDrag(PointerEventData e) => _dragging = e.button == PointerEventData.InputButton.Left && BagPanel.CanDrag(e);
+
+        public void OnDrag(PointerEventData e) { if (_dragging) BagPanel.Move(e.delta); }
+
+        public void OnEndDrag(PointerEventData e)
+        {
+            if (_dragging) BagPanel.SaveSpot();
+            _dragging = false;
+        }
+
+        public void OnPointerClick(PointerEventData e)
+        {
+            if (e.button == PointerEventData.InputButton.Right && !e.dragging && BagPanel.CanDrag(e)) BagPanel.ResetSpot();
         }
     }
 

@@ -26,6 +26,7 @@ namespace VillagePlebs
         internal static ConfigEntry<KeyboardShortcut> MenuKey, CommandKey;
         internal static ConfigEntry<AwayMode> WhileAway;
         internal static ConfigEntry<int> MaxCompanions, MaxBought, CompanionPrice;
+        internal static ConfigEntry<string> BagPanelSpot;
 
         private Harmony _harmony;
         internal Harmony Harmony => _harmony;
@@ -36,6 +37,7 @@ namespace VillagePlebs
         {
             ConfigFile cfg = Config;
             MenuKey = cfg.BindConfigInOrder("General", "Menu Key", defaultValue: new KeyboardShortcut(KeyCode.J), "Tap: your companion's menu (or the summon panel). Hold: all your companions near you come with you, or go home. E on a companion opens its menu too.", sectionOrder: true, settingOrder: true);
+            BagPanelSpot = cfg.Bind("General", "Bag Panel Position", "", new ConfigDescription("Where the companion bag panel was last dragged to: its top-left corner, as fractions of the screen across and up. Empty: placed by the inventory. Right-click the panel to clear it.", null, new ConfigurationManagerAttributes { Browsable = false }));
             CommandKey = cfg.BindConfigInOrder("General", "Command Key", defaultValue: new KeyboardShortcut(KeyCode.H), "Point at something and press it: an enemy (they attack it), a tree, rock or plant (it works it), your chest (it puts its things in), its tombstone, a free bed (its bed), the ground (it waits there), or the sky (it comes back).", sectionOrder: true, settingOrder: true);
             MaxCompanions = cfg.BindConfigInOrder("Companion", "Max Companions", defaultValue: 1, "How many companions each player can have for free (summoned from the menu). More are bought from traders: Max Bought Companions. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<int>(1, 10));
             MaxBought = cfg.BindConfigInOrder("Companion", "Max Bought Companions", defaultValue: 2, "How many more companions each player can buy from any trader (Haldor, Hildir, the Bog Witch) on top of their free ones (Max Companions). Buying one lets you name them; the coins are taken when they join you. 0: none for sale. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<int>(0, 6));
