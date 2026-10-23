@@ -75,7 +75,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="app.config" Visible="false" />
-    <None Include="README.md" Visible="false" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Newtonsoft.Json">
