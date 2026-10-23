@@ -48,6 +48,7 @@ namespace VillagePlebs
         private RawImage _previewImg;
         private Button _maleBtn, _femaleBtn, _hairReset;
         private TMP_Text _hairName, _beardName, _einherjarHairName;
+        private TMP_Text[] _tattooDesigns = Array.Empty<TMP_Text>(), _tattooInks = Array.Empty<TMP_Text>();
         private Slider _skinSlider, _hairToneSlider, _hairShadeSlider;
         private HsvPicker _hairPicker;
         private Image _hairSwatch;
@@ -72,6 +73,7 @@ namespace VillagePlebs
             Id = Companion.IdOf(c);
             Current = Looks.Of(c);
             if (string.IsNullOrEmpty(Current.BrLook)) Current.BrLook = BodyReplacerLook.DefaultLook();
+            if (Current.BrTattoos == null) Current.BrTattoos = "";
         }
 
         /// <summary>The columns, filling <paramref name="area"/> (in the menu's window). <paramref name="apply"/>: Apply pressed.</summary>
@@ -165,6 +167,34 @@ namespace VillagePlebs
             _muscleSection = Section(einherjar, T("villagepleb_looks_muscle"), "Muscle").gameObject;
             MakeSlider(_muscleSection.transform, (Current.BrMuscle >= 0f ? Current.BrMuscle : BodyReplacerLook.MuscleDefault(Current.Model)) / 100f,
                 v => { Current.BrMuscle = v * 100f; ApplyToClone(); });
+            if (BodyReplacerLook.HasTattoos) BuildTattoos(einherjar);
+        }
+
+        // BodyReplacer's tattoos (a newer BodyReplacer): for each area its design (or none) and below it the ink
+        private void BuildTattoos(Transform einherjar)
+        {
+            string[] areas = BodyReplacerLook.TattooAreas();
+            _tattooDesigns = new TMP_Text[areas.Length];
+            _tattooInks = new TMP_Text[areas.Length];
+            for (int i = 0; i < areas.Length; i++)
+            {
+                int area = i;
+                Transform section = Section(einherjar, T("villagepleb_looks_tattoo_area", areas[area]), "Tattoo" + area);
+                _tattooDesigns[area] = PickerRow(section, () => StepTattoo(area, -1, 0), () => StepTattoo(area, 1, 0));
+                _tattooInks[area] = PickerRow(section, () => StepTattoo(area, 0, -1), () => StepTattoo(area, 0, 1));
+            }
+        }
+
+        // The next or previous design (none sits at the start) or ink for that area
+        private void StepTattoo(int area, int designBy, int inkBy)
+        {
+            int designs = BodyReplacerLook.TattooDesignNames(area).Length + 1, inks = BodyReplacerLook.TattooInkNames().Length;
+            if (inks == 0) return;
+            int design = (BodyReplacerLook.TattooDesign(Current.BrTattoos, area) + designBy + designs) % designs;
+            int ink = (BodyReplacerLook.TattooInk(Current.BrTattoos, area) + inkBy + inks) % inks;
+            Current.BrTattoos = BodyReplacerLook.SetTattoo(Current.BrTattoos, area, design, ink);
+            Refresh();
+            ApplyToClone();
         }
 
         // A slider for one field of BodyReplacer's look, over that field's range (the slider itself runs 0 to 1)
@@ -177,15 +207,32 @@ namespace VillagePlebs
             ApplyToClone();
         }
 
-        // The style this body shows, among the ones it offers (each body has its own list)
-        private int EinherjarHairIndex(int[] ids) =>
-            Mathf.Max(0, Array.IndexOf(ids, BodyReplacerLook.ShownHairStyle(Current.Model, Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "HairStyle")))));
+        // The style this body shows, among the ones it offers (each body has its own list): its own styles, then (a newer BodyReplacer) the
+        // game's hairstyles it is fitted for, worn as the hair item with its look's HairStyle saying so
+        private int EinherjarHairIndex(int[] ids, string[] gameHairs)
+        {
+            int style = Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "HairStyle"));
+            if (gameHairs.Length > 0 && style == BodyReplacerLook.GameHairStyle)
+            {
+                int i = Array.FindIndex(gameHairs, h => h.GetStableHashCode() == Current.Hair);
+                if (i >= 0) return ids.Length + i;
+            }
+            return Mathf.Max(0, Array.IndexOf(ids, BodyReplacerLook.ShownHairStyle(Current.Model, style)));
+        }
 
         private void StepEinherjarHair(int by)
         {
             int[] ids = BodyReplacerLook.HairStyleIds(Current.Model);
-            if (ids.Length == 0) return;
-            SetEinherjarField("HairStyle", ids[(EinherjarHairIndex(ids) + by + ids.Length) % ids.Length]);
+            string[] gameHairs = BodyReplacerLook.GameHairs(Current.Model);
+            int count = ids.Length + gameHairs.Length;
+            if (count == 0) return;
+            int next = (EinherjarHairIndex(ids, gameHairs) + by + count) % count;
+            if (next < ids.Length) SetEinherjarField("HairStyle", ids[next]);
+            else
+            {
+                Current.Hair = gameHairs[next - ids.Length].GetStableHashCode();
+                SetEinherjarField("HairStyle", BodyReplacerLook.GameHairStyle);
+            }
             Refresh();
         }
 
@@ -505,6 +552,7 @@ namespace VillagePlebs
             }
             _eyes = null;   // (another body may be drawn now: EyeCentre looks again)
             BodyReplacerLook.Apply(_clone, Current.BrLook, Current.BrMuscle);
+            BodyReplacerLook.ApplyTattoos(_clone, Current.BrTattoos);
             CurrentModelIndex?.SetValue(vis, -1);   // (its body set again, with BodyReplacer's look: the same mesh, so nothing breaks)
             vis.SetModel(Current.Model);
             vis.SetHairItem(Current.Hair);
@@ -561,11 +609,12 @@ namespace VillagePlebs
         private void StepHair(int by) { Current.Hair = Looks.Step(Current.Hair, Looks.Hairs(), by); Refresh(); ApplyToClone(); }
         private void StepBeard(int by) { Current.Beard = Looks.Step(Current.Beard, Looks.Beards(), by); Refresh(); ApplyToClone(); }
 
-        // Randomise, Look like me: the game's own look; BodyReplacer's is kept as it is
+        // Randomise, Look like me: the game's own look; BodyReplacer's (and its tattoos) is kept as it is
         private void SetAll(Looks.Look look)
         {
             look.BrLook = Current.BrLook;
             look.BrMuscle = Current.BrMuscle;
+            look.BrTattoos = Current.BrTattoos;
             Current = look;
             Refresh();
             ApplyToClone();
@@ -589,8 +638,20 @@ namespace VillagePlebs
             _hairShadeSlider?.SetValueWithoutNotify(Current.HairShade);
             if (_einherjarHairName != null)
             {
-                string[] names = BodyReplacerLook.HairStyleNames(Current.Model);
-                _einherjarHairName.text = names.Length > 0 ? names[Mathf.Min(EinherjarHairIndex(BodyReplacerLook.HairStyleIds(Current.Model)), names.Length - 1)] : "";
+                string[] names = BodyReplacerLook.HairStyleNames(Current.Model), gameNames = BodyReplacerLook.GameHairNames(Current.Model);
+                int shown = EinherjarHairIndex(BodyReplacerLook.HairStyleIds(Current.Model), BodyReplacerLook.GameHairs(Current.Model));
+                _einherjarHairName.text = shown < names.Length ? names[shown] : shown - names.Length < gameNames.Length ? gameNames[shown - names.Length] : "";
+            }
+            if (_tattooDesigns.Length > 0)
+            {
+                string[] inks = BodyReplacerLook.TattooInkNames();
+                for (int area = 0; area < _tattooDesigns.Length; area++)
+                {
+                    string[] designs = BodyReplacerLook.TattooDesignNames(area);
+                    int design = BodyReplacerLook.TattooDesign(Current.BrTattoos, area), ink = BodyReplacerLook.TattooInk(Current.BrTattoos, area);
+                    _tattooDesigns[area].text = design > 0 && design <= designs.Length ? designs[design - 1] : Localization.instance.Localize("$menu_none");
+                    _tattooInks[area].text = design > 0 && ink >= 0 && ink < inks.Length ? inks[ink] : "";   // (no ink without a design)
+                }
             }
             if (_hairPicker != null)
             {

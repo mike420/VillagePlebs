@@ -19,6 +19,8 @@ namespace VillagePlebs
         // BodyReplacer's look for its body (its hairstyle, hair and eye colour...: the text it stores; empty: its default) and muscle (below 0:
         // the body's default), kept here too so it wakes with them (Profile) and the Looks tab starts from them
         public const string BrLookKey = "vp_brlook", BrMuscleKey = "vp_brmuscle";
+        // and its tattoos (the text it stores; empty: none)
+        public const string BrTattooKey = "vp_brtattoos";
 
         // The creator's ranges (PlayerCustomizaton): skin from fair to dark, hair from fair to dark brown, then a shade multiplier.
         private static readonly Color Skin0 = new Color(1f, 1f, 1f), Skin1 = new Color(0.32f, 0.23f, 0.17f);
@@ -46,14 +48,17 @@ namespace VillagePlebs
         public static float HairShade(Component c) => Companion.Zdo(c)?.GetFloat(HairL, 0.8f) ?? 0.8f;
         public static string BrLook(Component c) => Companion.Zdo(c)?.GetString(BrLookKey, "") ?? "";
         public static float BrMuscle(Component c) => Companion.Zdo(c)?.GetFloat(BrMuscleKey, -1f) ?? -1f;
+        public static string BrTattoos(Component c) => Companion.Zdo(c)?.GetString(BrTattooKey, "") ?? "";
 
-        /// <summary>BodyReplacer's look (with BodyReplacer installed: <see cref="BodyReplacerLook"/>).</summary>
-        public static void SetBrLook(Humanoid c, string look, float muscle)
+        /// <summary>BodyReplacer's look and tattoos (with BodyReplacer installed: <see cref="BodyReplacerLook"/>).</summary>
+        public static void SetBrLook(Humanoid c, string look, float muscle, string tattoos)
         {
             ZDO z = Companion.Zdo(c);
             z.Set(BrLookKey, look ?? "");
             z.Set(BrMuscleKey, muscle);
+            z.Set(BrTattooKey, tattoos ?? "");
             BodyReplacerLook.Apply(c.gameObject, look, muscle);
+            BodyReplacerLook.ApplyTattoos(c.gameObject, tattoos);
             Portraits.Dirty(c);
         }
 
@@ -181,10 +186,11 @@ namespace VillagePlebs
             public float Skin, HairTone, HairShade;
             public string BrLook;      // BodyReplacer's (empty: its default)
             public float BrMuscle;     // (below 0: the body's default)
+            public string BrTattoos;   // BodyReplacer's tattoos (empty: none)
         }
 
         public static Look Of(Component c) =>
-            new Look { Model = Model(c), Hair = Hair(c), Beard = Beard(c), Skin = SkinTone(c), HairTone = HairTone(c), HairShade = HairShade(c), BrLook = BrLook(c), BrMuscle = BrMuscle(c) };
+            new Look { Model = Model(c), Hair = Hair(c), Beard = Beard(c), Skin = SkinTone(c), HairTone = HairTone(c), HairShade = HairShade(c), BrLook = BrLook(c), BrMuscle = BrMuscle(c), BrTattoos = BrTattoos(c) };
 
         public static Look Random()
         {
@@ -216,7 +222,7 @@ namespace VillagePlebs
             SetHairColor(c, l.HairTone, l.HairShade);
             SetHair(c, l.Hair);
             SetBeard(c, l.Model == 0 ? l.Beard : 0); // (the second body has no beard)
-            if (!string.IsNullOrEmpty(l.BrLook)) SetBrLook(c, l.BrLook, l.BrMuscle);
+            if (!string.IsNullOrEmpty(l.BrLook) || !string.IsNullOrEmpty(l.BrTattoos)) SetBrLook(c, l.BrLook, l.BrMuscle, l.BrTattoos);
             if (!fresh) SetModel(c, l.Model); // last: a different body makes it again
         }
 
