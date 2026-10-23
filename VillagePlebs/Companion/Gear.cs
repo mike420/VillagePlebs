@@ -333,10 +333,12 @@ namespace VillagePlebs
             TMPro.TMP_Text font = e.m_amount;
             if (font == null) return null;
             var go = new GameObject("CompanionSlotLabel", typeof(RectTransform));
+            go.SetActive(false);
             go.transform.SetParent(e.transform, false);
             var t = go.AddComponent<TMPro.TextMeshProUGUI>();
             t.font = font.font;
             t.fontSharedMaterial = font.fontSharedMaterial;
+            go.SetActive(true);
             t.fontSize = 11f;
             t.color = new Color(1f, 1f, 1f, 0.4f);
             t.alignment = TMPro.TextAlignmentOptions.Bottom;
