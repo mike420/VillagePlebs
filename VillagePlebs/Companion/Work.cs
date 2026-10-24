@@ -1040,12 +1040,14 @@ namespace VillagePlebs
             bool goalSeen = false;
             Task best = null;
             float bestScore = float.MaxValue;
-            foreach (Collider col in Physics.OverlapSphere(center, radius, ~0, QueryTriggerInteraction.Collide))
+            float reach = (jobs & (Job.Wood | Job.Stone | Job.Ore)) != 0 ? radius + OutsideReach : radius;
+            foreach (Collider col in Physics.OverlapSphere(center, reach, ~0, QueryTriggerInteraction.Collide))
             {
                 GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;
                 if (!seen.Add(go)) continue;
                 Task t = Consider(st, go, jobs, axe, pick);
                 if (t == null || Skipped(st, t.Target) || ClaimedByOther(st, t.Target)) continue;
+                if (t.Kind != Kind.Hit && Flat(t.Target.transform.position, center) > radius) continue;
                 t.ForGoal = goal != null && Drops(t.Target).Any(goal.Wants);
                 if (t.ForGoal) goalSeen = true;
                 float score = Vector3.Distance(t.Target.transform.position, me.transform.position) + Priority(t) - (t.ForGoal ? 60f : 0f) - (t.Edible && st.Hungry ? 200f : 0f);
@@ -1116,6 +1118,27 @@ namespace VillagePlebs
             Claims[t.Target.gameObject.GetInstanceID()] = new KeyValuePair<long, float>(Companion.IdOf(st.Body), Time.time + 60f);
         }
 
+        // How far past its home radius it goes for wood and stone, since it never takes them from inside a base.
+        public const float OutsideReach = 50f;
+
+        // A player base: the game's own (workbenches, fires) or within reach of anything a player built.
+        internal static bool InBase(Vector3 at) => EffectArea.IsPointInsideArea(at, EffectArea.Type.PlayerBase) != null || NearBuildings(at);
+
+        private static readonly Dictionary<int, KeyValuePair<bool, float>> BaseSeen = new Dictionary<int, KeyValuePair<bool, float>>();
+
+        private static bool InBase(GameObject go)
+        {
+            int id = go.GetInstanceID();
+            if (BaseSeen.TryGetValue(id, out var seen) && Time.time < seen.Value) return seen.Key;
+            if (BaseSeen.Count > 4000) BaseSeen.Clear();
+            bool inside = InBase(go.transform.position);
+            BaseSeen[id] = new KeyValuePair<bool, float>(inside, Time.time + 30f);
+            return inside;
+        }
+
+        internal static bool Breaks(GameObject go) =>
+            go.GetComponent<TreeBase>() != null || go.GetComponent<TreeLog>() != null || go.GetComponent<MineRock>() != null || go.GetComponent<MineRock5>() != null || go.GetComponent<Destructible>() != null;
+
         private static bool NearBuildings(Vector3 at) =>
             Physics.OverlapSphere(at, 10f, LayerMask.GetMask("piece", "piece_nonsolid")).Any(col => col.GetComponentInParent<Piece>() is Piece p && p.IsPlacedByPlayer());
 
@@ -1147,7 +1170,7 @@ namespace VillagePlebs
 
         internal static Task Consider(BrainState st, GameObject go, Job jobs, ItemDrop.ItemData axe, ItemDrop.ItemData pick, bool ordered = false)
         {
-            if (!ordered && go.GetComponent<TreeBase>() != null && NearBuildings(go.transform.position)) return null;
+            if (!ordered && Breaks(go) && InBase(go)) return null;
             if (go.GetComponent<Piece>() != null || go.GetComponent<Character>() != null) return null;
             if ((jobs & Job.Wood) != 0 && axe != null)
             {

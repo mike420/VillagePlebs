@@ -169,13 +169,15 @@ namespace VillagePlebs
             ItemDrop.ItemData axe = Work.Axe(me), pick = Work.Pickaxe(me);
             var seen = new HashSet<GameObject>();
             var targets = new List<Component>();
-            foreach (Collider col in Physics.OverlapSphere(center, radius, ~0, QueryTriggerInteraction.Collide))
+            foreach (Collider col in Physics.OverlapSphere(center, radius + Work.OutsideReach, ~0, QueryTriggerInteraction.Collide))
             {
                 GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;
                 if (!seen.Add(go) || go.GetComponent<Piece>() != null || go.GetComponent<Character>() != null) continue;
                 Component t = (Component)go.GetComponent<TreeLog>() ?? (Component)go.GetComponent<TreeBase>() ?? (Component)go.GetComponent<MineRock5>() ?? (Component)go.GetComponent<MineRock>()
                               ?? (Component)go.GetComponent<Destructible>() ?? go.GetComponent<Pickable>();
-                if (t != null) targets.Add(t);
+                if (t == null) continue;
+                if (t is Pickable ? Vector3.Distance(t.transform.position, center) > radius : Work.InBase(t.transform.position)) continue;
+                targets.Add(t);
             }
             targets = targets.OrderBy(t => hungry && Work.Edible(t) ? 0 : st.Goal != null && Work.Drops(t).Any(st.Goal.Wants) ? 1 : 2)
                              .ThenBy(t => Vector3.Distance(t.transform.position, center)).ToList();
