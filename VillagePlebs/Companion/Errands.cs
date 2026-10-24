@@ -4,7 +4,7 @@ using static VillagePlebs.Words;
 
 namespace VillagePlebs
 {
-    internal enum Errand { PutAway, Restock, BetterGear, RepairGear, RepairBase, Fires, Cook, Plant, Harvest }
+    internal enum Errand { PutAway, Restock, BetterGear, RepairGear, RepairBase, Fires, Cook, Plant, Harvest, Fish, Smelt }
 
     internal static class Errands
     {
@@ -19,6 +19,8 @@ namespace VillagePlebs
             (Errand.Cook, P("villagepleb_errands_cook"), "Puts the raw food it carries on a cooking station near home."),
             (Errand.Plant, P("villagepleb_errands_plant"), "Sows seeds in neat rows on the tilled ground at home with its cultivator, fetching both from its own chests."),
             (Errand.Harvest, P("villagepleb_errands_harvest"), "Picks every ripe crop at home and carries the harvest."),
+            (Errand.Fish, P("villagepleb_errands_fish"), "Fishes near home with a rod and the right bait (from its own chests) until the bait runs out or its bag is full."),
+            (Errand.Smelt, P("villagepleb_errands_smelt"), "Empties the smelters near home, feeds them fuel and ore from its bag and the chests, and takes what they made home."),
         };
 
         public static string Run(BrainState st, Errand what)
@@ -136,6 +138,21 @@ namespace VillagePlebs
                     if (!Farming.RipeNear(center, radius).Any()) return P("villagepleb_errands_nothing_ripe");
                     going = Work.StartFarm(st, Errand.Harvest);
                     return going ? P("villagepleb_errands_harvesting") : null;
+                }
+                case Errand.Fish:
+                {
+                    bool OwnChests(System.Func<ItemDrop.ItemData, bool> has) => Home.Chests(me).Any(c => c.GetInventory().GetAllItems().Any(has));
+                    if (Fishing.Rod(me) == null && !OwnChests(Fishing.IsRod)) return P("villagepleb_errands_need_rod");
+                    if (!Fishing.HasBait(me) && !OwnChests(Fishing.IsBait)) return P("villagepleb_errands_no_bait");
+                    if (!Fishing.Near(center, radius + Farming.FieldReach).Any()) return P("villagepleb_errands_no_fish");
+                    going = Work.StartFarm(st, Errand.Fish);
+                    return going ? P("villagepleb_errands_fishing") : null;
+                }
+                case Errand.Smelt:
+                {
+                    if (!Smelting.Near(center, radius).Any()) return P("villagepleb_errands_no_smelter");
+                    going = Work.StartFarm(st, Errand.Smelt);
+                    return going ? P("villagepleb_errands_smelting") : null;
                 }
             }
             return null;

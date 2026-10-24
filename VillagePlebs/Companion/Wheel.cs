@@ -200,7 +200,7 @@ namespace VillagePlebs
         private static readonly Dictionary<Errand, string> ErrandIcons = new Dictionary<Errand, string>
         {
             [Errand.PutAway] = "putaway", [Errand.Restock] = "restock", [Errand.BetterGear] = "bettergear", [Errand.RepairGear] = "repairgear", [Errand.RepairBase] = "repairbase",
-            [Errand.Fires] = "fires", [Errand.Cook] = "cook", [Errand.Plant] = "plant", [Errand.Harvest] = "harvest",
+            [Errand.Fires] = "fires", [Errand.Cook] = "cook", [Errand.Plant] = "plant", [Errand.Harvest] = "harvest", [Errand.Fish] = "fishing", [Errand.Smelt] = "smelting",
         };
 
         private static IEnumerable<Slice> ErrandSlices() =>
@@ -210,7 +210,7 @@ namespace VillagePlebs
                 return new Slice
                 {
                     Group = P("villagepleb_menu_errands"), Label = e.Label, Icon = ErrandIcons.TryGetValue(what, out string icon) ? icon : "putaway",
-                    Active = what == Errand.Plant || what == Errand.Harvest ? c => Brain.Get(c)?.Farm == what : (Func<Humanoid, bool>)null,
+                    Active = what == Errand.Plant || what == Errand.Harvest || what == Errand.Fish || what == Errand.Smelt ? c => Brain.Get(c)?.Farm == what : (Func<Humanoid, bool>)null,
                     Do = (p, c) =>
                     {
                         BrainState st = Brain.Claim(c, out string why);

@@ -70,6 +70,8 @@
     </Compile>
   </ItemGroup>
   <ItemGroup>
+    <Content Include="Assets\Wheel\fishing.png" />
+    <Content Include="Assets\Wheel\smelting.png" />
     <Content Include="Package\icon.png" />
     <Content Include="Package\manifest.json" />
     <Content Include="Package\CHANGELOG.md" />

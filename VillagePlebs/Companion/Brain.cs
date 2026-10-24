@@ -145,6 +145,8 @@ namespace VillagePlebs
         public string AutoNote = "";
         public float NextFoodLook, NextNeedLook, MasterGoneSince, TripStart;
         public readonly HashSet<string> Wanted = new HashSet<string>();
+        public readonly HashSet<string> SmeltFeeds = new HashSet<string>();
+        public bool SmeltStored, Unpacking;
         public readonly Dictionary<int, float> Skipped = new Dictionary<int, float>();
         public readonly Dictionary<string, int> Gathered = new Dictionary<string, int>();
         public float NextEnemyScan, NextGear, NextAsk, LastAsk, HealthAtAsk = 1f;
@@ -359,7 +361,7 @@ namespace VillagePlebs
                 Player me = Player.m_localPlayer;
                 long master = Companion.MasterId(c);
                 Player near = me != null && master != me.GetPlayerID()
-                    ? Player.GetAllPlayers().FirstOrDefault(p => p != null && p.GetPlayerID() == master && Vector3.Distance(p.transform.position, c.transform.position) < 64f) : null;
+                    ? Player.GetAllPlayers().FirstOrDefault(p => p != null && p.GetPlayerID() == master && Vector3.Distance(p.transform.position, c.transform.position) < Companion.RunReach) : null;
                 if (near != null) { why = P("villagepleb_brain_with_its_player", Companion.NameOf(c), near.GetPlayerName()); return null; }
                 if (!Companion.Write(c, _ => { })) { why = P("villagepleb_companion_gear_open"); return null; }
             }

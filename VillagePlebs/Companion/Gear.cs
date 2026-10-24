@@ -6,11 +6,11 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    internal enum GearKind { Weapon, Spare, Shield, Bow, Ammo, Axe, Pickaxe, Hammer, Head, Chest, Legs, Cape, Belt, Food }
+    internal enum GearKind { Weapon, Spare, Shield, Bow, Ammo, Axe, Pickaxe, Hammer, Head, Chest, Legs, Cape, Belt, Food, Rod, Bait }
 
     internal static class Gear
     {
-        public const int BagRows = 4, Rows = 6, Width = 8;
+        public const int BagRows = 4, Rows = 7, Width = 8;
 
         public class Slot { public GearKind Kind; public string Label; public int X, Y; }
 
@@ -32,6 +32,8 @@ namespace VillagePlebs
             new Slot { Kind = GearKind.Food,    Label = Words.P("villagepleb_gear_slot_food"),    X = 5, Y = 5 },
             new Slot { Kind = GearKind.Food,    Label = Words.P("villagepleb_gear_slot_food"),    X = 6, Y = 5 },
             new Slot { Kind = GearKind.Food,    Label = Words.P("villagepleb_gear_slot_food"),    X = 7, Y = 5 },
+            new Slot { Kind = GearKind.Rod,     Label = Words.P("villagepleb_gear_slot_rod"),     X = 0, Y = 6 },
+            new Slot { Kind = GearKind.Bait,    Label = Words.P("villagepleb_gear_slot_bait"),    X = 1, Y = 6 },
         };
 
         public static HitData.DamageModifiers Modifiers(Humanoid c)
@@ -61,8 +63,10 @@ namespace VillagePlebs
                 case GearKind.Weapon:
                 case GearKind.Spare: return Companion.IsMelee(i) || IsAxe(i);
                 case GearKind.Shield: return t == ItemDrop.ItemData.ItemType.Shield;
-                case GearKind.Bow: return Companion.IsRanged(i) && i.m_shared.m_skillType != Skills.SkillType.Fishing;
-                case GearKind.Ammo: return t == ItemDrop.ItemData.ItemType.Ammo;
+                case GearKind.Bow: return Companion.IsRanged(i) && i.m_shared.m_skillType != Skills.SkillType.Fishing && !Fishing.IsRod(i);
+                case GearKind.Rod: return Fishing.IsRod(i);
+                case GearKind.Bait: return Fishing.IsBait(i);
+                case GearKind.Ammo: return t == ItemDrop.ItemData.ItemType.Ammo && !Fishing.IsBait(i);
                 case GearKind.Axe: return IsAxe(i);
                 case GearKind.Pickaxe: return IsPick(i);
                 case GearKind.Hammer: return Mending.IsHammer(i);
@@ -99,6 +103,8 @@ namespace VillagePlebs
                 case GearKind.Axe: return i.m_shared.m_toolTier * 1000f + i.GetDamage().m_chop;
                 case GearKind.Pickaxe: return i.m_shared.m_toolTier * 1000f + i.GetDamage().m_pickaxe;
                 case GearKind.Hammer: return i.m_durability;
+                case GearKind.Rod: return i.m_quality * 1000f + i.m_durability;
+                case GearKind.Bait: return i.m_stack;
                 default: return i.GetArmor() + i.m_quality * 0.01f;
             }
         }
@@ -218,6 +224,7 @@ namespace VillagePlebs
             why = null;
             Inventory mine = p.GetInventory(), its = c.GetInventory();
             if (!mine.ContainsItem(item)) return false;
+            Grow(its);
             var fits = All.Where(s => Fits(s, item)).ToList();
             if (fits.Count == 0) { why = Words.P("villagepleb_gear_not_gear"); return false; }
             if (!Companion.Write(c, _ => { })) { why = Words.P("villagepleb_gear_things_busy"); return false; }

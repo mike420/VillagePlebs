@@ -91,6 +91,9 @@ namespace VillagePlebs
 
         private static float _nextClaim;
 
+        // How far from you your game runs your companions (and, within it, nobody else's game takes them from you).
+        public const float RunReach = 100f;
+
         public static void KeepOwnership(Player p)
         {
             if (Time.time < _nextClaim) return;
@@ -101,7 +104,7 @@ namespace VillagePlebs
                 ZNetView view = c.GetComponent<ZNetView>();
                 if (view.IsOwner()) continue;
                 bool orphan = !Running(view.GetZDO().GetOwner());
-                if (!orphan && Vector3.Distance(c.transform.position, p.transform.position) > 64f) continue;
+                if (!orphan && Vector3.Distance(c.transform.position, p.transform.position) > RunReach) continue;
                 Container gear = c.GetComponent<Container>();
                 if (gear != null) Containers.Take(gear, orphan);
                 else view.ClaimOwnership();

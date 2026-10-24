@@ -119,6 +119,7 @@ namespace VillagePlebs
             else if (global::Menu.IsVisible() || InventoryGui.IsVisible()) { CloseMenu(); return; }
             if (!GameUi.Typing && Time.unscaledTime > _openedAt + 0.2f && ZInput.GetButtonDown("Use")) { CloseMenu(); return; }
             if (_restoreAgain) { _restoreAgain = false; RestoreScrolls(); Reveal(); }
+            KeepRunning();
             TickJob();
             TickMenu();
             TickLooks();
@@ -164,6 +165,18 @@ namespace VillagePlebs
             Draw(true);
             _drawn = sig;
             _lastRebuild = Time.unscaledTime;
+        }
+
+        private float _nextClaim;
+
+        // While its menu is open your game runs it, wherever it is (as errands do), so what only the game running it knows (its meals,
+        // fights, plans) stays in the menu rather than coming and going as the companion is handed between games.
+        private void KeepRunning()
+        {
+            if (_shown == null || !Commandable || Time.unscaledTime < _nextClaim) return;
+            _nextClaim = Time.unscaledTime + 1f;
+            ZNetView view = _shown.GetComponent<ZNetView>();
+            if (view != null && view.IsValid() && !view.IsOwner()) Brain.Claim(_shown, out _);
         }
 
         // What it is doing, in a panel of its own above the menu: built once per companion and updated in place, never redrawn with the menu.
@@ -855,7 +868,9 @@ namespace VillagePlebs
             }, GameUi.Text);
             EndCard();
 
-            if (Commandable && c.GetComponent<ZNetView>().IsOwner())
+            // Shown whenever you may command it: pressing one takes over running it first (Brain.Claim), so it doesn't come and go
+            // with which game happens to be running the companion.
+            if (Commandable)
             {
                 BeginCard(T("villagepleb_menu_errands"));
                 Note(T("villagepleb_menu_errands_about", Companion.NameOf(c)), GameUi.Dim);
@@ -1167,7 +1182,7 @@ namespace VillagePlebs
 
             BeginCard(T("villagepleb_menu_its_gear"));
             bool mine = Mine;
-            foreach (int row in new[] { 4, 5 })
+            foreach (int row in Enumerable.Range(Gear.BagRows, Gear.Rows - Gear.BagRows))
             {
                 Gear.Slot[] slots = Gear.All.Where(s => s.Y == row).ToArray();
                 for (int j = 0; j < slots.Length; j++)

@@ -13,7 +13,7 @@ namespace VillagePlebs
 
     internal static class Work
     {
-        internal enum Kind { None, Hit, Pick, PickUp, Store, Upgrade, Craft, Hunt, Cook, Fetch, Fuel, Mend, Armory, Plant }
+        internal enum Kind { None, Hit, Pick, PickUp, Store, Upgrade, Craft, Hunt, Cook, Fetch, Fuel, Mend, Armory, Plant, Fish, Smelt }
 
         internal class Task
         {
@@ -25,6 +25,7 @@ namespace VillagePlebs
             public Farming.Crop Crop;
             public Container FetchFrom;
             public Func<ItemDrop.ItemData, bool> Take;
+            public bool Dump;
             public bool ForGoal;
             public bool Edible;
             public bool Trip;
@@ -33,6 +34,9 @@ namespace VillagePlebs
             public Vector3 Pos;
             public float Closer = 1f;
             public int Swings, MissedRun;
+            public int Stage, Tries, Before;
+            public float StageAt;
+            public bool Settled;
             public bool UsedChop;
             public float HealthAt = -1f;
             public float Started, LastClose;
@@ -187,7 +191,7 @@ namespace VillagePlebs
                     Brain.Status(st, P("villagepleb_work_status_heading_home"));
                     return;
                 }
-                else { st.GoingHomeUntil = 0f; st.Remember(P("villagepleb_work_got_home")); }
+                else { st.GoingHomeUntil = 0f; st.Unpacking = true; st.Remember(P("villagepleb_work_got_home")); }
             }
             if (TravelHome(st, center, radius, moveTo)) return;
             if (Clearing(st, moveTo)) return;
@@ -195,6 +199,7 @@ namespace VillagePlebs
 
             if (st.Task != null && !Valid(st, st.Task)) Drop(st);
             if (st.Task == null && !NextQueued(st) && !NextInArea(st)) NextFarm(st);
+            if (st.Task == null && st.Unpacking) Unpack(st);
             if (st.Task == null && Time.time >= st.NextWorkLook)
             {
                 st.NextWorkLook = Time.time + 1.5f;
@@ -294,7 +299,7 @@ namespace VillagePlebs
             st.Task = t;
             st.Helping = false;
             st.CommandUntil = Time.time + 120f;
-            if (fromYou) { st.RepairAt = null; st.ComeUntil = 0f; st.EmoteUntil = 0f; st.PendingEmote = null; st.Farm = null; st.Then = null; st.GoingHomeUntil = 0f; }
+            if (fromYou) { st.RepairAt = null; st.ComeUntil = 0f; st.EmoteUntil = 0f; st.PendingEmote = null; st.Farm = null; st.Then = null; st.GoingHomeUntil = 0f; st.Unpacking = false; }
             st.Remember(P(fromYou ? "villagepleb_work_you_pointed" : "villagepleb_work_next_in_patch", Describe(t)));
             return true;
         }
@@ -390,6 +395,44 @@ namespace VillagePlebs
             if (m == null) return P("villagepleb_work_job_home");
             if (m.StartCost > 0) progress = Mathf.Clamp01(1f - m.Cost / (float)m.StartCost);
             return P("villagepleb_work_job_home_mission", m.What);
+        }
+
+        // Home after being sent there: what is in its bag goes into its own chests, nearest first, a chest at a time while they have room.
+        // What is in its equipment panel (weapons, tools, armour, food, rod and bait) stays with it.
+        private static void Unpack(BrainState st)
+        {
+            Humanoid me = st.Body;
+            List<ItemDrop.ItemData> loose = me.GetInventory().GetAllItems().Where(i => !Gear.InSlot(i)).ToList();
+            Container chest = loose.Count == 0 ? null : Home.Chests(me)
+                .Where(c => !Containers.InUse(c) && !Skipped(st, c) && loose.Any(i => c.GetInventory().CanAddItem(i)))
+                .OrderBy(c => Vector3.Distance(c.transform.position, me.transform.position)).FirstOrDefault(c => Brain.CanReach(me, c.transform.position));
+            if (chest == null) { st.Unpacking = false; return; }
+            Task t = New(Kind.Store, chest, Job.None);
+            t.Dump = true;
+            st.Task = t;
+        }
+
+        private static void Unload(BrainState st, Container chest)
+        {
+            Humanoid me = st.Body;
+            if (chest == null || !Containers.Take(chest)) return;
+            Inventory mine = me.GetInventory(), its = chest.GetInventory();
+            int put = 0;
+            foreach (ItemDrop.ItemData item in mine.GetAllItems().Where(i => !Gear.InSlot(i)).ToList())
+            {
+                if (!its.CanAddItem(item)) continue;
+                if (me.IsItemEquiped(item)) me.UnequipItem(item, false);
+                item.m_equipped = false;
+                its.MoveItemToThis(mine, item);
+                if (!mine.ContainsItem(item)) put++;
+            }
+            if (put > 0)
+            {
+                Companion.SaveBag(me);
+                st.Remember(P("villagepleb_work_unpacked", put));
+                VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(me)} emptied {put} item stacks into its chest at {chest.transform.position:F0}");
+            }
+            else st.Skipped[chest.gameObject.GetInstanceID()] = Time.time + 30f;
         }
 
         // Sent home: whatever it was doing (its mission, an old order) waits until it is back.
@@ -543,7 +586,7 @@ namespace VillagePlebs
             Humanoid me = st.Body;
             Task t = st.Task;
             if (t.Ordered) { Action<Vector3, float, bool> walk = moveTo; moveTo = (p, d, run) => walk(p, d, run || Flat(p, me.transform.position) > 3f); }
-            Vector3 at = t.Kind == Kind.Plant ? t.Pos : Point(t.Target, me.transform.position);
+            Vector3 at = t.Kind == Kind.Plant || t.Kind == Kind.Fish ? t.Pos : Point(t.Target, me.transform.position);
             float dist = Flat(at, me.transform.position);
             if (Time.time - t.Started > (t.Trip ? 240f : t.Ordered ? 180f : 60f) || (dist > 3f && Time.time - t.LastClose > (t.Trip || t.Ordered ? 120f : 20f)))
             {
@@ -628,7 +671,8 @@ namespace VillagePlebs
                     if (dist > 2f) { moveTo(at, 1.2f, dist > 8f); break; }
                     t.LastClose = Time.time;
                     stop();
-                    Store(st, (Container)t.Target, t.Take);
+                    if (t.Dump) Unload(st, (Container)t.Target);
+                    else Store(st, (Container)t.Target, t.Take);
                     st.Task = null;
                     break;
 
@@ -675,6 +719,107 @@ namespace VillagePlebs
                     { t.Crop = nextCrop; t.Pos = nextAt; t.Target = Heightmap.FindHeightmap(nextAt); t.Started = t.LastClose = Time.time; }
                     else st.Task = null;
                     break;
+
+                case Kind.Fish:
+                {
+                    var fish = t.Target as Fish;
+                    ItemDrop.ItemData rod = Fishing.Rod(me);
+                    if (rod == null) { st.Task = null; break; }
+                    if (st.WorkTool != rod) { st.WorkTool = rod; st.NextGear = 0f; }
+                    FishingFloat line = Fishing.FloatOf(me);
+                    if (t.Stage == 0)
+                    {
+                        if (dist > 1.2f) { moveTo(at, 0.6f, dist > 6f); break; }
+                        stop();
+                        t.Stage = 1;
+                        t.StageAt = Time.time;
+                        break;
+                    }
+                    t.LastClose = Time.time;
+                    stop();
+                    if (t.Stage == 1)
+                    {
+                        if (line != null) { t.Stage = 2; t.StageAt = Time.time; break; }
+                        if (fish == null || Flat(fish.transform.position, me.transform.position) > 22f) { st.Task = null; break; }
+                        ItemDrop.ItemData bait = Fishing.BaitFor(me, fish);
+                        if (bait == null) { st.Task = null; break; }
+                        lookAt(fish.transform.position);
+                        if (Stamina.Get(me) < Stamina.Max(me) * 0.5f) { t.StageAt = Time.time; Brain.Status(st, P("villagepleb_work_status_breath")); break; }
+                        Vector3 ahead = me.transform.forward, toFish = fish.transform.position - me.transform.position;
+                        ahead.y = 0f; toFish.y = 0f;
+                        if (!me.IsItemEquiped(rod) || me.InAttack() || Time.time - t.StageAt < 0.6f || toFish.sqrMagnitude > 0.01f && Vector3.Angle(ahead, toFish) > 10f)
+                        {
+                            if (Time.time - t.StageAt > 12f) Skip(st, fish, null, 2f);
+                            break;
+                        }
+                        t.Before = Fishing.Caught(me);
+                        if (Fishing.Cast(me, rod, bait, fish.transform.position))
+                        {
+                            t.Stage = 2; t.StageAt = Time.time; t.Tries++; t.Settled = false;
+                            Activity.Log(me, $"casts at a {Localization.instance.Localize(fish.m_name)} {Flat(fish.transform.position, me.transform.position):0} m out with {Localization.instance.Localize(bait.m_shared.m_name)} (try {t.Tries})");
+                        }
+                        break;
+                    }
+                    if (t.Stage == 2)
+                    {
+                        if (line == null)
+                        {
+                            if (Time.time - t.StageAt > 4f)
+                            {
+                                Activity.Log(me, "its line came back before anything bit");
+                                if (t.Tries >= 3) Skip(st, fish, null, 2f); else { t.Stage = 1; t.StageAt = Time.time; }
+                            }
+                            break;
+                        }
+                        lookAt(line.transform.position);
+                        if (!t.Settled && Time.time - t.StageAt > 2.5f)
+                        {
+                            t.Settled = true;
+                            if (!line.IsInWater()) { t.Stage = 3; t.StageAt = Time.time; break; }
+                        }
+                        if (Fishing.Nibbling(line) || fish == null || Time.time - t.StageAt > 45f)
+                        {
+                            Activity.Log(me, Fishing.Nibbling(line) ? "a fish bites: reeling in" : "nothing bit: reeling in to cast again");
+                            t.Stage = 3; t.StageAt = Time.time;
+                        }
+                        break;
+                    }
+                    // Reeling in: block held to draw the line, eased off while a hooked fish fights or the line is near breaking.
+                    if (line == null)
+                    {
+                        Fishing.Reel(me, false);
+                        if (Fishing.Caught(me) > t.Before) st.Remember(P("villagepleb_work_fish_caught"));
+                        st.Task = null;
+                        break;
+                    }
+                    lookAt(line.transform.position);
+                    Fish hooked = line.GetCatch();
+                    Fishing.Reel(me, !(hooked != null && (hooked.IsEscaping() || Fishing.Tension(me, line) > 2.5f)));
+                    if (Time.time - t.StageAt > 90f) { Fishing.Reel(me, false); st.Task = null; }
+                    break;
+                }
+
+                case Kind.Smelt:
+                {
+                    var smelter = (Smelter)t.Target;
+                    if (dist > 2.2f && !CanReachOver(t, dist)) { moveTo(at, 1.5f, dist > 8f); break; }
+                    t.LastClose = Time.time;
+                    stop();
+                    lookAt(smelter.transform.position + Vector3.up);
+                    bool emptied = Smelting.Ready(smelter) > 0;
+                    if (emptied)
+                    {
+                        Smelting.Empty(smelter);
+                        foreach (Smelter.ItemConversion c in smelter.m_conversion) if (c.m_to != null) st.Wanted.Add(c.m_to.gameObject.name);
+                        st.WorkSpot = Smelting.Out(smelter);
+                    }
+                    int fed = Smelting.Feed(me, smelter);
+                    if (fed > 0) st.Remember(P("villagepleb_work_smelt_fed", fed, smelter.m_name));
+                    if (fed == 0 && !emptied) st.Skipped[smelter.gameObject.GetInstanceID()] = Time.time + 60f;
+                    GameFields.Anim(me)?.SetTrigger("interact");
+                    st.Task = null;
+                    break;
+                }
 
                 case Kind.Fuel:
                     if (dist > 2f) { moveTo(at, 1.2f, dist > 8f); break; }
@@ -786,6 +931,8 @@ namespace VillagePlebs
             return t.Kind switch
             {
                 Kind.Hit => P(t.Job == Job.Wood ? "villagepleb_work_do_chopping" : "villagepleb_work_do_mining", what),
+                Kind.Fish => P("villagepleb_work_do_fishing"),
+                Kind.Smelt => P("villagepleb_work_do_smelting", ((Smelter)t.Target)?.m_name ?? ""),
                 Kind.Pick => P(t.Target != null && Goals.IsCrop(Utils.GetPrefabName(t.Target.gameObject)) ? "villagepleb_work_do_harvesting" : "villagepleb_work_do_picking", what),
                 Kind.Plant => P("villagepleb_work_do_planting", t.Crop?.Label ?? ""),
                 Kind.PickUp => P("villagepleb_work_do_picking_up", what),
@@ -830,7 +977,7 @@ namespace VillagePlebs
 
         private static bool Valid(BrainState st, Task t)
         {
-            if (t.Target == null) return false;
+            if (t.Target == null) return t.Kind == Kind.Fish && t.Stage >= 2;
             if (t.Kind == Kind.Pick && Companion.Zdo(t.Target)?.GetBool(ZDOVars.s_picked, false) == true) return false;
             if ((t.Kind == Kind.Store || t.Kind == Kind.Fetch || t.Kind == Kind.Armory) && Containers.InUse((Container)t.Target)) return false;
             if (t.Kind == Kind.Mend && ((WearNTear)t.Target).GetHealthPercentage() >= 0.999f) return false;
@@ -1469,7 +1616,92 @@ namespace VillagePlebs
         }
 
         public static bool Keeps(Humanoid h, ItemDrop.ItemData i) => Gear.InSlot(i) || h.IsItemEquiped(i) || Companion.Useful(h, i) || IsTool(i) || IsCookable(i) || Mending.IsHammer(i)
-                                                                    || Farming.IsCultivator(i) || Farming.IsSeed(h, i);
+                                                                    || Farming.IsCultivator(i) || Farming.IsSeed(h, i) || Fishing.IsRod(i) || Fishing.IsBait(i)
+                                                                    || Brain.Get(h) is BrainState b && b.Farm == Errand.Smelt && b.SmeltFeeds.Contains(i.m_shared.m_name);
+
+        // The fishing errand, a fish at a time: a rod and bait (fetched from its own chest), then the nearest fish it has bait for
+        // with a dry spot within a cast of it. Done when its bag is full, the bait runs out, or no fish near home will take it.
+        private static bool NextFish(BrainState st, Vector3 center, float radius, out string done)
+        {
+            done = null;
+            Humanoid me = st.Body;
+            if (BagFull(me)) { done = P("villagepleb_work_farm_bag_full"); return false; }
+            if (Fishing.Rod(me) == null || !Fishing.HasBait(me))
+            {
+                Func<ItemDrop.ItemData, bool> gear = i => Fishing.IsRod(i) && Fishing.Rod(me) == null || Fishing.IsBait(i);
+                if (st.FarmTrips < 3 && OwnChestWith(me, gear) is Container chest)
+                {
+                    st.FarmTrips++;
+                    Task fetch = New(Kind.Store, chest, Job.None);
+                    fetch.Take = gear;
+                    return Ordered(st, fetch, false);
+                }
+                done = P(Fishing.Rod(me) == null ? "villagepleb_errands_need_rod" : "villagepleb_work_fish_no_bait");
+                return false;
+            }
+            List<Fish> near = Fishing.Near(center, radius + Farming.FieldReach).ToList();
+            foreach (Fish fish in near.Where(f => !Skipped(st, f) && Fishing.BaitFor(me, f) != null).OrderBy(f => Vector3.Distance(f.transform.position, me.transform.position)).Take(5))
+            {
+                if (!Fishing.Spot(me, fish, out Vector3 stand)) { st.Skipped[fish.gameObject.GetInstanceID()] = Time.time + 120f; continue; }
+                Task t = New(Kind.Fish, fish, Job.None);
+                t.Pos = stand;
+                return Ordered(st, t, false);
+            }
+            done = P(near.Count == 0 ? "villagepleb_work_fish_none" : "villagepleb_work_fish_none_take");
+            return false;
+        }
+
+        // The smelting errand, a step at a time: pick up what the smelters made, empty those holding finished goods, feed the ones
+        // with room from its bag, fetch fuel and ore from its chests or yours when it has none, and at the end carry what was made home.
+        private static bool NextSmelt(BrainState st, Vector3 center, float radius, out string done)
+        {
+            done = null;
+            Humanoid me = st.Body;
+            Inventory inv = me.GetInventory();
+            List<Smelter> smelters = Smelting.Near(center, radius).ToList();
+            if (smelters.Count == 0) { done = P("villagepleb_errands_no_smelter"); return false; }
+            st.SmeltFeeds.Clear();
+            foreach (Smelter s in smelters)
+            {
+                foreach (Smelter.ItemConversion c in s.m_conversion) if (c.m_from != null) st.SmeltFeeds.Add(c.m_from.m_itemData.m_shared.m_name);
+                if (s.m_maxFuel > 0 && s.m_fuelItem != null) st.SmeltFeeds.Add(s.m_fuelItem.m_itemData.m_shared.m_name);
+            }
+            float Away(Component c) => Vector3.Distance(c.transform.position, me.transform.position);
+            if (!BagFull(me))
+            {
+                ItemDrop made = ItemDrops().Where(d => d != null && !Skipped(st, d) && inv.CanAddItem(d.m_itemData)
+                        && smelters.Any(s => Smelting.Makes(s, Utils.GetPrefabName(d.gameObject)) && Vector3.Distance(d.transform.position, Smelting.Out(s)) < 4f))
+                    .OrderBy(Away).FirstOrDefault();
+                if (made != null) return Ordered(st, New(Kind.PickUp, made, Job.Loot), false);
+                Smelter full = smelters.Where(s => Smelting.Ready(s) > 0 && !Skipped(st, s)).OrderBy(Away).FirstOrDefault(s => Brain.CanReach(me, s.transform.position, 3f));
+                if (full != null) return Ordered(st, New(Kind.Smelt, full, Job.None), false);
+            }
+            Smelter feed = smelters.Where(s => !Skipped(st, s) && inv.GetAllItems().Any(i => Smelting.Wants(s, i))).OrderBy(Away).FirstOrDefault(s => Brain.CanReach(me, s.transform.position, 3f));
+            if (feed != null) return Ordered(st, New(Kind.Smelt, feed, Job.None), false);
+            List<Smelter> open = smelters.Where(s => !Skipped(st, s)).ToList();
+            Func<ItemDrop.ItemData, bool> wanted = i => open.Any(s => Smelting.Wants(s, i)) && Carry.Weight(me) + i.GetWeight() <= Carry.Max(me) * 0.9f;
+            if (st.FarmTrips < 6)
+            {
+                Container chest = OwnChestWith(me, wanted)
+                                  ?? YourChests(me, center, radius + 20f).Where(c => !Skipped(st, c) && c.GetInventory().GetAllItems().Any(wanted)).Take(6).FirstOrDefault(c => Brain.CanReach(me, c.transform.position));
+                if (chest != null)
+                {
+                    st.FarmTrips++;
+                    Task fetch = New(Kind.Store, chest, Job.None);
+                    fetch.Take = wanted;
+                    return Ordered(st, fetch, false);
+                }
+            }
+            if (!st.SmeltStored && inv.GetAllItems().Any(i => i.m_dropPrefab != null && smelters.Any(s => Smelting.Makes(s, i.m_dropPrefab.name))))
+            {
+                st.SmeltStored = true;
+                IEnumerable<Container> homes = Stows(me) ? YourChests(me, center, radius + 20f).Concat(Home.Chests(me)) : Home.Chests(me).Concat(YourChests(me, center, radius + 20f));
+                Container home = homes.Where(c => !Containers.InUse(c) && HasRoom(c, me)).Take(6).FirstOrDefault(c => Brain.CanReach(me, c.transform.position));
+                if (home != null) return Ordered(st, New(Kind.Store, home, Job.None), false);
+            }
+            done = P("villagepleb_work_smelt_done");
+            return false;
+        }
 
         // The plant or harvest errand, one step at a time: carry in the crop it just picked, fetch a cultivator or seeds
         // from its own chest, then the next ripe crop or free spot. When there is nothing left it says so and stops.
@@ -1479,6 +1711,13 @@ namespace VillagePlebs
             Humanoid me = st.Body;
             Vector3 center = Center(me);
             float radius = RadiusOf(me);
+            if (st.Farm == Errand.Fish || st.Farm == Errand.Smelt)
+            {
+                if (st.Farm == Errand.Fish ? NextFish(st, center, radius, out string over) : NextSmelt(st, center, radius, out over)) return true;
+                st.Farm = null;
+                if (over != null) Talk.Tell(me, over);
+                return false;
+            }
             string done = null;
             bool plant = st.Farm == Errand.Plant;
             if (BagFull(me)) done = P("villagepleb_work_farm_bag_full");
@@ -1528,6 +1767,7 @@ namespace VillagePlebs
             if (st.Task != null && st.Task.Ordered) st.Task = null;
             st.Farm = what;
             st.FarmTrips = 0;
+            st.SmeltStored = false;
             if (what == Errand.Plant) Farming.Forget(st);
             st.GoingHomeUntil = 0f;
             st.CommandUntil = Time.time + 120f;
@@ -1568,7 +1808,7 @@ namespace VillagePlebs
                     if (!mine.HaveEmptySlot() && !mine.CanAddItem(item)) break;
                     if (Wants(me, item, jobs) || take != null && take(item)) { item.m_equipped = false; mine.MoveItemToThis(its, item); took++; }
                 }
-                if (stows)
+                if (stows && take == null)
                     foreach (ItemDrop.ItemData item in its.GetAllItems().OrderBy(i => i.m_stack).ToList())
                     {
                         if (mine.GetEmptySlots() <= 2 || Carry.Weight(me) > Carry.Max(me) * 0.8f) break;
@@ -1577,6 +1817,12 @@ namespace VillagePlebs
                         if (MovePart(its, mine, item, Mathf.Min(item.m_stack, extra)) > 0) tidied++;
                     }
             }
+            else if (take != null)
+                foreach (ItemDrop.ItemData item in its.GetAllItems().ToList())
+                {
+                    if (!mine.HaveEmptySlot() && !mine.CanAddItem(item)) break;
+                    if (take(item)) { mine.MoveItemToThis(its, item); took++; }
+                }
             if (put + took + tidied > 0)
             {
                 st.Remember(yours ? P("villagepleb_work_put_away_yours", put) : tidied > 0 ? P("villagepleb_work_at_its_chest_tidied", put, took, tidied) : P("villagepleb_work_at_its_chest", put, took));

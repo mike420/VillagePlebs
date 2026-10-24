@@ -26,7 +26,7 @@ namespace VillagePlebs
         private static readonly AccessTools.FieldRef<InventoryGui, int> ActiveGroup = AccessTools.FieldRefAccess<InventoryGui, int>("m_activeGroup");
         private static readonly System.Reflection.MethodInfo SetActiveGroup = AccessTools.Method(typeof(InventoryGui), "SetActiveGroup", new[] { typeof(int), typeof(bool) });
         private static bool _warned, _saidWhy, _buildWarned;
-        private const float Reach = 30f;
+        private const float Reach = 100f;
 
         public static void Tick(InventoryGui gui)
         {
@@ -79,7 +79,7 @@ namespace VillagePlebs
             if (p == null) return null;
             Humanoid c = Companion.All().Where(h => Companion.IsMine(h, p)).OrderBy(h => Vector3.Distance(h.transform.position, p.transform.position)).FirstOrDefault();
             float d = c != null ? Vector3.Distance(c.transform.position, p.transform.position) : float.MaxValue;
-            if (d > 100f) return null;
+            if (d > Reach + 50f) return null;
             Container open = CurrentContainer(gui);
             string why = c.IsDead() ? "it is dead" : !c.GetComponent<ZNetView>().IsOwner() ? "another game runs it (its bag can only be changed there)"
                        : d >= Reach ? $"it is further than {Reach:0} m" : open != null && open.gameObject == c.gameObject ? "its bag is the chest you have open" : "unknown";
