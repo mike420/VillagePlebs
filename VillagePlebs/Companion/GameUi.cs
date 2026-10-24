@@ -163,12 +163,12 @@ namespace VillagePlebs
             return t;
         }
 
-        internal static RectTransform HeaderBox(Transform parent, Vector2 pos, Vector2 size)
+        internal static RectTransform HeaderBox(Transform parent, Vector2 pos, Vector2 size, bool accent = true)
         {
             Image bar = Widgets.Box(parent, "Header", MagicMike.ModSettings.Theme.Header);
             bar.raycastTarget = false;
             RectTransform r = At(bar, pos, size);
-            Accent(r);
+            if (accent) Accent(r);
             return r;
         }
 
@@ -379,8 +379,7 @@ namespace VillagePlebs
             r.anchoredPosition = pos;
             InventoryElement e = go.GetComponent<InventoryElement>();
             e.Initialize(0, 0);
-            Transform binding = go.transform.Find("binding");
-            if (binding != null && binding.GetComponent<TMP_Text>() is TMP_Text b) b.enabled = false;
+            HideKeyNumbers(go, e);
             e.m_icon.enabled = false;
             e.m_durability.gameObject.SetActive(false);
             e.m_equiped.enabled = e.m_queued.enabled = e.m_noteleport.enabled = e.m_food.enabled = false;
@@ -401,7 +400,14 @@ namespace VillagePlebs
             return e;
         }
 
-        internal static void Fill(InventoryElement e, ItemDrop.ItemData item, string amount = null)
+        // The hotbar's key numbers a cell copied from the inventory carries, whatever the game calls them.
+        private static void HideKeyNumbers(GameObject go, InventoryElement e)
+        {
+            foreach (TMP_Text t in go.GetComponentsInChildren<TMP_Text>(true))
+                if (t != e.m_amount && t != e.m_quality && t.name.IndexOf("bind", StringComparison.OrdinalIgnoreCase) >= 0) { t.text = ""; t.enabled = false; }
+        }
+
+        internal static void Fill(InventoryElement e, ItemDrop.ItemData item, string amount = null, bool quality = true)
         {
             if (item == null)
             {
@@ -419,7 +425,7 @@ namespace VillagePlebs
             if (e.m_durability.gameObject.activeSelf != worn) e.m_durability.gameObject.SetActive(worn);
             if (worn) e.m_durability.SetValue(item.GetDurabilityPercentage());
             e.m_equiped.enabled = item.m_equipped;
-            e.m_quality.enabled = amount == null && item.m_shared.m_maxQuality > 1;
+            e.m_quality.enabled = quality && amount == null && item.m_shared.m_maxQuality > 1;
             if (e.m_quality.enabled) e.m_quality.text = item.m_quality.ToString();
             e.m_amount.enabled = amount != null || item.m_shared.m_maxStackSize > 1;
             string count = amount ?? $"{item.m_stack}/{item.m_shared.m_maxStackSize}";
@@ -441,8 +447,7 @@ namespace VillagePlebs
 
             InventoryElement e = go.GetComponent<InventoryElement>();
             e.Initialize(0, 0);
-            Transform binding = go.transform.Find("binding");
-            if (binding != null && binding.GetComponent<TMP_Text>() is TMP_Text b) b.enabled = false;
+            HideKeyNumbers(go, e);
             e.m_icon.enabled = true;
             e.m_icon.sprite = item.GetIcon();
             e.m_icon.color = Color.white;

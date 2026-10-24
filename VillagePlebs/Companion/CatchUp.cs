@@ -264,7 +264,7 @@ namespace VillagePlebs
             if (fellTo == null) harvested = Harvest(me, center, radius, got, ref budget, ref full);
 
             Stage = "trip";
-            string trip = fellTo == null ? AwayTrip(me, center, radius, got, ref budget) : null;
+            string trip = fellTo == null ? AwayTrip(me, center, radius, got, ref budget, out _, out _) : null;
             if (trip != null) Journal.Trip(me, P("villagepleb_catchup_trip_journal", trip));
 
             Stage = "storing";
@@ -364,8 +364,43 @@ namespace VillagePlebs
             return n;
         }
 
-        private static string AwayTrip(Humanoid me, Vector3 center, float radius, Dictionary<string, int> got, ref float budget)
+        // A trip while you are near, past what the game has loaded around you: what its mission needs that can be picked within 400 m
+        // of home (from the world's records, as while you're away), and a hunt for what comes from creatures. What it will bring back
+        // (null: nothing out there), which way it went and how far, and the list of it in words.
+        public static Dictionary<string, int> FarTrip(Humanoid me, Vector3 center, float radius, HashSet<string> prey, out Vector3 way, out string list)
         {
+            var got = new Dictionary<string, int>();
+            float budget = 1200f;
+            AwayTrip(me, center, radius, got, ref budget, out way, out float far);
+            if (prey != null && prey.Count > 0 && (Companion.BestRanged(me) != null || Companion.BestMelee(me) != null))
+            {
+                float hunting = 400f;
+                Hunt(me, got, new Dictionary<string, int>(), prey, ref hunting, EnvMan.instance != null ? EnvMan.instance.m_dayLengthSec : 1800f);
+                if (far < 1f) { Vector2 r = UnityEngine.Random.insideUnitCircle.normalized; way = new Vector3(r.x, 0f, r.y) * 90f; }
+            }
+            list = string.Join(", ", got.Select(kv => ObjectDB.instance.GetItemPrefab(kv.Key)?.GetComponent<ItemDrop>() is ItemDrop d
+                ? Amount(new KeyValuePair<string, int>(d.m_itemData.m_shared.m_name, kv.Value), true) : null).Where(t => t != null));
+            return got.Count > 0 ? got : null;
+        }
+
+        // What a trip brought: into its bag, and what doesn't fit into the chests.
+        public static void Bring(Humanoid me, Dictionary<string, int> got)
+        {
+            var left = new Dictionary<string, int>();
+            foreach (var kv in got)
+            {
+                GameObject prefab = ObjectDB.instance.GetItemPrefab(kv.Key);
+                if (prefab == null || prefab.GetComponent<ItemDrop>() == null) continue;
+                int over = kv.Value - AddUpTo(me.GetInventory(), prefab, kv.Value);
+                if (over > 0) left[kv.Key] = over;
+            }
+            if (left.Count > 0) Store(me, left);
+        }
+
+        private static string AwayTrip(Humanoid me, Vector3 center, float radius, Dictionary<string, int> got, ref float budget, out Vector3 way, out float distance)
+        {
+            way = Vector3.zero;
+            distance = 0f;
             if (budget < 300f || ZDOMan.instance == null) return null;
             Goal g = Goals.Pick(me, center, radius);
             if (g == null || g.Raw.Count == 0) return null;
@@ -412,6 +447,8 @@ namespace VillagePlebs
                 }
             }
             if (brought.Count == 0) return null;
+            way = farWay;
+            distance = farthest;
             budget -= farthest * 2f / 3f;
             return P(TripKeys[Remote.Dir(farWay)], farthest.ToString("0"), string.Join(", ", brought.Select(kv => Amount(kv, true))));
         }

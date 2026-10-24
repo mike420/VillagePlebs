@@ -148,6 +148,11 @@ namespace VillagePlebs
         public readonly HashSet<string> SmeltFeeds = new HashSet<string>();
         public bool SmeltStored, Unpacking;
         public float FishWaitSince, NextFishLook;
+        // A trip past what is loaded: what it brings back, where it heads, the words for it.
+        public Dictionary<string, int> FarGot;
+        public Vector3 FarTo;
+        public float FarStarted, FarBack, NextFarTrip;
+        public string FarWhat, FarList;
         public readonly Dictionary<int, float> Skipped = new Dictionary<int, float>();
         public readonly Dictionary<string, int> Gathered = new Dictionary<string, int>();
         public float NextEnemyScan, NextGear, NextAsk, LastAsk, HealthAtAsk = 1f;

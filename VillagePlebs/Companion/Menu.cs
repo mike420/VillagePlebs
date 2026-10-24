@@ -586,7 +586,7 @@ namespace VillagePlebs
             string name = Companion.NameOf(c);
             float closeX = w - Pad - 110f;
             _sig.Append("|H").Append(name).Append(_renaming).Append(Mine);
-            if (_make) GameUi.HeaderBox(_window, new Vector2(12f, -10f), new Vector2(w - 24f, 160f));
+            if (_make) GameUi.HeaderBox(_window, new Vector2(12f, -10f), new Vector2(w - 24f, 160f), false);
 
             // Up to five of your plebs side by side: name, portrait, Rename. The one shown is framed; a click on another opens it.
             List<Profile> mine = pl != null ? Profile.Here(pl) : new List<Profile>();
@@ -624,7 +624,7 @@ namespace VillagePlebs
                     }, enabled: target != null, size: 13f);
                 }
                 if (!_make) continue;
-                if (chosen) GameUi.HeaderBox(_window, new Vector2(mid - 45f, -44f), new Vector2(90f, 90f));
+                if (chosen) GameUi.HeaderBox(_window, new Vector2(mid - 45f, -44f), new Vector2(90f, 90f), false);
                 RawImage face = GameUi.Picture(_window, new Vector2(mid - 39f, -50f), new Vector2(78f, 78f), Portraits.Get(prof.Id));
                 TMP_Text initial = GameUi.Label(face.transform.parent, shownName.Length > 0 ? shownName.Substring(0, 1).ToUpperInvariant() : "?", Vector2.zero, new Vector2(78f, 78f), 40f,
                     GameUi.Dim, GameUi.Norse, TextAlignmentOptions.Center);
@@ -701,11 +701,9 @@ namespace VillagePlebs
                     {
                         List<Food.Meal> now = Food.Meals(c);
                         Food.Meal m = k < now.Count ? now[k] : null;
+                        // Just the minutes left: no bar over them (a meal's own durability bar is hidden too).
                         GameUi.Fill(e, m?.Item, m != null ? T("villagepleb_menu_minutes_short", Mathf.CeilToInt(m.Time / 60f)) : null);
-                        if (m == null) return;
-                        e.m_durability.gameObject.SetActive(true);
-                        e.m_durability.SetValue(m.Fraction);
-                        e.m_durability.SetColor(m.Fraction < 0.2f ? GameUi.Warn : GameUi.Good);
+                        if (e.m_durability.gameObject.activeSelf) e.m_durability.gameObject.SetActive(false);
                     }
                     Show();
                     _live.Add(Show);
@@ -783,22 +781,6 @@ namespace VillagePlebs
             bool here = Here(c);
 
             if (EpicMmo.On) DrawLevel(c);
-
-            BeginCard(Loc("$hud_food"));
-            if (!here) Note(T("villagepleb_menu_shows_elsewhere"), GameUi.Dim);
-            else LiveText(() =>
-            {
-                List<Food.Meal> now = Food.Meals(c);
-                if (now.Count == 0) return Tint(T("villagepleb_menu_nothing_eaten"), GameUi.Warn);
-                return string.Join("\n", now.Select(m =>
-                {
-                    ItemDrop.ItemData.SharedData f = m.Item.m_shared;
-                    string gives = f.m_foodEitr > 0f ? T("villagepleb_menu_food_gives_eitr", f.m_food.ToString("0"), f.m_foodStamina.ToString("0"), f.m_foodEitr.ToString("0"), f.m_foodRegen.ToString("0.#"))
-                                                     : T("villagepleb_menu_food_gives", f.m_food.ToString("0"), f.m_foodStamina.ToString("0"), f.m_foodRegen.ToString("0.#"));
-                    return $"{Loc(f.m_name)}:  {gives}  ·  {T("villagepleb_menu_min_left", Mathf.CeilToInt(m.Time / 60f))}";
-                }));
-            }, GameUi.Text);
-            EndCard();
 
             BeginCard(T("villagepleb_menu_fighting_card"));
             string Block()
@@ -1251,7 +1233,7 @@ namespace VillagePlebs
                         _pending = () => { ItemDrop.ItemData now = _shown != null ? Gear.In(_shown, slot) : null; if (now != null && !Companion.Take(_shown, Player.m_localPlayer, now, out string why) && why != null) _note = Words.Show(why); };
                         _nextCheck = 0f;
                     } : (Action)null);
-                    void Show() => GameUi.Fill(e, Gear.In(c, slot));
+                    void Show() => GameUi.Fill(e, Gear.In(c, slot), quality: false);
                     Show();
                     _live.Add(Show);
                     Line(_in, pos.x - (space - 64f) / 2f, _y + 66f, space, 14f, GameUi.Dim, TextAlignmentOptions.Top).text = Words.Show(slots[k].Label);
@@ -1278,7 +1260,7 @@ namespace VillagePlebs
                         _pending = () => { ItemDrop.ItemData now = _shown != null ? _shown.GetInventory().GetItemAt(cx, cy) : null; if (now != null && !Companion.Take(_shown, Player.m_localPlayer, now, out string why) && why != null) _note = Words.Show(why); };
                         _nextCheck = 0f;
                     } : (Action)null);
-                    void Show() => GameUi.Fill(e, c.GetInventory().GetItemAt(cx, cy));
+                    void Show() => GameUi.Fill(e, c.GetInventory().GetItemAt(cx, cy), quality: false);
                     Show();
                     _live.Add(Show);
                 }
@@ -1305,7 +1287,7 @@ namespace VillagePlebs
                             _pending = () => { List<ItemDrop.ItemData> now = Giveable(); if (k < now.Count && !Companion.Give(_shown, Player.m_localPlayer, now[k], out string why) && why != null) _note = Words.Show(why); };
                             _nextCheck = 0f;
                         });
-                        void Show() { List<ItemDrop.ItemData> now = Giveable(); GameUi.Fill(e, k < now.Count ? now[k] : null); }
+                        void Show() { List<ItemDrop.ItemData> now = Giveable(); GameUi.Fill(e, k < now.Count ? now[k] : null, quality: false); }
                         Show();
                         _live.Add(Show);
                     }

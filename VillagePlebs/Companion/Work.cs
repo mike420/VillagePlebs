@@ -195,6 +195,7 @@ namespace VillagePlebs
             }
             if (TravelHome(st, center, radius, moveTo)) return;
             if (Clearing(st, moveTo)) return;
+            if (FarTripStep(st, moveTo, stop)) return;
             if (Time.time >= st.NextLoanLook) { st.NextLoanLook = Time.time + 30f; Loans.Return(st); }
 
             if (st.Task != null && !Valid(st, st.Task)) Drop(st);
@@ -1267,10 +1268,11 @@ namespace VillagePlebs
                 }
                 if (Time.time < st.TripUntil) { st.TripUntil = 0f; st.Remember(P("villagepleb_work_trip_back")); }
             }
+            if (searched && goal != null && goal.Raw.Count > 0 && !goalSeen && !Directed(st) && StartFarTrip(st, center, radius, goal, goalPrey)) return null;
             if (searched && goal != null && goal.Raw.Count > 0 && !goalSeen && !Directed(st) && !goalPrey.Any())
             {
                 Talk.Tell(me, P("villagepleb_work_cant_find", Goals.Or(goal.Things()), goal.What), "far:" + goal.What, 30f);
-                foreach (string item in goal.Raw.Keys) st.Unfindable[item] = Time.time + 600f;
+                foreach (string item in goal.Raw.Keys) st.Unfindable[item] = Time.time + 180f;
                 st.NextUpgradeLook = 0f;
             }
             if (best == null && inv.GetEmptySlots() == 0) Talk.Tell(me, P("villagepleb_work_bag_no_room"), "full", 15f);
@@ -1422,6 +1424,65 @@ namespace VillagePlebs
             }
             if (best != null) { best.Trip = true; best.ForGoal = true; }
             return best;
+        }
+
+        // Nothing it needs is loaded near home: it may still be out there, past what the game keeps loaded around you. It sets off
+        // that way, out past home, and comes back a while later with what it found (CatchUp.FarTrip), as it does while you're away.
+        private static bool StartFarTrip(BrainState st, Vector3 center, float radius, Goal goal, HashSet<string> prey)
+        {
+            if (Time.time < st.NextFarTrip || st.FarGot != null) return false;
+            st.NextFarTrip = Time.time + 240f;
+            Humanoid me = st.Body;
+            Dictionary<string, int> got = CatchUp.FarTrip(me, center, radius, prey, out Vector3 way, out string list);
+            if (got == null) return false;
+            way.y = 0f;
+            Vector3 to = center + (way.sqrMagnitude > 0.01f ? way.normalized : me.transform.forward) * (radius + 35f);
+            if (ZoneSystem.instance != null && ZoneSystem.instance.GetSolidHeight(to, out float h)) to.y = h;
+            st.FarGot = got;
+            st.FarTo = to;
+            st.FarStarted = Time.time;
+            st.FarBack = 0f;
+            st.FarList = list;
+            st.FarWhat = Goals.And(goal.Things());
+            st.Task = null;
+            string away = FromHome(center + way, center);
+            Talk.Mention(me, P("villagepleb_work_trip_say", st.FarWhat, away), "trip:" + goal.What, 10f);
+            st.Remember(P("villagepleb_work_trip_remember", st.FarWhat));
+            Journal.Trip(me, P("villagepleb_work_trip_journal", away, st.FarWhat));
+            Activity.Log(me, $"sets off past home for {st.FarWhat}: will bring {list}");
+            return true;
+        }
+
+        private static bool FarTripStep(BrainState st, Action<Vector3, float, bool> moveTo, Action stop)
+        {
+            if (st.FarGot == null) return false;
+            Humanoid me = st.Body;
+            bool cut = OnOrder(st) || st.InCombat;
+            if (!cut && st.FarBack == 0f)
+            {
+                if (Flat(me.transform.position, st.FarTo) > 4f && Time.time - st.FarStarted < 90f)
+                {
+                    moveTo(st.FarTo, 2f, true);
+                    Brain.Status(st, P("villagepleb_work_status_far_out", st.FarWhat));
+                    return true;
+                }
+                st.FarBack = Time.time + 30f;
+            }
+            if (!cut && Time.time < st.FarBack)
+            {
+                stop();
+                Brain.Status(st, P("villagepleb_work_status_far_gathering", st.FarWhat));
+                return true;
+            }
+            CatchUp.Bring(me, st.FarGot);
+            Talk.Mention(me, P("villagepleb_work_far_home", st.FarList), "farback", 5f);
+            st.Remember(P("villagepleb_work_trip_back"));
+            Activity.Log(me, $"back from its trip with {st.FarList}");
+            foreach (string item in st.FarGot.Keys) st.Unfindable.Remove(item);
+            st.FarGot = null;
+            st.FarBack = 0f;
+            st.NextUpgradeLook = 0f;
+            return false;
         }
 
         internal static string Compass(Vector3 way)
