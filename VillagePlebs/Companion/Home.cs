@@ -25,10 +25,13 @@ namespace VillagePlebs
             if (hover == null || AssignFor == null) return;
             Bed bed = hover.GetComponentInParent<Bed>();
             if (bed != null) { ToggleBed(bed, AssignFor); return; }
-            Container chest = hover.GetComponentInParent<Container>();
+            // The chest may sit anywhere on the piece looked at (some building mods put the storage beside or below the part you see).
+            Container chest = hover.GetComponentInParent<Container>() ?? hover.GetComponentInParent<Piece>()?.GetComponentInChildren<Container>(true);
+            VillagePlebsPlugin.Instance?.Note($"Assign key on {hover.name}: {(chest != null ? $"chest {chest.name}, storage {IsChest(chest)}, in use {Containers.InUse(chest)}" : "no chest or bed")}");
             if (chest == null) return;
             if (NotStorage(chest) && chest.GetComponentInParent<Piece>() != null) VillagePlebsPlugin.Tell(T("villagepleb_home_not_a_chest", Companion.NameOf(AssignFor)));
             else if (IsChest(chest)) ToggleChest(chest, AssignFor);
+            else VillagePlebsPlugin.Tell(T("villagepleb_home_cant_keep", Companion.NameOf(AssignFor)));
         }
 
         public static void StopAssign(string why = null)
@@ -197,14 +200,31 @@ namespace VillagePlebs
             long id = Companion.IdOf(c);
             if (z == null) return;
             if (Containers.InUse(chest)) { VillagePlebsPlugin.Tell(T("villagepleb_home_chest_open")); return; }
-            bool mine = z.GetLong(HomeKey, 0L) == id;
-            if (!mine && z.GetLong(HomeKey, 0L) != 0L) { VillagePlebsPlugin.Tell(T("villagepleb_home_chest_others", Named(z.GetString(HomeName, ""), "villagepleb_home_another_companion"))); return; }
+            long had = z.GetLong(HomeKey, 0L);
+            bool mine = had == id;
+            // Only another player's companion keeps it from you: one of your own, or one that is gone (released, or replaced and given
+            // a new id), simply hands it over.
+            if (!mine && had != 0L && OtherPlayers(had))
+            {
+                VillagePlebsPlugin.Tell(T("villagepleb_home_chest_others", Named(z.GetString(HomeName, ""), "villagepleb_home_another_companion")));
+                return;
+            }
+            VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(c)} {(mine ? "lets go of" : had != 0L ? $"takes over (from {had})" : "takes")} the chest at {chest.transform.position:F0}");
             Claim(chest);
             z.Set(HomeKey, mine ? 0L : id);
             z.Set(HomeName, mine ? "" : Companion.NameOf(c));
             _chestCache.Clear();
             int count = Chests(c).Count;
             VillagePlebsPlugin.Tell(mine ? T("villagepleb_home_chest_let_go", Companion.NameOf(c)) : T(count == 1 ? "villagepleb_home_chest_taken_one" : "villagepleb_home_chest_taken_many", Companion.NameOf(c), count));
+        }
+
+        // Whether that companion id belongs to someone else: a companion here mastered by another player.
+        private static bool OtherPlayers(long id)
+        {
+            Player me = Player.m_localPlayer;
+            if (me != null && Profile.Find(me, id) != null) return false;
+            Humanoid there = Companion.All().FirstOrDefault(h => Companion.IdOf(h) == id);
+            return there != null && me != null && !Companion.IsMine(there, me);
         }
 
         public static bool IsChest(Container c)

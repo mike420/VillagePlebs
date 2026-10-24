@@ -200,6 +200,7 @@ namespace VillagePlebs
             if (st.Task != null && !Valid(st, st.Task)) Drop(st);
             if (st.Task == null && !NextQueued(st) && !NextInArea(st)) NextFarm(st);
             if (st.Task == null && st.Unpacking) Unpack(st);
+            if (st.Task == null && st.Farm == Errand.Fish) { stop(); return; }
             if (st.Task == null && Time.time >= st.NextWorkLook)
             {
                 st.NextWorkLook = Time.time + 1.5f;
@@ -1581,7 +1582,8 @@ namespace VillagePlebs
 
         public static bool IsStock(BrainState st, ItemDrop.ItemData i) => StockCap(st, i) > 0;
 
-        public static bool BagFull(Humanoid me) => me.GetInventory().GetEmptySlots() <= 1 || Carry.Weight(me) > Carry.Max(me) * 0.9f;
+        // Full means no free cell left in its bag, or carrying all it can (what it wears counts, as for a player).
+        public static bool BagFull(Humanoid me) => me.GetInventory().GetEmptySlots() <= 0 || Carry.Weight(me) >= Carry.Max(me);
 
         private static int Stocked(Humanoid me, string name) => Home.Chests(me).Sum(c => c.GetInventory().GetAllItems().Where(i => i.m_shared.m_name == name).Sum(i => i.m_stack));
 
@@ -1625,7 +1627,15 @@ namespace VillagePlebs
         {
             done = null;
             Humanoid me = st.Body;
-            if (BagFull(me)) { done = P("villagepleb_work_farm_bag_full"); return false; }
+            // A fish needs a free cell and the strength to carry it: what it wears counts towards its weight, so "nearly at its limit"
+            // (as other work uses) would stop a well-armoured companion with an empty bag.
+            int free = me.GetInventory().GetEmptySlots();
+            if (free <= 0 || Carry.Weight(me) >= Carry.Max(me))
+            {
+                Activity.Log(me, $"stops fishing: {free} free cells, carrying {Carry.Weight(me):0} of {Carry.Max(me):0}");
+                done = P(free <= 0 ? "villagepleb_work_farm_bag_full" : "villagepleb_work_too_heavy");
+                return false;
+            }
             if (Fishing.Rod(me) == null || !Fishing.HasBait(me))
             {
                 Func<ItemDrop.ItemData, bool> gear = i => Fishing.IsRod(i) && Fishing.Rod(me) == null || Fishing.IsBait(i);
@@ -1639,15 +1649,25 @@ namespace VillagePlebs
                 done = P(Fishing.Rod(me) == null ? "villagepleb_errands_need_rod" : "villagepleb_work_fish_no_bait");
                 return false;
             }
+            // Between fish it waits at the water a while (looking every few seconds) for one it can catch to swim near.
+            if (Time.time < st.NextFishLook) return true;
+            st.NextFishLook = Time.time + 5f;
             List<Fish> near = Fishing.Near(center, radius + Farming.FieldReach).ToList();
-            foreach (Fish fish in near.Where(f => !Skipped(st, f) && Fishing.BaitFor(me, f) != null).OrderBy(f => Vector3.Distance(f.transform.position, me.transform.position)).Take(5))
+            List<Fish> takers = near.Where(f => Fishing.BaitFor(me, f) != null).ToList();
+            foreach (Fish fish in takers.Where(f => !Skipped(st, f)).OrderBy(f => Vector3.Distance(f.transform.position, me.transform.position)).Take(5))
             {
                 if (!Fishing.Spot(me, fish, out Vector3 stand)) { st.Skipped[fish.gameObject.GetInstanceID()] = Time.time + 120f; continue; }
                 Task t = New(Kind.Fish, fish, Job.None);
                 t.Pos = stand;
+                st.FishWaitSince = 0f;
+                st.NextFishLook = 0f;
                 return Ordered(st, t, false);
             }
-            done = P(near.Count == 0 ? "villagepleb_work_fish_none" : "villagepleb_work_fish_none_take");
+            if (st.FishWaitSince == 0f) { st.FishWaitSince = Time.time; Activity.Log(me, $"waits for a fish it can catch ({near.Count} near, {takers.Count} take its bait)"); }
+            if (Time.time - st.FishWaitSince < 120f) { Brain.Status(st, P("villagepleb_work_status_fish_wait")); return true; }
+            st.FishWaitSince = 0f;
+            string baits = string.Join(", ", me.GetInventory().GetAllItems().Where(Fishing.IsBait).Select(i => i.m_shared.m_name).Distinct());
+            done = near.Count == 0 ? P("villagepleb_work_fish_none") : takers.Count == 0 ? P("villagepleb_work_fish_none_take", baits) : P("villagepleb_work_fish_cant_reach");
             return false;
         }
 
@@ -1679,7 +1699,7 @@ namespace VillagePlebs
             Smelter feed = smelters.Where(s => !Skipped(st, s) && inv.GetAllItems().Any(i => Smelting.Wants(s, i))).OrderBy(Away).FirstOrDefault(s => Brain.CanReach(me, s.transform.position, 3f));
             if (feed != null) return Ordered(st, New(Kind.Smelt, feed, Job.None), false);
             List<Smelter> open = smelters.Where(s => !Skipped(st, s)).ToList();
-            Func<ItemDrop.ItemData, bool> wanted = i => open.Any(s => Smelting.Wants(s, i)) && Carry.Weight(me) + i.GetWeight() <= Carry.Max(me) * 0.9f;
+            Func<ItemDrop.ItemData, bool> wanted = i => open.Any(s => Smelting.Wants(s, i)) && Carry.Weight(me) + i.GetWeight() <= Carry.Max(me);
             if (st.FarmTrips < 6)
             {
                 Container chest = OwnChestWith(me, wanted)
@@ -1768,6 +1788,7 @@ namespace VillagePlebs
             st.Farm = what;
             st.FarmTrips = 0;
             st.SmeltStored = false;
+            st.FishWaitSince = st.NextFishLook = 0f;
             if (what == Errand.Plant) Farming.Forget(st);
             st.GoingHomeUntil = 0f;
             st.CommandUntil = Time.time + 120f;
@@ -1811,9 +1832,9 @@ namespace VillagePlebs
                 if (stows && take == null)
                     foreach (ItemDrop.ItemData item in its.GetAllItems().OrderBy(i => i.m_stack).ToList())
                     {
-                        if (mine.GetEmptySlots() <= 2 || Carry.Weight(me) > Carry.Max(me) * 0.8f) break;
+                        if (mine.GetEmptySlots() <= 0 || Carry.Weight(me) >= Carry.Max(me)) break;
                         int extra = IsStock(st, item) ? Stocked(me, item.m_shared.m_name) - StockCap(st, item) : item.m_stack;
-                        if (item.m_shared.m_weight > 0f) extra = Mathf.Min(extra, Mathf.FloorToInt((Carry.Max(me) * 0.9f - Carry.Weight(me)) / item.m_shared.m_weight));
+                        if (item.m_shared.m_weight > 0f) extra = Mathf.Min(extra, Mathf.FloorToInt((Carry.Max(me) - Carry.Weight(me)) / item.m_shared.m_weight));
                         if (MovePart(its, mine, item, Mathf.Min(item.m_stack, extra)) > 0) tidied++;
                     }
             }

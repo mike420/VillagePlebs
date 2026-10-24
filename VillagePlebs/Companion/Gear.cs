@@ -6,7 +6,7 @@ using UnityEngine;
 
 namespace VillagePlebs
 {
-    internal enum GearKind { Weapon, Spare, Shield, Bow, Ammo, Axe, Pickaxe, Hammer, Head, Chest, Legs, Cape, Belt, Food, Rod, Bait }
+    internal enum GearKind { Sword, Knife, Polearm, Spear, Cultivator, Spare, Shield, Bow, Ammo, Axe, Pickaxe, Hammer, Head, Chest, Legs, Cape, Belt, Food, Rod, Bait }
 
     internal static class Gear
     {
@@ -16,24 +16,28 @@ namespace VillagePlebs
 
         public static readonly Slot[] All =
         {
-            new Slot { Kind = GearKind.Weapon,  Label = Words.P("villagepleb_gear_slot_weapon"),  X = 0, Y = 4 },
-            new Slot { Kind = GearKind.Spare,   Label = Words.P("villagepleb_gear_slot_spare"),   X = 1, Y = 4 },
-            new Slot { Kind = GearKind.Shield,  Label = Words.P("villagepleb_gear_slot_shield"),  X = 2, Y = 4 },
-            new Slot { Kind = GearKind.Bow,     Label = Words.P("villagepleb_gear_slot_bow"),     X = 3, Y = 4 },
-            new Slot { Kind = GearKind.Ammo,    Label = Words.P("villagepleb_gear_slot_arrows"),  X = 4, Y = 4 },
-            new Slot { Kind = GearKind.Axe,     Label = Words.P("villagepleb_gear_slot_axe"),     X = 5, Y = 4 },
-            new Slot { Kind = GearKind.Pickaxe, Label = Words.P("villagepleb_gear_slot_pickaxe"), X = 6, Y = 4 },
-            new Slot { Kind = GearKind.Hammer,  Label = Words.P("villagepleb_gear_slot_hammer"),  X = 7, Y = 4 },
-            new Slot { Kind = GearKind.Head,    Label = Words.P("villagepleb_gear_slot_helmet"),  X = 0, Y = 5 },
-            new Slot { Kind = GearKind.Chest,   Label = Words.P("villagepleb_gear_slot_chest"),   X = 1, Y = 5 },
-            new Slot { Kind = GearKind.Legs,    Label = Words.P("villagepleb_gear_slot_legs"),    X = 2, Y = 5 },
-            new Slot { Kind = GearKind.Cape,    Label = Words.P("villagepleb_gear_slot_cape"),    X = 3, Y = 5 },
-            new Slot { Kind = GearKind.Belt,    Label = Words.P("villagepleb_gear_slot_belt"),    X = 4, Y = 5 },
-            new Slot { Kind = GearKind.Food,    Label = Words.P("villagepleb_gear_slot_food"),    X = 5, Y = 5 },
-            new Slot { Kind = GearKind.Food,    Label = Words.P("villagepleb_gear_slot_food"),    X = 6, Y = 5 },
-            new Slot { Kind = GearKind.Food,    Label = Words.P("villagepleb_gear_slot_food"),    X = 7, Y = 5 },
-            new Slot { Kind = GearKind.Rod,     Label = Words.P("villagepleb_gear_slot_rod"),     X = 0, Y = 6 },
-            new Slot { Kind = GearKind.Bait,    Label = Words.P("villagepleb_gear_slot_bait"),    X = 1, Y = 6 },
+            new Slot { Kind = GearKind.Sword, Label = Words.P("villagepleb_gear_slot_sword"), X = 0, Y = 4 },
+            new Slot { Kind = GearKind.Knife, Label = Words.P("villagepleb_gear_slot_knife"), X = 1, Y = 4 },
+            new Slot { Kind = GearKind.Polearm, Label = Words.P("villagepleb_gear_slot_polearm"), X = 2, Y = 4 },
+            new Slot { Kind = GearKind.Spear, Label = Words.P("villagepleb_gear_slot_spear"), X = 3, Y = 4 },
+            new Slot { Kind = GearKind.Spare, Label = Words.P("villagepleb_gear_slot_spare"), X = 4, Y = 4 },
+            new Slot { Kind = GearKind.Shield, Label = Words.P("villagepleb_gear_slot_shield"), X = 5, Y = 4 },
+            new Slot { Kind = GearKind.Bow, Label = Words.P("villagepleb_gear_slot_bow"), X = 6, Y = 4 },
+            new Slot { Kind = GearKind.Ammo, Label = Words.P("villagepleb_gear_slot_arrows"), X = 7, Y = 4 },
+            new Slot { Kind = GearKind.Axe, Label = Words.P("villagepleb_gear_slot_axe"), X = 0, Y = 5 },
+            new Slot { Kind = GearKind.Pickaxe, Label = Words.P("villagepleb_gear_slot_pickaxe"), X = 1, Y = 5 },
+            new Slot { Kind = GearKind.Hammer, Label = Words.P("villagepleb_gear_slot_hammer"), X = 2, Y = 5 },
+            new Slot { Kind = GearKind.Cultivator, Label = Words.P("villagepleb_gear_slot_cultivator"), X = 3, Y = 5 },
+            new Slot { Kind = GearKind.Rod, Label = Words.P("villagepleb_gear_slot_rod"), X = 4, Y = 5 },
+            new Slot { Kind = GearKind.Bait, Label = Words.P("villagepleb_gear_slot_bait"), X = 5, Y = 5 },
+            new Slot { Kind = GearKind.Head, Label = Words.P("villagepleb_gear_slot_helmet"), X = 6, Y = 5 },
+            new Slot { Kind = GearKind.Chest, Label = Words.P("villagepleb_gear_slot_chest"), X = 7, Y = 5 },
+            new Slot { Kind = GearKind.Legs, Label = Words.P("villagepleb_gear_slot_legs"), X = 0, Y = 6 },
+            new Slot { Kind = GearKind.Cape, Label = Words.P("villagepleb_gear_slot_cape"), X = 1, Y = 6 },
+            new Slot { Kind = GearKind.Belt, Label = Words.P("villagepleb_gear_slot_belt"), X = 2, Y = 6 },
+            new Slot { Kind = GearKind.Food, Label = Words.P("villagepleb_gear_slot_food"), X = 3, Y = 6 },
+            new Slot { Kind = GearKind.Food, Label = Words.P("villagepleb_gear_slot_food"), X = 4, Y = 6 },
+            new Slot { Kind = GearKind.Food, Label = Words.P("villagepleb_gear_slot_food"), X = 5, Y = 6 },
         };
 
         public static HitData.DamageModifiers Modifiers(Humanoid c)
@@ -60,8 +64,12 @@ namespace VillagePlebs
             var t = i.m_shared.m_itemType;
             switch (s.Kind)
             {
-                case GearKind.Weapon:
                 case GearKind.Spare: return Companion.IsMelee(i) || IsAxe(i);
+                case GearKind.Sword: return Companion.IsMelee(i) && i.m_shared.m_skillType == Skills.SkillType.Swords;
+                case GearKind.Knife: return Companion.IsMelee(i) && i.m_shared.m_skillType == Skills.SkillType.Knives;
+                case GearKind.Polearm: return Companion.IsMelee(i) && i.m_shared.m_skillType == Skills.SkillType.Polearms;
+                case GearKind.Spear: return i.IsWeapon() && i.m_shared.m_skillType == Skills.SkillType.Spears;
+                case GearKind.Cultivator: return Farming.IsCultivator(i);
                 case GearKind.Shield: return t == ItemDrop.ItemData.ItemType.Shield;
                 case GearKind.Bow: return Companion.IsRanged(i) && i.m_shared.m_skillType != Skills.SkillType.Fishing && !Fishing.IsRod(i);
                 case GearKind.Rod: return Fishing.IsRod(i);
@@ -92,7 +100,10 @@ namespace VillagePlebs
         {
             switch (s.Kind)
             {
-                case GearKind.Weapon:
+                case GearKind.Sword:
+                case GearKind.Knife:
+                case GearKind.Polearm:
+                case GearKind.Spear:
                 case GearKind.Spare:
                 case GearKind.Bow: return Harm(i) + i.m_quality * 0.01f;
                 case GearKind.Shield: return i.GetBlockPower(1f) + i.m_quality * 0.01f;
@@ -102,7 +113,8 @@ namespace VillagePlebs
                     return (matches ? 100000f : 0f) + Harm(i) * 100f + i.m_stack;
                 case GearKind.Axe: return i.m_shared.m_toolTier * 1000f + i.GetDamage().m_chop;
                 case GearKind.Pickaxe: return i.m_shared.m_toolTier * 1000f + i.GetDamage().m_pickaxe;
-                case GearKind.Hammer: return i.m_durability;
+                case GearKind.Hammer:
+                case GearKind.Cultivator: return i.m_durability;
                 case GearKind.Rod: return i.m_quality * 1000f + i.m_durability;
                 case GearKind.Bait: return i.m_stack;
                 default: return i.GetArmor() + i.m_quality * 0.01f;
@@ -116,11 +128,11 @@ namespace VillagePlebs
             Grow(inv);
             bool moved = false;
             moved |= ArrangeFood(inv);
-            foreach (Slot s in All.Where(x => x.Kind != GearKind.Food).OrderBy(x => x.Kind == GearKind.Weapon ? 1 : x.Kind == GearKind.Spare ? 2 : x.Kind == GearKind.Ammo ? 3 : 0))
+            foreach (Slot s in All.Where(x => x.Kind != GearKind.Food).OrderBy(x => x.Kind == GearKind.Spare ? 2 : x.Kind == GearKind.Ammo ? 3 : 0))
             {
                 ItemDrop.ItemData current = In(h, s);
                 if (current != null && !Fits(s, current)) { if (ToBag(inv, current)) { moved = true; current = null; } else continue; }
-                ItemDrop.ItemData best = inv.GetAllItems().Where(i => !InSlot(i) && Fits(s, i) && !(IsTool(i) && (s.Kind == GearKind.Weapon || s.Kind == GearKind.Spare)))
+                ItemDrop.ItemData best = inv.GetAllItems().Where(i => !InSlot(i) && Fits(s, i) && !(IsTool(i) && s.Kind == GearKind.Spare))
                                            .OrderByDescending(i => Score(h, s, i)).FirstOrDefault();
                 if (best == null) continue;
                 if (current == null) { best.m_gridPos = new Vector2i(s.X, s.Y); moved = true; continue; }

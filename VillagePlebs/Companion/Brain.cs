@@ -147,6 +147,7 @@ namespace VillagePlebs
         public readonly HashSet<string> Wanted = new HashSet<string>();
         public readonly HashSet<string> SmeltFeeds = new HashSet<string>();
         public bool SmeltStored, Unpacking;
+        public float FishWaitSince, NextFishLook;
         public readonly Dictionary<int, float> Skipped = new Dictionary<int, float>();
         public readonly Dictionary<string, int> Gathered = new Dictionary<string, int>();
         public float NextEnemyScan, NextGear, NextAsk, LastAsk, HealthAtAsk = 1f;

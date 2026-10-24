@@ -34,7 +34,7 @@ namespace VillagePlebs
             string topic, item = null;
             ItemDrop.ItemData breaking = inv.GetAllItems().FirstOrDefault(i => (me.IsItemEquiped(i) || Work.IsTool(i)) && i.m_shared.m_useDurability && i.m_shared.m_canBeReparied
                                                                               && i.GetMaxDurability() > 0f && i.m_durability < i.GetMaxDurability() * 0.1f);
-            if (inv.GetEmptySlots() == 0 || Carry.Weight(me) > Carry.Max(me) * 0.95f) topic = "bag";
+            if (inv.GetEmptySlots() == 0 || Carry.Weight(me) >= Carry.Max(me)) topic = "bag";
             else if (breaking != null) { topic = "worn"; item = Low(breaking.m_shared.m_name); }
             else if (!inv.GetAllItems().Any(Food.IsFood) && Food.Meals(me).Count == 0) topic = "food";
             else return;

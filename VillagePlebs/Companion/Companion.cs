@@ -73,7 +73,8 @@ namespace VillagePlebs
             All().Where(c => IsMine(c, p) && Vector3.Distance(c.transform.position, p.transform.position) < range)
                  .OrderBy(c => Vector3.Distance(c.transform.position, p.transform.position)).FirstOrDefault();
 
-        public static bool CanCommand(Component c, Player p) => IsMine(c, p) || (Zdo(c)?.GetBool(Keys.Friends, false) ?? false);
+        // Only its own master gives it orders.
+        public static bool CanCommand(Component c, Player p) => IsMine(c, p);
 
         public static bool Write(Humanoid c, System.Action<ZDO> change)
         {
@@ -321,7 +322,7 @@ namespace VillagePlebs
 
         internal static bool IsMelee(ItemDrop.ItemData item) =>
             item.IsWeapon() && !IsRanged(item) && item.m_shared.m_skillType != Skills.SkillType.Pickaxes && item.m_shared.m_skillType != Skills.SkillType.Unarmed
-            && item.m_shared.m_attack != null && item.m_shared.m_attack.m_attackType != Attack.AttackType.Projectile;
+            && item.m_shared.m_attack != null && item.m_shared.m_attack.m_attackType != Attack.AttackType.Projectile && item.m_shared.m_buildPieces == null;
 
         public static ItemDrop.ItemData BestMelee(Humanoid h) => h.GetInventory().GetAllItems().Where(IsMelee).OrderByDescending(i => i.GetDamage().GetTotalDamage()).FirstOrDefault();
 
@@ -342,7 +343,7 @@ namespace VillagePlebs
             d.m_blunt * Factor(m.m_blunt) + d.m_slash * Factor(m.m_slash) + d.m_pierce * Factor(m.m_pierce) + d.m_fire * Factor(m.m_fire)
             + d.m_frost * Factor(m.m_frost) + d.m_lightning * Factor(m.m_lightning) + d.m_poison * Factor(m.m_poison) + d.m_spirit * Factor(m.m_spirit)
             + d.m_chop * Factor(m.m_chop) * 0.2f + d.m_pickaxe * Factor(m.m_pickaxe) * 0.2f;
-        public static ItemDrop.ItemData BestRanged(Humanoid h) => h.GetInventory().GetAllItems().Where(i => IsRanged(i) && HasAmmoFor(h, i)).OrderByDescending(i => i.GetDamage().GetTotalDamage()).FirstOrDefault();
+        public static ItemDrop.ItemData BestRanged(Humanoid h) => h.GetInventory().GetAllItems().Where(i => IsRanged(i) && !Fishing.IsRod(i) && HasAmmoFor(h, i)).OrderByDescending(i => i.GetDamage().GetTotalDamage()).FirstOrDefault();
 
         public static List<ItemDrop.ItemData> HealingPotions(Humanoid h) =>
             h.GetInventory().GetAllItems().Where(i => i.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Consumable && i.m_shared.m_consumeStatusEffect is SE_Stats se
@@ -363,6 +364,10 @@ namespace VillagePlebs
                                               .OrderByDescending(i => i.GetArmor()).ThenByDescending(i => i.m_quality).FirstOrDefault();
                 if (best != null) Equip(h, best);
             }
+
+            // Work tools (rod, cultivator, hammer) go away once it is done with them, even with no weapon to take their place.
+            foreach (ItemDrop.ItemData held in new[] { Right(h), Left(h) })
+                if (held != null && held != tool && (Fishing.IsRod(held) || Farming.IsCultivator(held) || held.m_shared.m_buildPieces != null)) h.UnequipItem(held, false);
 
             ItemDrop.ItemData weapon = tool != null && inv.ContainsItem(tool) ? tool : wantRanged ? BestRanged(h) ?? BestMeleeAgainst(h, against) : BestMeleeAgainst(h, against) ?? BestRanged(h);
             if (weapon != null) Equip(h, weapon);

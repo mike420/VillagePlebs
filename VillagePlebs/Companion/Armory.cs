@@ -12,13 +12,13 @@ namespace VillagePlebs
         public static bool Allowed(Component c) => Companion.Zdo(c)?.GetBool(Key, true) ?? true;
 
         private static readonly GearKind[] Kinds =
-            { GearKind.Weapon, GearKind.Shield, GearKind.Bow, GearKind.Ammo, GearKind.Axe, GearKind.Pickaxe, GearKind.Head, GearKind.Chest, GearKind.Legs, GearKind.Cape };
+            { GearKind.Spare, GearKind.Shield, GearKind.Bow, GearKind.Ammo, GearKind.Axe, GearKind.Pickaxe, GearKind.Head, GearKind.Chest, GearKind.Legs, GearKind.Cape };
 
         private static bool Worn(ItemDrop.ItemData i) => i.m_shared.m_useDurability && i.m_shared.m_maxDurability > 0f && i.m_durability < i.GetMaxDurability() * 0.25f;
 
         private static float Current(Humanoid me, Gear.Slot s)
         {
-            if (s.Kind == GearKind.Weapon)
+            if (s.Kind == GearKind.Spare)
                 return me.GetInventory().GetAllItems().Where(Companion.IsMelee).Select(i => Gear.Score(me, s, i)).DefaultIfEmpty(0f).Max();
             ItemDrop.ItemData there = Gear.In(me, s);
             return there != null ? Gear.Score(me, s, there) : -1f;
@@ -27,7 +27,7 @@ namespace VillagePlebs
         private static bool Better(Humanoid me, Gear.Slot s, ItemDrop.ItemData i)
         {
             if (!Gear.Fits(s, i) || Worn(i) || i.m_shared.m_questItem) return false;
-            if (s.Kind == GearKind.Weapon && (Gear.IsTool(i) || !Companion.IsMelee(i))) return false;
+            if (s.Kind == GearKind.Spare && (Gear.IsTool(i) || !Companion.IsMelee(i))) return false;
             if (s.Kind == GearKind.Ammo)
             {
                 ItemDrop.ItemData bow = Gear.In(me, Gear.All.First(x => x.Kind == GearKind.Bow));
@@ -78,7 +78,7 @@ namespace VillagePlebs
             {
                 if (!its.ContainsItem(pick)) continue;
                 if (mine.GetEmptySlots() == 0) { Talk.Tell(me, P("villagepleb_armory_bag_full"), "armoryfull", 60f); break; }
-                Gear.Slot slot = Gear.All.First(s => Gear.Fits(s, pick) && Kinds.Contains(s.Kind) && (s.Kind != GearKind.Weapon || !Gear.IsTool(pick)));
+                Gear.Slot slot = Gear.All.First(s => Gear.Fits(s, pick) && Kinds.Contains(s.Kind) && (s.Kind != GearKind.Spare || !Gear.IsTool(pick)));
                 ItemDrop.ItemData old = Gear.In(me, slot);
                 pick.m_equipped = false;
                 int had = mine.CountItems(pick.m_shared.m_name);
