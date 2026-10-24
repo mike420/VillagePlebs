@@ -472,11 +472,12 @@ namespace VillagePlebs
             Humanoid me = st.Body;
             if (st.Asleep && Companion.OrderOf(me) != Order.Gather) Sleep.Wake(st, P("villagepleb_brain_wake_called"));
             if (MakeWay(st, dt)) return;
-            if (Idle.Emoting(st, p => LookAt(st.Ai, p))) return;
+            bool onOrder = Work.OnOrder(st);
+            if (!onOrder && Idle.Emoting(st, p => LookAt(st.Ai, p))) return;
             if (Idle.Come(st, master, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run), () => st.Ai.StopMoving(), p => LookAt(st.Ai, p))) return;
-            if (Loot.Tick(st, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run))) return;
+            if (!onOrder && Loot.Tick(st, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run))) return;
             if (Grave.Tick(st, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run), () => st.Ai.StopMoving())) return;
-            if (Repair.Tick(st, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run), () => st.Ai.StopMoving())) return;
+            if (!onOrder && Repair.Tick(st, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run), () => st.Ai.StopMoving())) return;
             Needs.Tick(st, master);
             switch (Companion.OrderOf(me))
             {

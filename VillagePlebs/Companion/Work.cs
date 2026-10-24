@@ -215,9 +215,13 @@ namespace VillagePlebs
             st.Task = t;
             st.Helping = false;
             st.CommandUntil = Time.time + 120f;
+            if (fromYou) { st.RepairAt = null; st.ComeUntil = 0f; st.EmoteUntil = 0f; st.PendingEmote = null; }
             st.Remember(P(fromYou ? "villagepleb_work_you_pointed" : "villagepleb_work_next_in_patch", Describe(t)));
             return true;
         }
+
+        public static bool OnOrder(BrainState st) =>
+            st.Area != null || st.PickQueue.Count > 0 || st.Task != null && st.Task.Ordered && Time.time < st.CommandUntil;
 
         public static bool Ordered(BrainState st, Kind kind, Component target) => Ordered(st, New(kind, target, Job.None));
 
@@ -433,6 +437,7 @@ namespace VillagePlebs
         {
             Humanoid me = st.Body;
             Task t = st.Task;
+            if (t.Ordered) { Action<Vector3, float, bool> walk = moveTo; moveTo = (p, d, run) => walk(p, d, run || Flat(p, me.transform.position) > 3f); }
             Vector3 at = Point(t.Target, me.transform.position);
             float dist = Flat(at, me.transform.position);
             if (Time.time - t.Started > (t.Trip ? 240f : t.Ordered ? 180f : 60f) || (dist > 3f && Time.time - t.LastClose > (t.Trip || t.Ordered ? 120f : 20f)))
@@ -477,7 +482,7 @@ namespace VillagePlebs
                 case Kind.Hit:
                     ItemDrop.ItemData tool = t.Job == Job.Wood ? Axe(me) : Pickaxe(me);
                     if (tool == null) { st.Task = null; break; }
-                    st.WorkTool = tool;
+                    if (st.WorkTool != tool) { st.WorkTool = tool; st.NextGear = 0f; }
                     Bounds size = Size(t.Target);
                     float big = Mathf.InverseLerp(0.6f, 3f, Mathf.Max(size.size.x, size.size.z, size.size.y * 0.5f));
                     float reach = Mathf.Lerp(0.6f, Mathf.Min(1.3f, (tool.m_shared.m_attack?.m_attackRange ?? 1.8f) * 0.6f), big) * t.Closer;
