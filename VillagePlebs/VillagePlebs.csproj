@@ -48,6 +48,9 @@
       <LogicalName>translations/English.json</LogicalName>
     </EmbeddedResource>
     <None Include="Assets\Translations\**\VillagePlebs.json" Exclude="Assets\Translations\English\VillagePlebs.json" />
+    <EmbeddedResource Include="Assets\Wheel\*.png">
+      <LogicalName>wheel/%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="Assets\gift_box.png">
       <LogicalName>gift_box.png</LogicalName>
     </EmbeddedResource>

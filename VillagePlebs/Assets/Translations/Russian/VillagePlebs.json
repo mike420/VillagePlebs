@@ -120,6 +120,7 @@
   "villagepleb_menu_errands": "Поручения",
   "villagepleb_menu_errands_about": "Один щелчок: он сразу идёт выполнять поручение, а потом возвращается к прежнему делу (рядом с домом). Или скажите в чате (по-английски): «{0}, restock», «gear up», «repair the base»...",
   "villagepleb_menu_how_it_fights": "Как он сражается",
+  "villagepleb_wheel_current": "сейчас",
   "villagepleb_menu_style_auto": "Пусть решает сам (рекомендуется)",
   "villagepleb_menu_style_aggressive": "Агрессивно",
   "villagepleb_menu_style_balanced": "Взвешенно",

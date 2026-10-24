@@ -27,6 +27,7 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 
 [list]
 [*]Press [b]J[/b] to summon your companion or open its menu ([b]E[/b] on it too). Hold [b]J[/b]: your companions come with you, or go home. A new companion gets straight to work on its own mission (making or upgrading its gear) where you summoned it, until you tell it to come with you.
+[*][b]Command wheel:[/b] [b]Left Shift + Q[/b] opens a wheel for the companion you look at: its orders and errands round the outside, how it fights inside. Hover a wedge and it grows; let go or click to choose.
 [*][b]Point and command:[/b] aim at something and press [b]H[/b]: an enemy (it attacks it), a tree, rock or plant (it works it), your chest (it puts its things in), a cart (it pulls it), its tombstone (it fetches its things), a free bed (it makes it its bed), the ground (it waits there), the sky (it comes back). It only takes an order it has the tools for, in its bag or its own chests (it fetches them first), and your orders come before its mission; jobs it has no tool for wait while it works on its mission.
 [*][b]Let it decide:[/b] it reads what you are doing. It fights beside you, mines or chops beside you and keeps close while you explore; where a place is too dangerous for its gear it tells you and only defends.
 [*][b]Combat:[/b] timed parries (it learns each creature's swing), dodge rolls, flanking, backstabs, weapon specials, meads, kiting with a bow, and care around bosses.
@@ -52,6 +53,7 @@ Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in
 [*][b]Menu Key[/b] (default J)
 [*][b]Command Key[/b] (default H)
 [*][b]Assign Key[/b] (default Y)
+[*][b]Wheel Key[/b] (default Left Shift + Q)
 [/list]
 
 [b]Companion[/b]

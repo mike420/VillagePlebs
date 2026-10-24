@@ -103,13 +103,14 @@ namespace VillagePlebs
             Player player = Player.m_localPlayer;
             Net.Update(player);
             Passing.Tick();
-            if (player == null) { if (MenuOpen) CloseMenu(); return; }
+            if (player == null) { if (MenuOpen) CloseMenu(); Wheel.Close(); return; }
             Companion.KeepOwnership(player);
             Home.Tick(player);
             Portraits.Tick();
             UpdateMenu(player);
+            Wheel.Tick(player);
             MenuKeyPressed(player);
-            if (!MenuOpen && Home.AssignFor == null && !TypingOrBusy() && MainConfig.commandKey.Value.IsDown()) Pointing.Command(player);
+            if (!MenuOpen && !Wheel.Open && Home.AssignFor == null && !TypingOrBusy() && MainConfig.commandKey.Value.IsDown()) Pointing.Command(player);
             Marks.Tick();
         }
 
@@ -119,7 +120,7 @@ namespace VillagePlebs
         private void MenuKeyPressed(Player player)
         {
             if (MenuOpen) { if (MainConfig.menuKey.Value.IsDown() && !GameUi.Typing) CloseMenu(); _keyDownAt = -1f; return; }
-            if (Home.AssignFor != null || TypingOrBusy()) { _keyDownAt = -1f; return; }
+            if (Home.AssignFor != null || Wheel.Open || TypingOrBusy()) { _keyDownAt = -1f; return; }
             if (MainConfig.menuKey.Value.IsDown()) { _keyDownAt = Time.time; _keyHeld = false; return; }
             if (_keyDownAt < 0f) return;
             if (MainConfig.menuKey.Value.IsPressed())

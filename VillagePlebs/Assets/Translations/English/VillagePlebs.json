@@ -120,6 +120,7 @@
   "villagepleb_menu_errands": "Errands",
   "villagepleb_menu_errands_about": "One click: it goes and does it now, then carries on with what it was doing (near its home). Or say it in chat: \"{0}, restock\", \"gear up\", \"repair the base\"...",
   "villagepleb_menu_how_it_fights": "How it fights",
+  "villagepleb_wheel_current": "current",
   "villagepleb_menu_style_auto": "Let it decide (recommended)",
   "villagepleb_menu_style_aggressive": "Aggressive",
   "villagepleb_menu_style_balanced": "Balanced",

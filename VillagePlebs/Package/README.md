@@ -29,6 +29,7 @@ Thank you for your support, and happy gaming! ⚔️  ...... (A Paypal account i
 ## ⭐ Features:
 
   * Press `J` to summon your companion or open its menu (`E` on it too). Hold `J`: your companions come with you, or go home. A new companion gets straight to work on its own mission (making or upgrading its gear) where you summoned it, until you tell it to come with you.
+  * **Command wheel:** `Left Shift + Q` opens a wheel for the companion you look at: its orders and errands round the outside, how it fights inside. Hover a wedge and it grows; let go or click to choose.
   * **Point and command:** aim at something and press `H`: an enemy (it attacks it), a tree, rock or plant (it works it), your chest (it puts its things in), a cart (it pulls it), its tombstone (it fetches its things), a free bed (it makes it its bed), the ground (it waits there), the sky (it comes back). It only takes an order it has the tools for, in its bag or its own chests (it fetches them first), and your orders come before its mission; jobs it has no tool for wait while it works on its mission.
   * **Let it decide:** it reads what you are doing. It fights beside you, mines or chops beside you and keeps close while you explore; where a place is too dangerous for its gear it tells you and only defends.
   * **Combat:** timed parries (it learns each creature's swing), dodge rolls, flanking, backstabs, weapon specials, meads, kiting with a bow, and care around bosses.
@@ -54,6 +55,7 @@ Settings are in `BepInEx/config/MagicMike.VillagePlebs.cfg`. Change them in game
 | General | Menu Key | J | Tap: your companion's menu (or the summon panel). Hold: your companions near you come with you, or go home. |
 | General | Command Key | H | Point at something and press it to give an order: an enemy, a tree, rock or plant, your chest, a cart, its tombstone, a free bed, the ground or the sky. |
 | General | Assign Key | Y | While choosing a companion's bed and chests (its menu: Home), look at a bed or a chest and press it to give it to the companion; again to take it back. |
+| General | Wheel Key | Left Shift + Q | Opens the command wheel for the companion you look at (or your nearest): orders and errands round the outside, how it fights inside. Hold and let go over a choice, or tap and click. |
 | Companion | Max Companions | 1 | How many companions each player can have for free, summoned from the menu (synced). |
 | Companion | Max Bought Companions | 2 | How many more each player can buy from any trader (Haldor, Hildir, the Bog Witch), 0 to 6. Buying one lets you name them; the coins are taken when they join you (synced). |
 | Companion | Companion Price | 500 | What a trader asks for a companion, in coins (synced). |
