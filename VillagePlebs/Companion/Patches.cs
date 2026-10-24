@@ -195,7 +195,7 @@ namespace VillagePlebs
     [HarmonyPatch(typeof(WearNTear), nameof(WearNTear.Damage))]
     internal static class WearNTear_Damage_NotFromCompanion
     {
-        private static bool Prefix(HitData hit) => !(Aoe_OnHit.HittingCompanion && hit.m_hitType == HitData.HitType.Self);
+        private static bool Prefix(HitData hit) => !(Aoe_OnHit.HittingCompanion && hit.m_hitType == HitData.HitType.Self) && !Companion.Is(hit.GetAttacker());
     }
 
     [HarmonyPatch(typeof(Character), nameof(Character.OnDeath))]
