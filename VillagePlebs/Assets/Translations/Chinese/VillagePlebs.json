@@ -152,7 +152,7 @@
   "villagepleb_menu_send_away": "遣散",
   "villagepleb_menu_send_away_about": "永久遣散同伴。只有背包为空时才行，这样什么都不会丢。",
   "villagepleb_menu_send_home": "送回家",
-  "villagepleb_menu_tab_companions": "同伴",
+  "villagepleb_menu_tab_companions": "Plebs",
   "villagepleb_menu_release": "永久放走{0}",
   "villagepleb_menu_release_again": "再按一次:永久放走{0}",
   "villagepleb_menu_release_hint": "必须先取出它的装备。此操作无法撤销。",
