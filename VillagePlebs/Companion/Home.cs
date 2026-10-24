@@ -27,7 +27,6 @@ namespace VillagePlebs
             if (bed != null) { ToggleBed(bed, AssignFor); return; }
             // The chest may sit anywhere on the piece looked at (some building mods put the storage beside or below the part you see).
             Container chest = hover.GetComponentInParent<Container>() ?? hover.GetComponentInParent<Piece>()?.GetComponentInChildren<Container>(true);
-            VillagePlebsPlugin.Instance?.Note($"Assign key on {hover.name}: {(chest != null ? $"chest {chest.name}, storage {IsChest(chest)}, in use {Containers.InUse(chest)}" : "no chest or bed")}");
             if (chest == null) return;
             if (NotStorage(chest) && chest.GetComponentInParent<Piece>() != null) VillagePlebsPlugin.Tell(T("villagepleb_home_not_a_chest", Companion.NameOf(AssignFor)));
             else if (IsChest(chest)) ToggleChest(chest, AssignFor);
@@ -209,7 +208,6 @@ namespace VillagePlebs
                 VillagePlebsPlugin.Tell(T("villagepleb_home_chest_others", Named(z.GetString(HomeName, ""), "villagepleb_home_another_companion")));
                 return;
             }
-            VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(c)} {(mine ? "lets go of" : had != 0L ? $"takes over (from {had})" : "takes")} the chest at {chest.transform.position:F0}");
             Claim(chest);
             z.Set(HomeKey, mine ? 0L : id);
             z.Set(HomeName, mine ? "" : Companion.NameOf(c));

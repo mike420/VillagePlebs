@@ -147,12 +147,7 @@ namespace VillagePlebs
                 try
                 {
                     Draw(false);
-                    string sig = _sig.ToString();
-                    if (sig != _drawn && (asked || now - _lastRebuild >= 1f))
-                    {
-                        if (!asked) WhyRedrawn(_drawn, sig);
-                        Rebuild();
-                    }
+                    if (_sig.ToString() != _drawn && (asked || now - _lastRebuild >= 1f)) Rebuild();
                 }
                 catch (Exception e) { MenuFailed(e); return; }
             }
@@ -162,20 +157,6 @@ namespace VillagePlebs
                 try { foreach (Action a in _live) a(); }
                 catch (Exception) { _nextCheck = 0f; }
             }
-        }
-
-        private float _nextWhy;
-
-        // Logs what changed when the menu lays itself out again with nobody clicking: the first place the two drawings differ.
-        private void WhyRedrawn(string was, string now)
-        {
-            if (Time.unscaledTime < _nextWhy || string.IsNullOrEmpty(was)) return;
-            _nextWhy = Time.unscaledTime + 5f;
-            int i = 0;
-            while (i < was.Length && i < now.Length && was[i] == now[i]) i++;
-            int from = Mathf.Max(0, i - 40);
-            string Cut(string t) => t.Substring(Mathf.Min(from, t.Length), Mathf.Min(120, Mathf.Max(0, t.Length - from))).Replace("\n", " / ");
-            VillagePlebsPlugin.Instance?.Note($"Menu redrawn ({_tab}): was \"…{Cut(was)}…\" now \"…{Cut(now)}…\"");
         }
 
         private void Rebuild()

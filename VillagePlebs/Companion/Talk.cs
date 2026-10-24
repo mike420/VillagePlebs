@@ -116,7 +116,10 @@ namespace VillagePlebs
 
         internal static void Say(Humanoid c, string text)
         {
-            if (c != null && Chat.instance != null) Chat.instance.SetNpcText(c.gameObject, Vector3.up * 2.3f, 30f, 5f, "", Words.Show(text), false);
+            if (c == null || Chat.instance == null) return;
+            // Long enough to read: 10 s, and more for a longer line (up to 20 s).
+            string shown = Words.Show(text);
+            Chat.instance.SetNpcText(c.gameObject, Vector3.up * 2.3f, 30f, Mathf.Clamp(6f + shown.Length * 0.08f, 10f, 20f), "", shown, false);
         }
 
         public const string ChattyKey = "vp_chatty";
@@ -164,7 +167,8 @@ namespace VillagePlebs
         {
             if (Chat.instance == null) return;
             Chat.instance.AddString(name, Words.Show(text), Talker.Type.Normal);
-            if (HideTimer != null) HideTimer(Chat.instance) = 0f;
+            // The chat window fades once its timer passes the game's delay (about 10 s): started back, it stays some 25 s.
+            if (HideTimer != null) HideTimer(Chat.instance) = -15f;
         }
 
         public static void Forget() => LastSaid.Clear();
