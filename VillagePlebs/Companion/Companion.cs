@@ -131,6 +131,8 @@ namespace VillagePlebs
             zdo.Set(Keys.Name, string.IsNullOrEmpty(name) ? "Rádvar" : name);
             zdo.Set(Keys.Order, (int)Order.Gather);
             zdo.Set(Keys.Post, pos);
+            zdo.Set(Work.SummonSetKey, true);
+            zdo.Set(Work.SummonSpotKey, pos);
             zdo.Set(Keys.Style, (int)Style.Auto);
             zdo.Set(Following.MigratedKey, true);
             zdo.Set(Keys.Retreat, 30);

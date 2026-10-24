@@ -350,7 +350,7 @@ namespace VillagePlebs
         {
             int n = 0;
             var seen = new HashSet<GameObject>();
-            foreach (Collider col in Physics.OverlapSphere(center, radius, ~0, QueryTriggerInteraction.Collide))
+            foreach (Collider col in Physics.OverlapSphere(center, radius + Farming.FieldReach, ~0, QueryTriggerInteraction.Collide))
             {
                 if (budget <= 0f) break;
                 GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;

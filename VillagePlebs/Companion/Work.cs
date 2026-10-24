@@ -122,11 +122,15 @@ namespace VillagePlebs
 
         public const string HomeSetKey = "vp_homeset", HomeSpotKey = "vp_homespot";
 
+        // Where it was summoned: its home until it has a bed or a home spot, whatever guard post it is given meanwhile.
+        public const string SummonSetKey = "vp_summonset", SummonSpotKey = "vp_summonspot";
+
         public static Vector3 Center(Humanoid c)
         {
             ZDO z = Companion.Zdo(c);
             if (z.GetBool(HomeSetKey, false)) return z.GetVec3(HomeSpotKey, c.transform.position);
             if (z.GetBool(Keys.HasBed, false)) return z.GetVec3(Keys.BedPos, c.transform.position);
+            if (z.GetBool(SummonSetKey, false)) return z.GetVec3(SummonSpotKey, c.transform.position);
             return z.GetVec3(Keys.Post, c.transform.position);
         }
 
@@ -172,6 +176,19 @@ namespace VillagePlebs
             st.Ticked = st.OnDuties ? Job.None : JobsOf(me) & ~Unequipped(me, JobsOf(me));
             Vector3 center = Center(me);
             float radius = RadiusOf(me);
+            if (Time.time < st.GoingHomeUntil)
+            {
+                if (st.Task != null && st.Task.Ordered) st.GoingHomeUntil = 0f;
+                else if (Flat(center, me.transform.position) > 4f)
+                {
+                    st.Task = null;
+                    if (TravelHome(st, center, radius, moveTo)) return;
+                    moveTo(center, 2f, true);
+                    Brain.Status(st, P("villagepleb_work_status_heading_home"));
+                    return;
+                }
+                else { st.GoingHomeUntil = 0f; st.Remember(P("villagepleb_work_got_home")); }
+            }
             if (TravelHome(st, center, radius, moveTo)) return;
             if (Clearing(st, moveTo)) return;
             if (Time.time >= st.NextLoanLook) { st.NextLoanLook = Time.time + 30f; Loans.Return(st); }
@@ -277,7 +294,7 @@ namespace VillagePlebs
             st.Task = t;
             st.Helping = false;
             st.CommandUntil = Time.time + 120f;
-            if (fromYou) { st.RepairAt = null; st.ComeUntil = 0f; st.EmoteUntil = 0f; st.PendingEmote = null; st.Farm = null; st.Then = null; }
+            if (fromYou) { st.RepairAt = null; st.ComeUntil = 0f; st.EmoteUntil = 0f; st.PendingEmote = null; st.Farm = null; st.Then = null; st.GoingHomeUntil = 0f; }
             st.Remember(P(fromYou ? "villagepleb_work_you_pointed" : "villagepleb_work_next_in_patch", Describe(t)));
             return true;
         }
@@ -371,6 +388,22 @@ namespace VillagePlebs
             if (m != null && m.StartCost > 0) progress = Mathf.Clamp01(1f - m.Cost / (float)m.StartCost);
             return st.Goal == null ? P("villagepleb_work_job_home")
                  : st.Goal.Raw.Count > 0 ? P("villagepleb_work_job_home_mission_still", st.Goal.What, st.Goal.RawText()) : P("villagepleb_work_job_home_mission", st.Goal.What);
+        }
+
+        // Sent home: whatever it was doing (its mission, an old order) waits until it is back.
+        public static void SendHome(BrainState st)
+        {
+            st.Area = null;
+            st.PickQueue.Clear();
+            st.Farm = null;
+            st.Then = null;
+            st.Task = null;
+            st.WorkTool = null;
+            st.CommandUntil = 0f;
+            st.TripUntil = 0f;
+            st.RepairAt = null;
+            st.GoingHomeUntil = Time.time + 90f;
+            SaveArea(st);
         }
 
         public static void StopJob(BrainState st)
@@ -1461,14 +1494,15 @@ namespace VillagePlebs
                         return Ordered(st, New(Kind.Store, chest, Job.None), false);
                     }
                     if (Farming.Cultivator(me) == null) done = P("villagepleb_errands_need_cultivator");
-                    else if (Farming.FindSpot(st, center, radius, out Farming.Crop seed, out Vector3 spot))
+                    else if (Farming.FindSpot(st, center, radius, out Farming.Crop seed, out Vector3 spot, out Farming.Miss miss))
                     {
                         Task sow = New(Kind.Plant, Heightmap.FindHeightmap(spot), Job.None);
                         sow.Crop = seed;
                         sow.Pos = spot;
                         return Ordered(st, sow, false);
                     }
-                    else done = Farming.CanSow(me) ? P("villagepleb_work_farm_sown") : P("villagepleb_work_farm_out_of_seeds");
+                    else if (!Farming.CanSow(me) || miss == Farming.Miss.NoSeeds) done = P("villagepleb_work_farm_out_of_seeds");
+                    else done = P(miss == Farming.Miss.WontGrow ? "villagepleb_work_farm_wont_grow" : miss == Farming.Miss.CantReach ? "villagepleb_work_farm_cant_reach" : "villagepleb_work_farm_sown");
                 }
                 else
                 {
@@ -1492,6 +1526,8 @@ namespace VillagePlebs
             if (st.Task != null && st.Task.Ordered) st.Task = null;
             st.Farm = what;
             st.FarmTrips = 0;
+            if (what == Errand.Plant) Farming.Forget(st);
+            st.GoingHomeUntil = 0f;
             st.CommandUntil = Time.time + 120f;
             return NextFarm(st);
         }

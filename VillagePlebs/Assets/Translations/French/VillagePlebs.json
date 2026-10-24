@@ -359,6 +359,8 @@
   "villagepleb_errands_no_seeds": "Je n'ai pas de graines dans mon sac ni dans mes coffres.",
   "villagepleb_work_farm_bag_full": "Mon sac est plein, alors j'arrête.",
   "villagepleb_work_farm_sown": "Tout est semé.",
+  "villagepleb_work_farm_wont_grow": "Aucune de mes graines ne poussera sur le reste du champ ici.",
+  "villagepleb_work_farm_cant_reach": "Je n'arrive pas à atteindre le reste du champ.",
   "villagepleb_work_farm_out_of_seeds": "Je n'ai plus de graines.",
   "villagepleb_work_farm_harvested": "La récolte est rentrée.",
   "villagepleb_armory_bag_full": "Il y a un meilleur équipement dans votre coffre, mais mon sac est plein.",

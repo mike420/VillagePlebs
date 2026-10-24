@@ -148,7 +148,7 @@ namespace VillagePlebs
         public readonly Dictionary<int, float> Skipped = new Dictionary<int, float>();
         public readonly Dictionary<string, int> Gathered = new Dictionary<string, int>();
         public float NextEnemyScan, NextGear, NextAsk, LastAsk, HealthAtAsk = 1f;
-        public float NextPlant, NextToolLook, NextMissionCheck;
+        public float NextPlant, NextToolLook, NextMissionCheck, GoingHomeUntil;
         public Work.Task Then;
         public Job Ticked;
         public Errand? Farm;
@@ -478,7 +478,7 @@ namespace VillagePlebs
             Humanoid me = st.Body;
             if (st.Asleep && Companion.OrderOf(me) != Order.Gather) Sleep.Wake(st, P("villagepleb_brain_wake_called"));
             if (MakeWay(st, dt)) return;
-            bool onOrder = Work.OnOrder(st);
+            bool onOrder = Work.OnOrder(st) || Time.time < st.GoingHomeUntil;
             if (!onOrder && Idle.Emoting(st, p => LookAt(st.Ai, p))) return;
             if (Idle.Come(st, master, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run), () => st.Ai.StopMoving(), p => LookAt(st.Ai, p))) return;
             if (!onOrder && Loot.Tick(st, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run))) return;

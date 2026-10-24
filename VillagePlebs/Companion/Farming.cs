@@ -30,16 +30,17 @@ namespace VillagePlebs
         private static readonly Dictionary<PieceTable, List<Crop>> Known = new Dictionary<PieceTable, List<Crop>>();
         private static readonly Dictionary<long, Field> Fields = new Dictionary<long, Field>();
         private static readonly List<Crop> None = new List<Crop>();
-        private static readonly Vector2Int[] Sides = { Vector2Int.right, Vector2Int.left, Vector2Int.up, Vector2Int.down };
 
         public static ItemDrop.ItemData Cultivator(Humanoid h) =>
             h.GetInventory().GetAllItems().FirstOrDefault(i => IsCultivator(i) && (!i.m_shared.m_useDurability || i.m_durability > 0f));
 
         public static bool IsCultivator(ItemDrop.ItemData i) => Crops(i.m_shared.m_buildPieces).Count > 0;
 
+        // Seeds it keeps rather than putting away: real seeds whenever it has a cultivator to sow them with, and while planting
+        // also the food crops (carrots, turnips) a patch already grows from.
         public static bool IsSeed(Humanoid h, ItemDrop.ItemData i) =>
-            Brain.Get(h)?.Farm == Errand.Plant && Cultivator(h) is ItemDrop.ItemData tool
-            && Crops(tool.m_shared.m_buildPieces).Any(c => c.Piece.m_resources.Any(r => r.m_resItem != null && r.m_resItem.m_itemData.m_shared.m_name == i.m_shared.m_name));
+            Cultivator(h) is ItemDrop.ItemData tool && (IsSeedItem(i) || Brain.Get(h)?.Farm == Errand.Plant
+                && Crops(tool.m_shared.m_buildPieces).Any(c => c.Piece.m_resources.Any(r => r.m_resItem != null && r.m_resItem.m_itemData.m_shared.m_name == i.m_shared.m_name)));
 
         private static HashSet<string> _seeds;
 
@@ -72,7 +73,7 @@ namespace VillagePlebs
         public static bool HasField(BrainState st, Vector3 center, float radius) => FieldOf(st, center, radius).Cells.Count > 0;
 
         public static IEnumerable<Pickable> RipeNear(Vector3 center, float radius) =>
-            Physics.OverlapSphere(center, radius, ~0, QueryTriggerInteraction.Collide)
+            Physics.OverlapSphere(center, radius + FieldReach, ~0, QueryTriggerInteraction.Collide)
                 .Select(col => (col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject).GetComponent<Pickable>())
                 .Where(Ripe).Distinct();
 
@@ -117,6 +118,7 @@ namespace VillagePlebs
                 Piece piece = go != null ? go.GetComponent<Piece>() : null;
                 Plant plant = go != null ? go.GetComponent<Plant>() : null;
                 if (piece == null || plant == null || !(plant.m_needCultivatedGround || piece.m_cultivatedGroundOnly) || piece.m_resources.Length == 0) continue;
+                if (plant.m_grownPrefabs.Any(g => g != null && g.GetComponent<TreeBase>() != null)) continue;
                 var crop = new Crop { Piece = piece, Plant = plant, Name = go.name };
                 float reach = Reach(go);
                 foreach (GameObject grown in plant.m_grownPrefabs)
@@ -167,6 +169,8 @@ namespace VillagePlebs
 
         private static float Flat(Vector3 a, Vector3 b) { a.y = 0f; b.y = 0f; return Vector3.Distance(a, b); }
 
+        public const float FieldReach = 40f;
+
         private static Field FieldOf(BrainState st, Vector3 center, float radius)
         {
             long id = Companion.IdOf(st.Body);
@@ -175,17 +179,43 @@ namespace VillagePlebs
             f.Center = center; f.Radius = radius; f.Until = Time.time + 30f;
             f.Cells = new HashSet<Vector2Int>();
             Heightmap hm = null;
+            bool Tilled(Vector2Int c)
+            {
+                var p = new Vector3(c.x + 0.5f, center.y, c.y + 0.5f);
+                if (hm == null || !hm.IsPointInside(p)) hm = Heightmap.FindHeightmap(p);
+                return hm != null && hm.IsCultivated(p);
+            }
             int r = Mathf.CeilToInt(radius);
+            var open = new Queue<Vector2Int>();
             for (int x = -r; x <= r; x++)
                 for (int z = -r; z <= r; z++)
                 {
                     if (x * x + z * z > r * r) continue;
-                    var p = new Vector3(Mathf.Floor(center.x) + x + 0.5f, center.y, Mathf.Floor(center.z) + z + 0.5f);
-                    if (hm == null || !hm.IsPointInside(p)) hm = Heightmap.FindHeightmap(p);
-                    if (hm != null && hm.IsCultivated(p)) f.Cells.Add(Cell(p));
+                    var c = new Vector2Int(Mathf.FloorToInt(center.x) + x, Mathf.FloorToInt(center.z) + z);
+                    if (Tilled(c) && f.Cells.Add(c)) open.Enqueue(c);
                 }
+            // A field that runs past the edge of its home is still one field: follow the tilled ground out to its end.
+            float far = radius + FieldReach;
+            while (open.Count > 0 && f.Cells.Count < 6000)
+            {
+                Vector2Int c = open.Dequeue();
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dz = -1; dz <= 1; dz++)
+                    {
+                        var n = new Vector2Int(c.x + dx, c.y + dz);
+                        if (f.Cells.Contains(n) || Flat(new Vector3(n.x + 0.5f, 0f, n.y + 0.5f), center) > far || !Tilled(n)) continue;
+                        f.Cells.Add(n);
+                        open.Enqueue(n);
+                    }
+            }
             foreach (Vector2Int gone in f.Bad.Where(kv => kv.Value < Time.time).Select(kv => kv.Key).ToList()) f.Bad.Remove(gone);
             return f;
+        }
+
+        // A fresh look at the field: new tilled ground, and spots given up on before it had these seeds.
+        public static void Forget(BrainState st)
+        {
+            if (Fields.TryGetValue(Companion.IdOf(st.Body), out Field f)) { f.Until = 0f; f.Bad.Clear(); }
         }
 
         public static void Bad(BrainState st, Vector3 spot)
@@ -193,11 +223,19 @@ namespace VillagePlebs
             if (Fields.TryGetValue(Companion.IdOf(st.Body), out Field f)) f.Bad[Spot(spot)] = Time.time + 300f;
         }
 
-        // Next free spot on the home's cultivated ground. Rows grow out from the crops already there, one grid step at a time,
-        // and each spot takes the crop nearest to it; bare ground starts a fresh grid with whatever seeds it carries.
-        public static bool FindSpot(BrainState st, Vector3 center, float radius, out Crop crop, out Vector3 spot)
+        // Next free spot on the home's cultivated ground: one grid of rows and columns over all of it, lined up on the world
+        // and spaced for the widest crop the cultivator plants, so every crop fits every spot and stays healthy.
+        // A spot takes the crop growing next to it if it has those seeds, else whichever seeds it has most of.
+        // Why FindSpot found nothing: every spot is planted or blocked, none of its seeds grow on the free ones, or it can't get to them.
+        public enum Miss { Full, WontGrow, CantReach, NoSeeds }
+
+        private enum Fit { Ok, Climate, Blocked }
+
+        public static bool FindSpot(BrainState st, Vector3 center, float radius, out Crop crop, out Vector3 spot) => FindSpot(st, center, radius, out crop, out spot, out _);
+
+        public static bool FindSpot(BrainState st, Vector3 center, float radius, out Crop crop, out Vector3 spot, out Miss why)
         {
-            crop = null; spot = Vector3.zero;
+            crop = null; spot = Vector3.zero; why = Miss.Full;
             Humanoid me = st.Body;
             ItemDrop.ItemData tool = Cultivator(me);
             if (tool == null) return false;
@@ -205,14 +243,15 @@ namespace VillagePlebs
             Inventory inv = me.GetInventory();
             if (!all.Any(c => Afford(inv, c.Piece))) return false;
             Field field = FieldOf(st, center, radius);
-            if (field.Cells.Count == 0) return false;
-
+            if (field.Cells.Count == 0) { Note(me, $"found no tilled ground within {radius:0} m of its home at {center:F0}"); return false; }
             var planted = new List<KeyValuePair<Vector3, Crop>>();
             var seen = new HashSet<GameObject>();
-            foreach (Collider col in Physics.OverlapSphere(center, radius, Space))
+            int minX = field.Cells.Min(c => c.x), maxX = field.Cells.Max(c => c.x) + 1, minZ = field.Cells.Min(c => c.y), maxZ = field.Cells.Max(c => c.y) + 1;
+            var box = new Vector3((minX + maxX) * 0.5f, center.y, (minZ + maxZ) * 0.5f);
+            foreach (Collider col in Physics.OverlapBox(box, new Vector3((maxX - minX) * 0.5f + 2f, 200f, (maxZ - minZ) * 0.5f + 2f), Quaternion.identity, Space))
             {
                 GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;
-                if (!seen.Add(go) || !field.Cells.Contains(Cell(go.transform.position))) continue;
+                if (!seen.Add(go)) continue;
                 string name = Utils.GetPrefabName(go);
                 Crop c = all.FirstOrDefault(k => k.Name == name || k.Grown.Contains(name));
                 if (c != null) planted.Add(new KeyValuePair<Vector3, Crop>(go.transform.position, c));
@@ -232,83 +271,92 @@ namespace VillagePlebs
                         if (near.TryGetValue(new Vector2Int(c.x + x, c.y + z), out var l)) foreach (var kv in l) yield return kv;
             }
             bool Taken(Vector3 p, float within) => Around(p, Mathf.CeilToInt(within)).Any(kv => Flat(kv.Key, p) < within);
-            Crop Nearest(Vector3 p)
-            {
-                if (planted.Count == 0) return null;
-                var close = Around(p, 3).ToList();
-                return (close.Count > 0 ? close : planted).OrderBy(kv => Flat(kv.Key, p)).First().Value;
-            }
 
-            var options = new List<KeyValuePair<Vector3, Crop>>();
-            foreach (var kv in planted)
-            {
-                Crop c = kv.Value;
-                if (!Afford(inv, c.Piece)) continue;
-                foreach (Vector2Int side in Sides)
-                {
-                    Vector3 p = kv.Key + new Vector3(side.x, 0f, side.y) * c.Step;
-                    if (!field.Cells.Contains(Cell(p)) || Taken(p, c.Step * 0.75f) || Nearest(p) != c) continue;
-                    options.Add(new KeyValuePair<Vector3, Crop>(p, c));
-                }
-            }
-            if (options.Count == 0)
-            {
-                Crop any = all.Where(k => Afford(inv, k.Piece) && k.Piece.m_resources.All(r => r.m_resItem == null || !Food.IsFood(r.m_resItem.m_itemData)))
-                              .OrderByDescending(k => Seeds(inv, k.Piece)).FirstOrDefault();
-                var starts = field.Cells.Select(c => new Vector3(c.x + 0.5f, 0f, c.y + 0.5f)).Where(p => !Taken(p, 2f) && !field.Bad.ContainsKey(Spot(p)))
-                                  .OrderBy(p => Flat(p, me.transform.position)).Take(5);
-                foreach (Vector3 p in starts)
-                {
-                    Crop c = Nearest(p);
-                    if (c == null || !Afford(inv, c.Piece)) c = any;
-                    if (c != null) options.Add(new KeyValuePair<Vector3, Crop>(p, c));
-                }
-            }
+            List<Crop> seeds = all.Where(k => Afford(inv, k.Piece) && k.Piece.m_resources.All(r => r.m_resItem == null || !Food.IsFood(r.m_resItem.m_itemData)))
+                                  .OrderByDescending(k => Seeds(inv, k.Piece)).ToList();
+            List<Crop> sown = planted.Select(kv => kv.Value).Where(c => Afford(inv, c.Piece)).Distinct().ToList();
+            if (seeds.Count == 0 && sown.Count == 0) { why = Miss.NoSeeds; return false; }
+            float step = seeds.Concat(sown).Concat(planted.Select(kv => kv.Value)).Max(c => c.Step);
+            IEnumerable<Crop> Choices(Vector3 p) =>
+                Around(p, Mathf.CeilToInt(step * 1.5f)).Where(kv => Flat(kv.Key, p) <= step * 1.5f).OrderBy(kv => Flat(kv.Key, p))
+                    .Select(kv => kv.Value).Where(c => Afford(inv, c.Piece)).Concat(seeds).Distinct();
 
-            int reachTries = 0;
-            foreach (var o in options.OrderBy(o => Flat(o.Key, me.transform.position)))
+            var options = new List<Vector3>();
+            for (int i = Mathf.CeilToInt(minX / step); i * step < maxX; i++)
+                for (int j = Mathf.CeilToInt(minZ / step); j * step < maxZ; j++)
+                {
+                    var p = new Vector3(i * step, 0f, j * step);
+                    if (field.Cells.Contains(Cell(p)) && !Taken(p, step * 0.5f)) options.Add(p);
+                }
+            int gridSpots = options.Count;
+            if (gridSpots == 0)
+                options.AddRange(field.Cells.Select(c => new Vector3(c.x + 0.5f, 0f, c.y + 0.5f)).Where(p => !Taken(p, step * 0.75f)));
+
+            int reachTries = 0, skipped = 0, blockedSpots = 0, climateSpots = 0;
+            bool climate = false;
+            string firstBlock = null;
+            foreach (Vector3 o in options.OrderBy(o => Flat(o, me.transform.position)))
             {
-                Vector3 p = o.Key;
-                if (field.Bad.TryGetValue(Spot(p), out float until) && until > Time.time) continue;
-                if (!Fits(st, o.Value, ref p)) { field.Bad[Spot(p)] = Time.time + 60f; continue; }
-                if (!Brain.CanReach(me, p, 2f)) { field.Bad[Spot(p)] = Time.time + 300f; if (++reachTries >= 3) return false; continue; }
-                crop = o.Value; spot = p;
+                if (field.Bad.TryGetValue(Spot(o), out float until) && until > Time.time) { skipped++; continue; }
+                Crop chosen = null;
+                Vector3 at = o;
+                bool blocked = false;
+                foreach (Crop c in Choices(o))
+                {
+                    Vector3 q = o;
+                    Fit fit = Check(st, c, ref q, out string block);
+                    if (fit == Fit.Ok) { chosen = c; at = q; break; }
+                    if (fit == Fit.Blocked) { blocked = true; firstBlock = firstBlock ?? block; break; }
+                }
+                if (chosen == null) { field.Bad[Spot(o)] = Time.time + 60f; climate |= !blocked; if (blocked) blockedSpots++; else climateSpots++; continue; }
+                if (!Brain.CanReach(me, at, 2f)) { field.Bad[Spot(o)] = Time.time + 300f; why = Miss.CantReach; if (++reachTries >= 3) return false; continue; }
+                crop = chosen; spot = at;
                 return true;
             }
+            if (why != Miss.CantReach && climate) why = Miss.WontGrow;
+            Note(me, $"found nowhere to sow around its home at {center:F0} ({radius:0} m): {field.Cells.Count} tilled squares, rows {step:0.00} m apart, {gridSpots} free grid spots ({options.Count} tried), "
+                     + $"{blockedSpots} blocked (first: {firstBlock ?? "-"}), {climateSpots} too cold or the wrong biome for its seeds, {skipped} skipped, {reachTries} out of reach; "
+                     + $"seeds: {string.Join(", ", seeds.Concat(sown).Distinct().Select(c => c.Name))}");
             return false;
         }
 
+        private static void Note(Humanoid me, string text) => VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(me)} {text}");
+
         // The game's own checks for a healthy plant: right biome, tilled, open sky and its grow radius clear, and nothing near it crowded by it.
-        private static bool Fits(BrainState st, Crop crop, ref Vector3 p)
+        private static bool Fits(BrainState st, Crop crop, ref Vector3 p) => Check(st, crop, ref p, out _) == Fit.Ok;
+
+        // Climate: this crop won't grow in this biome or weather, though another might. Blocked: nothing can go on this spot.
+        private static Fit Check(BrainState st, Crop crop, ref Vector3 p, out string block)
         {
-            if (ZoneSystem.instance == null || !ZoneSystem.instance.GetGroundHeight(p, out float y)) return false;
+            block = null;
+            if (ZoneSystem.instance == null || !ZoneSystem.instance.GetGroundHeight(p, out float y)) { block = "no ground"; return Fit.Blocked; }
             p.y = y;
             Heightmap hm = Heightmap.FindHeightmap(p);
-            if (hm == null || !hm.IsCultivated(p)) return false;
+            if (hm == null || !hm.IsCultivated(p)) { block = "not tilled"; return Fit.Blocked; }
+            if (!PrivateArea.CheckAccess(p, 0f, false)) { block = "someone's ward"; return Fit.Blocked; }
+            if (Physics.Raycast(p + Vector3.up * 0.1f, Vector3.up, out RaycastHit roof, 100f, Roof)) { block = "under " + roof.collider.name; return Fit.Blocked; }
             Heightmap.Biome biome = hm.GetBiome(p);
-            if ((biome & crop.Plant.m_biome) == 0) return false;
-            if (crop.Piece.m_onlyInBiome != Heightmap.Biome.None && (biome & crop.Piece.m_onlyInBiome) == 0) return false;
+            if ((biome & crop.Plant.m_biome) == 0) return Fit.Climate;
+            if (crop.Piece.m_onlyInBiome != Heightmap.Biome.None && (biome & crop.Piece.m_onlyInBiome) == 0) return Fit.Climate;
             bool shielded = ShieldGenerator.IsInsideShield(p);
-            if (!crop.Plant.m_tolerateHeat && biome == Heightmap.Biome.AshLands && !shielded) return false;
-            if (!crop.Plant.m_tolerateCold && (biome == Heightmap.Biome.DeepNorth || biome == Heightmap.Biome.Mountain) && !shielded) return false;
-            if (!PrivateArea.CheckAccess(p, 0f, false)) return false;
-            if (Physics.Raycast(p, Vector3.up, 100f, Roof)) return false;
+            if (!crop.Plant.m_tolerateHeat && biome == Heightmap.Biome.AshLands && !shielded) return Fit.Climate;
+            if (!crop.Plant.m_tolerateCold && (biome == Heightmap.Biome.DeepNorth || biome == Heightmap.Biome.Mountain) && !shielded) return Fit.Climate;
             foreach (Collider col in Physics.OverlapSphere(p, crop.Plant.m_growRadius, Space))
             {
                 Plant other = col.GetComponent<Plant>();
-                if (other == null || other.GetStatus() == Plant.Status.Healthy) return false;
+                if (other == null || other.GetStatus() == Plant.Status.Healthy) { block = $"{col.name} ({LayerMask.LayerToName(col.gameObject.layer)}) in the way"; return Fit.Blocked; }
             }
             foreach (Collider col in Physics.OverlapSphere(p, crop.Reach + 2f, Space))
             {
                 Plant other = col.GetComponentInParent<Plant>();
-                if (other != null && Flat(other.transform.position, p) < other.m_growRadius + crop.Reach) return false;
+                if (other != null && Flat(other.transform.position, p) < other.m_growRadius + crop.Reach) { block = "too close to " + Utils.GetPrefabName(other.gameObject); return Fit.Blocked; }
             }
             foreach (Humanoid c in Companion.All())
             {
                 BrainState o = c.GetComponent<ZNetView>().IsOwner() ? Brain.Get(c) : null;
-                if (o != null && o != st && o.Task != null && o.Task.Kind == Work.Kind.Plant && Flat(o.Task.Pos, p) < crop.Step * 0.9f) return false;
+                if (o != null && o != st && o.Task != null && o.Task.Kind == Work.Kind.Plant && Flat(o.Task.Pos, p) < crop.Step * 0.9f) { block = "another companion is sowing there"; return Fit.Blocked; }
             }
-            return true;
+            return Fit.Ok;
         }
 
         public static bool Place(BrainState st, Crop crop, Vector3 p, float age = 0f)

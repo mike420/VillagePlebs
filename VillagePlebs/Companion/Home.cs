@@ -123,6 +123,7 @@ namespace VillagePlebs
             bool ok = Companion.Write(c, z => z.Set(Keys.Order, (int)Order.Follow));
             if (!ok) return false;
             BrainState st = Brain.Get(c);
+            st.GoingHomeUntil = 0f;
             if (manual) { st.ManualOrderAt = Time.time; st.Outing = false; st.Remember(P("villagepleb_home_remember_called")); Errands.ForTheRoad(st); }
             return true;
         }
@@ -133,13 +134,13 @@ namespace VillagePlebs
             bool ok = Companion.Write(c, z =>
             {
                 z.Set(Keys.Order, (int)Order.Gather);
-                if (!z.GetBool(Keys.HasBed, false)) z.Set(Keys.Post, c.transform.position);
+                if (!z.GetBool(Keys.HasBed, false) && !z.GetBool(Work.SummonSetKey, false)) z.Set(Keys.Post, c.transform.position);
             });
             if (!ok) return false;
             BrainState st = Brain.Get(c);
             st.Outing = false;
             st.NextArmoryLook = 0f;
-            if (manual) { st.ManualOrderAt = Time.time; st.Remember(P("villagepleb_home_remember_sent_home")); }
+            if (manual) { st.ManualOrderAt = Time.time; st.Remember(P("villagepleb_home_remember_sent_home")); Work.SendHome(st); }
             bool bed = Companion.Zdo(c).GetBool(Keys.HasBed, false);
             if (setUp != null) Talk.Tell(c, setUp);
             else if (!bed && !quiet) Talk.Tell(c, P("villagepleb_home_no_free_bed"), "nobed", 10f);

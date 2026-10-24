@@ -359,6 +359,8 @@
   "villagepleb_errands_no_seeds": "У меня нет семян ни в сумке, ни в сундуках.",
   "villagepleb_work_farm_bag_full": "Сумка полна, так что я закончил.",
   "villagepleb_work_farm_sown": "Всё засеяно.",
+  "villagepleb_work_farm_wont_grow": "Ни одно из моих семян не вырастет на остатке этого поля.",
+  "villagepleb_work_farm_cant_reach": "Я не могу добраться до остальной части поля.",
   "villagepleb_work_farm_out_of_seeds": "У меня кончились семена.",
   "villagepleb_work_farm_harvested": "Урожай собран.",
   "villagepleb_armory_bag_full": "В твоём сундуке есть снаряжение получше, но моя сумка полна.",

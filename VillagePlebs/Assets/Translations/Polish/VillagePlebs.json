@@ -359,6 +359,8 @@
   "villagepleb_errands_no_seeds": "Nie mam nasion w torbie ani w skrzyniach.",
   "villagepleb_work_farm_bag_full": "Mam pełną torbę, więc przestaję.",
   "villagepleb_work_farm_sown": "Wszystko obsiane.",
+  "villagepleb_work_farm_wont_grow": "Żadne z moich nasion nie wyrośnie na reszcie tego pola.",
+  "villagepleb_work_farm_cant_reach": "Nie mogę dojść do reszty pola.",
   "villagepleb_work_farm_out_of_seeds": "Skończyły mi się nasiona.",
   "villagepleb_work_farm_harvested": "Plony zebrane.",
   "villagepleb_armory_bag_full": "W twojej skrzyni jest lepszy sprzęt, ale moja torba jest pełna.",

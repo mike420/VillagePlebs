@@ -359,6 +359,8 @@
   "villagepleb_errands_no_seeds": "Çantamda da sandıklarımda da tohum yok.",
   "villagepleb_work_farm_bag_full": "Çantam doldu, bu yüzden bıraktım.",
   "villagepleb_work_farm_sown": "Hepsi ekildi.",
+  "villagepleb_work_farm_wont_grow": "Taşıdığım tohumların hiçbiri tarlanın kalanında burada büyümez.",
+  "villagepleb_work_farm_cant_reach": "Tarlanın kalanına ulaşamıyorum.",
   "villagepleb_work_farm_out_of_seeds": "Tohumum kalmadı.",
   "villagepleb_work_farm_harvested": "Hasat toplandı.",
   "villagepleb_armory_bag_full": "Sandığında daha iyi teçhizat var ama çantam dolu.",

@@ -359,6 +359,8 @@
   "villagepleb_errands_no_seeds": "我的包和箱子里都没有种子。",
   "villagepleb_work_farm_bag_full": "我的包满了，先停下了。",
   "villagepleb_work_farm_sown": "都种好了。",
+  "villagepleb_work_farm_wont_grow": "我带的种子在这块地剩下的地方都长不了。",
+  "villagepleb_work_farm_cant_reach": "我走不到地的其余部分。",
   "villagepleb_work_farm_out_of_seeds": "我的种子用完了。",
   "villagepleb_work_farm_harvested": "庄稼都收好了。",
   "villagepleb_armory_bag_full": "你箱子里有更好的装备，可我的背包满了。",

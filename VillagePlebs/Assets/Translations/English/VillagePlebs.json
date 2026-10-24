@@ -359,6 +359,8 @@
   "villagepleb_errands_no_seeds": "I've no seeds in my bag or my chests.",
   "villagepleb_work_farm_bag_full": "My bag is full, so I've stopped.",
   "villagepleb_work_farm_sown": "All sown.",
+  "villagepleb_work_farm_wont_grow": "None of the seeds I carry will grow on what's left of the field here.",
+  "villagepleb_work_farm_cant_reach": "I can't get to the rest of the field.",
   "villagepleb_work_farm_out_of_seeds": "I'm out of seeds.",
   "villagepleb_work_farm_harvested": "That's the harvest in.",
   "villagepleb_armory_bag_full": "There's better gear in your chest, but my bag is full.",

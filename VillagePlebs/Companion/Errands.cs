@@ -123,6 +123,7 @@ namespace VillagePlebs
                 }
                 case Errand.Plant:
                 {
+                    Farming.Forget(st);
                     if (!Farming.HasField(st, center, radius)) return P("villagepleb_errands_no_tilled");
                     bool InChests(System.Func<ItemDrop.ItemData, bool> has) => Home.Chests(me).Any(c => c.GetInventory().GetAllItems().Any(has));
                     if (Farming.Cultivator(me) == null && !InChests(Farming.IsCultivator)) return P("villagepleb_errands_need_cultivator");

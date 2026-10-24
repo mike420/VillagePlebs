@@ -359,6 +359,8 @@
   "villagepleb_errands_no_seeds": "Ich habe keine Samen in meiner Tasche oder meinen Truhen.",
   "villagepleb_work_farm_bag_full": "Meine Tasche ist voll, ich höre auf.",
   "villagepleb_work_farm_sown": "Alles gesät.",
+  "villagepleb_work_farm_wont_grow": "Keiner meiner Samen wächst auf dem Rest des Feldes hier.",
+  "villagepleb_work_farm_cant_reach": "Ich komme nicht an den Rest des Feldes heran.",
   "villagepleb_work_farm_out_of_seeds": "Ich habe keine Samen mehr.",
   "villagepleb_work_farm_harvested": "Die Ernte ist eingebracht.",
   "villagepleb_armory_bag_full": "In deiner Truhe ist bessere Ausrüstung, aber mein Beutel ist voll.",

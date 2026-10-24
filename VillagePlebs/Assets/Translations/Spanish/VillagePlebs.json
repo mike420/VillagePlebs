@@ -359,6 +359,8 @@
   "villagepleb_errands_no_seeds": "No tengo semillas en mi bolsa ni en mis cofres.",
   "villagepleb_work_farm_bag_full": "Mi bolsa está llena, así que paro.",
   "villagepleb_work_farm_sown": "Todo sembrado.",
+  "villagepleb_work_farm_wont_grow": "Ninguna de mis semillas crecerá en lo que queda del campo aquí.",
+  "villagepleb_work_farm_cant_reach": "No puedo llegar al resto del campo.",
   "villagepleb_work_farm_out_of_seeds": "Me he quedado sin semillas.",
   "villagepleb_work_farm_harvested": "La cosecha está recogida.",
   "villagepleb_armory_bag_full": "Hay mejor equipo en tu cofre, pero tengo la bolsa llena.",
