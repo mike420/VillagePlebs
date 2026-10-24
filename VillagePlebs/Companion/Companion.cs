@@ -149,15 +149,33 @@ namespace VillagePlebs
 
         private static void Dress(Humanoid c) => Looks.Randomise(c, true);
 
-        public static bool Dismiss(Humanoid c, out string why)
+        // Released for good: what it carries and wears goes into its own chests (what won't fit, into a crate where it stands),
+        // its chests and bed become yours, and it is gone.
+        public static bool Release(Humanoid c, Player p, out string why)
         {
             Container gear = c.GetComponent<Container>();
             ZNetView view = c.GetComponent<ZNetView>();
             if (gear != null && !Containers.Take(gear)) { why = P("villagepleb_companion_gear_open"); return false; }
-            if (gear != null && gear.GetInventory().NrOfItems() > 0) { why = P("villagepleb_companion_take_gear_first"); return false; }
             if (!view.IsOwner()) view.ClaimOwnership();
-            VillagePlebsPlugin.Instance?.Note($"The companion {NameOf(c)} was sent home");
-            if (Player.m_localPlayer != null) Profile.Forget(Player.m_localPlayer, IdOf(c));
+            Inventory inv = gear != null ? gear.GetInventory() : c.GetInventory();
+            int stored = 0;
+            foreach (ItemDrop.ItemData item in inv.GetAllItems().ToList())
+            {
+                item.m_equipped = false;
+                foreach (Container chest in Home.Chests(c))
+                {
+                    if (!chest.GetInventory().CanAddItem(item) || !Containers.Take(chest)) continue;
+                    chest.GetInventory().MoveItemToThis(inv, item);
+                    stored++;
+                    break;
+                }
+            }
+            int left = inv.NrOfItems();
+            if (left > 0) Tomb(c, inv, c.transform.position, c.transform.rotation);
+            Home.HandOver(c, p);
+            VillagePlebsPlugin.Instance?.Note($"The companion {NameOf(c)} was released: {stored} item stacks into its chests, {left} into a crate where it stood");
+            VillagePlebsPlugin.Tell(P(left > 0 ? "villagepleb_companion_released_crate" : "villagepleb_companion_released", NameOf(c)));
+            if (p != null) Profile.Forget(p, IdOf(c));
             view.Destroy();
             why = null;
             return true;

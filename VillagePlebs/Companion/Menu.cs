@@ -407,7 +407,7 @@ namespace VillagePlebs
                             Humanoid h3 = Companion.All().FirstOrDefault(h => Companion.IdOf(h) == hid);
                             if (h3 == null) return;
                             bool wasShown = _shown == h3;
-                            if (!Companion.Dismiss(h3, out string why)) { _note = Words.Show(why); return; }
+                            if (!Companion.Release(h3, Player.m_localPlayer, out string why)) { _note = Words.Show(why); return; }
                             _note = "";
                             if (wasShown) { _shown = null; _tab = Tab.Status; }
                         };
@@ -902,14 +902,6 @@ namespace VillagePlebs
             Note(T("villagepleb_menu_talking_about", Companion.NameOf(c)), GameUi.Text);
             EndCard();
 
-            if (Mine)
-            {
-                BeginCard(T("villagepleb_menu_send_away"));
-                Note(T("villagepleb_menu_send_away_about"), GameUi.Dim);
-                Btn(T("villagepleb_menu_send_home"), _left, _y, 200f, 32f, () => _pending = () => { if (Companion.Dismiss(c, out string why)) CloseMenu(); else _note = Words.Show(why); });
-                _y += 38f;
-                EndCard();
-            }
         }
 
         private void DrawMissions(Humanoid c)
@@ -1250,7 +1242,8 @@ namespace VillagePlebs
             Humanoid c = _shown;
             if (_looks == null || c == null || _looks.Id != Companion.IdOf(c)) return;
             Looks.Look look = _looks.Current;
-            if (LooksChange(h => Looks.Set(h, look))) CloseMenu();
+            if (!LooksChange(h => Looks.Set(h, look))) return;
+            Portraits.Set(Companion.IdOf(c), _looks.Snapshot());
         }
 
         private void TickLooks()

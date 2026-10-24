@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using UnityEngine;
 
 namespace VillagePlebs
@@ -193,90 +194,60 @@ namespace VillagePlebs
         public static void Randomise(Humanoid c, bool fresh) => Set(c, Random(), fresh);
     }
 
+    // Its picture: a still of the Looks preview, taken when its looks are applied (or the Looks tab first shows them), kept on disk.
     internal static class Portraits
     {
-        private class Shot { public RenderTexture Tex; public float At = -99f; public string Sig = ""; public float ChangedAt = -99f; }
-        private static readonly Dictionary<long, Shot> Shots = new Dictionary<long, Shot>();
-        private static Camera _cam;
-        private static Light _light;
-        private static int _next;
+        private static readonly Dictionary<long, Texture2D> Shots = new Dictionary<long, Texture2D>();
+        private static readonly HashSet<long> Missing = new HashSet<long>();
 
-        public static Texture Get(long id) => Shots.TryGetValue(id, out Shot s) && s.Tex != null && s.At > 0f ? s.Tex : null;
+        private static string File(long id) => System.IO.Path.Combine(BepInEx.Paths.ConfigPath, "VillagePlebs", "Portraits", id + ".png");
 
-        // Only what shows in the picture: its body, face and hair, and the armour on its head and shoulders. Not what it holds, which
-        // changes every time it swaps tools at work, so the portrait is only taken again when it actually looks different.
-        private static string Signature(Humanoid c)
+        public static Texture Get(long id)
         {
-            ZDO z = Companion.Zdo(c);
-            return string.Join("|", z.GetInt(ZDOVars.s_modelIndex, 0), z.GetInt(ZDOVars.s_hairItem, 0), z.GetInt(ZDOVars.s_beardItem, 0), z.GetVec3(ZDOVars.s_skinColor, Vector3.one),
-                z.GetVec3(ZDOVars.s_hairColor, Vector3.one), Looks.HairTone(c), Looks.HairShade(c), Looks.BrLook(c), Looks.BrMuscle(c), Looks.BrTattoos(c),
-                z.GetInt(ZDOVars.s_helmetItem, 0), z.GetInt(ZDOVars.s_chestItem, 0), z.GetInt(ZDOVars.s_shoulderItem, 0));
+            if (Shots.TryGetValue(id, out Texture2D tex) && tex != null) return tex;
+            if (id == 0L || Missing.Contains(id)) return null;
+            tex = Load(File(id));
+            if (tex == null) { Missing.Add(id); return null; }
+            Shots[id] = tex;
+            return tex;
         }
 
-        public static void Tick()
+        public static void Set(long id, Texture2D tex)
         {
-            Player me = Player.m_localPlayer;
-            List<Humanoid> all = Companion.All().Where(c => !c.IsDead() && me != null && Vector3.Distance(c.transform.position, me.transform.position) < 40f).ToList();
-            if (all.Count == 0) return;
-            _next = (_next + 1) % all.Count;
-            Humanoid c = all[_next];
-            long id = Companion.IdOf(c);
-            if (!Shots.TryGetValue(id, out Shot shot)) Shots[id] = shot = new Shot();
-            string sig = Signature(c);
-            if (sig != shot.Sig) { shot.Sig = sig; shot.ChangedAt = Time.time; return; }
-            if (shot.ChangedAt < 0f || Time.time - shot.ChangedAt < 0.6f) return;
-            Rigidbody body = c.GetComponent<Rigidbody>();
-            if ((body != null && body.linearVelocity.magnitude > 0.3f) || c.InAttack() || (c.GetComponent<ZNetView>().IsOwner() && Brain.Get(c).InCombat)) return;
-            shot.ChangedAt = -99f;
-            try { Render(c, shot); }
-            catch (Exception e) { VillagePlebsPlugin.Instance?.Warn("Could not take a companion's portrait: " + e.Message); shot.At = Time.time + 30f; }
-        }
-
-        private static void Render(Humanoid c, Shot shot)
-        {
-            if (_cam == null)
+            if (id == 0L || tex == null) return;
+            if (Shots.TryGetValue(id, out Texture2D old) && old != null && old != tex) UnityEngine.Object.Destroy(old);
+            Shots[id] = tex;
+            Missing.Remove(id);
+            try
             {
-                var go = new GameObject("vp_portrait_camera") { hideFlags = HideFlags.HideAndDontSave };
-                _cam = go.AddComponent<Camera>();
-                _cam.enabled = false;
-                _cam.clearFlags = CameraClearFlags.SolidColor;
-                _cam.backgroundColor = new Color(0.16f, 0.2f, 0.19f, 1f);
-                _cam.fieldOfView = 24f;
-                _cam.nearClipPlane = 0.05f;
-                _cam.farClipPlane = 3f;
-                _light = go.AddComponent<Light>();
-                _light.type = LightType.Point;
-                _light.range = 3f;
-                _light.intensity = 1.6f;
-                _light.enabled = false;
+                MethodInfo encode = Type.GetType("UnityEngine.ImageConversion, UnityEngine.ImageConversionModule")?.GetMethod("EncodeToPNG", new[] { typeof(Texture2D) });
+                if (!(encode?.Invoke(null, new object[] { tex }) is byte[] png)) return;
+                string file = File(id);
+                System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(file));
+                System.IO.File.WriteAllBytes(file, png);
             }
-            if (shot.Tex == null) { shot.Tex = new RenderTexture(128, 128, 16) { name = "vp_portrait", antiAliasing = 2 }; shot.Tex.Create(); }
+            catch (Exception e) { VillagePlebsPlugin.Instance?.Warn("Could not save a companion's portrait: " + e.Message); }
+        }
 
-            int mask = 0;
-            foreach (Renderer r in c.GetComponentsInChildren<Renderer>()) mask |= 1 << r.gameObject.layer;
-            Vector3 head = c.GetHeadPoint();
-            Vector3 forward = c.transform.forward; forward.y = 0f;
-            if (forward.sqrMagnitude < 0.01f) forward = Vector3.forward;
-            forward.Normalize();
-            _cam.transform.position = head + forward * 0.8f + Vector3.up * 0.04f;
-            _cam.transform.LookAt(head + Vector3.up * 0.02f);
-            _cam.cullingMask = mask;
-            _cam.targetTexture = shot.Tex;
-            _light.cullingMask = mask;
-            _light.enabled = true;
-            _cam.Render();
-            _light.enabled = false;
-            _cam.targetTexture = null;
-            shot.At = Time.time;
+        private static Texture2D Load(string file)
+        {
+            try
+            {
+                if (!System.IO.File.Exists(file)) return null;
+                var tex = new Texture2D(2, 2, TextureFormat.RGBA32, false) { name = "vp_portrait" };
+                MethodInfo load = Type.GetType("UnityEngine.ImageConversion, UnityEngine.ImageConversionModule")?.GetMethod("LoadImage", new[] { typeof(Texture2D), typeof(byte[]) });
+                if (load != null && (bool)load.Invoke(null, new object[] { tex, System.IO.File.ReadAllBytes(file) })) return tex;
+                UnityEngine.Object.Destroy(tex);
+            }
+            catch (Exception e) { VillagePlebsPlugin.Instance?.Warn("Could not load a companion's portrait: " + e.Message); }
+            return null;
         }
 
         public static void Stop()
         {
-            foreach (Shot s in Shots.Values) if (s.Tex != null) { s.Tex.Release(); UnityEngine.Object.Destroy(s.Tex); }
+            foreach (Texture2D t in Shots.Values) if (t != null) UnityEngine.Object.Destroy(t);
             Shots.Clear();
-            if (_cam != null) UnityEngine.Object.Destroy(_cam.gameObject);
-            _cam = null;
-            _light = null;
+            Missing.Clear();
         }
     }
 }

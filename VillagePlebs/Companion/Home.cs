@@ -39,6 +39,34 @@ namespace VillagePlebs
 
         public static long IdOn(Component piece) => Companion.Zdo(piece)?.GetLong(HomeKey, 0L) ?? 0L;
 
+        private static readonly AccessTools.FieldRef<Piece, long> Creator = AccessTools.FieldRefAccess<Piece, long>("m_creator");
+
+        // Released: its chests and bed are no longer its, and its chests are yours, as if you had built them (so a private one opens for you).
+        public static void HandOver(Humanoid c, Player p)
+        {
+            long id = Companion.IdOf(c);
+            foreach (Container chest in Object.FindObjectsByType<Container>(FindObjectsSortMode.None).Where(x => x != null && IdOn(x) == id).ToList())
+            {
+                if (!Claim(chest)) continue;
+                ZDO z = Companion.Zdo(chest);
+                z.Set(HomeKey, 0L);
+                z.Set(HomeName, "");
+                Piece piece = chest.GetComponentInParent<Piece>();
+                if (piece != null && p != null && Claim(piece))
+                {
+                    Creator(piece) = p.GetPlayerID();
+                    Companion.Zdo(piece)?.Set(ZDOVars.s_creator, p.GetPlayerID());
+                }
+            }
+            foreach (Bed bed in Object.FindObjectsByType<Bed>(FindObjectsSortMode.None).Where(b => b != null && IdOn(b) == id).ToList())
+            {
+                if (!Claim(bed)) continue;
+                Companion.Zdo(bed).Set(HomeKey, 0L);
+                Companion.Zdo(bed).Set(HomeName, "");
+            }
+            _chestCache.Clear();
+        }
+
         private static bool Claim(Component piece)
         {
             ZNetView v = piece.GetComponent<ZNetView>();

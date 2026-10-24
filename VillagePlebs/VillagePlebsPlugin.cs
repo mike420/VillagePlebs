@@ -106,7 +106,6 @@ namespace VillagePlebs
             if (player == null) { if (MenuOpen) CloseMenu(); Wheel.Close(); return; }
             Companion.KeepOwnership(player);
             Home.Tick(player);
-            Portraits.Tick();
             UpdateMenu(player);
             Wheel.Tick(player);
             MenuKeyPressed(player);

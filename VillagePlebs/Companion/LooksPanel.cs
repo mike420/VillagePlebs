@@ -48,6 +48,9 @@ namespace VillagePlebs
         private static readonly Color PreviewSolid = new Color(Theme.Field.r, Theme.Field.g, Theme.Field.b, 1f);
 
         private readonly Humanoid _companion;
+        private float _openedAt = -1f;
+        private bool _portraitChecked;
+        private static readonly Color PortraitBack = new Color(0.16f, 0.2f, 0.19f, 1f);
         private int _worn;
 
         private static bool _showArmour = true;
@@ -320,6 +323,13 @@ namespace VillagePlebs
         public void UpdatePerFrame()
         {
             if (_previewImg == null || !_previewImg.gameObject.activeInHierarchy || _cam == null) return;
+            if (_openedAt < 0f) _openedAt = Time.unscaledTime;
+            // Opened on the look it already has: its picture is brought up to date from this preview.
+            if (!_portraitChecked && _clone != null && Time.unscaledTime - _openedAt > 0.8f)
+            {
+                _portraitChecked = true;
+                if (Same(Current, Looks.Of(_companion))) Portraits.Set(Id, Snapshot());
+            }
             if (_clone != null && WornHash() != _worn) ApplyToClone();
             bool over = RectTransformUtility.RectangleContainsScreenPoint(_previewImg.rectTransform, Input.mousePosition, null);
             if (!_dragging && Input.GetMouseButtonDown(0) && over && !RectTransformUtility.RectangleContainsScreenPoint(_armourBox, Input.mousePosition, null))
@@ -391,6 +401,57 @@ namespace VillagePlebs
             _cam = null;
             _rt = null;
             _previewImg = null;
+        }
+
+        private static bool Same(Looks.Look a, Looks.Look b) =>
+            a.Model == b.Model && a.Hair == b.Hair && a.Beard == b.Beard && Mathf.Approximately(a.Skin, b.Skin) && Mathf.Approximately(a.HairTone, b.HairTone)
+            && Mathf.Approximately(a.HairShade, b.HairShade) && (a.BrLook ?? "") == (b.BrLook ?? "") && Mathf.Approximately(a.BrMuscle, b.BrMuscle) && (a.BrTattoos ?? "") == (b.BrTattoos ?? "");
+
+        // Head and shoulders of the preview body, from the front, in the preview's studio light: the companion's portrait.
+        public Texture2D Snapshot(int size = 160)
+        {
+            if (_cam == null || _clone == null) return null;
+            RenderTexture rt = RenderTexture.GetTemporary(size, size, 24, RenderTextureFormat.ARGB32);
+            RenderTexture before = RenderTexture.active, target = _cam.targetTexture;
+            Vector3 pos = _cam.transform.position;
+            Quaternion rot = _cam.transform.rotation;
+            Color back = _cam.backgroundColor;
+            bool faceOn = _faceLight != null && _faceLight.enabled;
+            float faceIntensity = _faceLight != null ? _faceLight.intensity : 0f;
+            Vector3 facePos = _faceLight != null ? _faceLight.transform.position : Vector3.zero;
+            Color ambient = RenderSettings.ambientLight;
+            float intensity = RenderSettings.ambientIntensity;
+            AmbientMode mode = RenderSettings.ambientMode;
+            try
+            {
+                Vector3 face = EyeCentre();
+                _cam.transform.position = face + new Vector3(0f, 0.05f, 1f) * 0.95f;
+                _cam.transform.LookAt(face - Vector3.up * 0.06f);
+                if (_faceLight != null) { _faceLight.enabled = true; _faceLight.intensity = 1.1f; _faceLight.transform.position = face + new Vector3(0f, 0.18f, 0.55f); }
+                RenderSettings.ambientMode = AmbientMode.Flat;
+                RenderSettings.ambientLight = new Color(0.45f, 0.4f, 0.35f);
+                RenderSettings.ambientIntensity = 1.2f;
+                _cam.backgroundColor = PortraitBack;
+                _cam.targetTexture = rt;
+                _cam.Render();
+                RenderTexture.active = rt;
+                var tex = new Texture2D(size, size, TextureFormat.RGBA32, false) { name = "vp_portrait" };
+                tex.ReadPixels(new Rect(0f, 0f, size, size), 0, 0);
+                tex.Apply();
+                return tex;
+            }
+            finally
+            {
+                RenderTexture.active = before;
+                _cam.targetTexture = target;
+                _cam.transform.SetPositionAndRotation(pos, rot);
+                _cam.backgroundColor = back;
+                if (_faceLight != null) { _faceLight.enabled = faceOn; _faceLight.intensity = faceIntensity; _faceLight.transform.position = facePos; }
+                RenderSettings.ambientMode = mode;
+                RenderSettings.ambientLight = ambient;
+                RenderSettings.ambientIntensity = intensity;
+                RenderTexture.ReleaseTemporary(rt);
+            }
         }
 
         private static int CharacterMask()
