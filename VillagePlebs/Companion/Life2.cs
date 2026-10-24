@@ -511,7 +511,7 @@ namespace VillagePlebs
 
     internal static class Carry
     {
-        public static float Max(Humanoid c) => 300f + Companion.Worn(c).Select(i => i.m_shared.m_equipStatusEffect as SE_Stats).Where(se => se != null).Sum(se => se.m_addMaxCarryWeight);
+        public static float Max(Humanoid c) => MainConfig.baseCarry.Value + Companion.Worn(c).Select(i => i.m_shared.m_equipStatusEffect as SE_Stats).Where(se => se != null).Sum(se => se.m_addMaxCarryWeight);
         public static float Weight(Humanoid c) => c.GetInventory().GetTotalWeight();
         public static bool Over(Humanoid c) => Weight(c) > Max(c);
     }

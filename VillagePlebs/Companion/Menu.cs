@@ -33,7 +33,7 @@ namespace VillagePlebs
         private LooksPanel _looks;
 
         private const float WindowW = 880f, Pad = 26f, CardPad = 14f, CardGap = 10f;
-        private static readonly Color HealthRed = new Color(0.9f, 0.25f, 0.18f), StaminaYellow = new Color(1f, 0.78f, 0.22f), EitrPurple = new Color(0.62f, 0.46f, 1f);
+        private static readonly Color HealthRed = new Color(0.9f, 0.25f, 0.18f), StaminaYellow = new Color(1f, 0.78f, 0.22f), CarryBrown = new Color(0.72f, 0.52f, 0.3f), EitrPurple = new Color(0.62f, 0.46f, 1f);
 
         private RectTransform _window, _list, _card, _oldWindow;
         private CanvasGroup _fresh;
@@ -41,6 +41,10 @@ namespace VillagePlebs
         private long _jobFor;
         private string _jobShown, _jobWaiting;
         private float _jobSince;
+        private RectTransform _jobPanel, _jobBar;
+        private TMP_Text _jobText;
+        private Button _jobStop;
+        private const float JobPanelH = 56f, JobGap = 8f;
         private TMP_InputField _field;
         private string _drawn = "", _scrollKey = "";
         private readonly Dictionary<string, float> _scrolls = new Dictionary<string, float>();
@@ -92,6 +96,7 @@ namespace VillagePlebs
             _hirePrice = -1;
             if (_window != null) Object.Destroy(_window.gameObject);
             if (_oldWindow != null) Object.Destroy(_oldWindow.gameObject);
+            DropJobPanel();
             _window = _list = _card = _oldWindow = null;
             _fresh = null;
             _field = null;
@@ -110,10 +115,11 @@ namespace VillagePlebs
             run?.Invoke();
             if (!MenuOpen) return;
             if (_window == null) { CloseMenu(); return; }
-            if (_shown != null && (_shown.IsDead() || Vector3.Distance(_shown.transform.position, player.transform.position) > 100f)) { CloseMenu(); return; }
+            if (_shown != null && _shown.IsDead()) { CloseMenu(); return; }
             else if (global::Menu.IsVisible() || InventoryGui.IsVisible()) { CloseMenu(); return; }
             if (!GameUi.Typing && Time.unscaledTime > _openedAt + 0.2f && ZInput.GetButtonDown("Use")) { CloseMenu(); return; }
             if (_restoreAgain) { _restoreAgain = false; RestoreScrolls(); Reveal(); }
+            TickJob();
             TickMenu();
             TickLooks();
         }
@@ -160,6 +166,68 @@ namespace VillagePlebs
             _lastRebuild = Time.unscaledTime;
         }
 
+        // What it is doing, in a panel of its own above the menu: built once per companion and updated in place, never redrawn with the menu.
+        private void JobPanel(Humanoid c, float w, float y)
+        {
+            long id = Companion.IdOf(c);
+            if (_jobPanel == null || _jobFor != id)
+            {
+                DropJobPanel();
+                _jobFor = id;
+                _jobShown = _jobWaiting = null;
+                Image box = MagicMike.ModSettings.Widgets.Box(GameUi.Canvas, "VillagePlebsJob", MagicMike.ModSettings.Theme.Panel, MagicMike.ModSettings.Theme.PanelOutline, 2f);
+                _jobPanel = (RectTransform)box.transform;
+                _jobPanel.anchorMin = _jobPanel.anchorMax = _jobPanel.pivot = new Vector2(0.5f, 0.5f);
+                float textW = w - Pad * 2f - 186f;
+                _jobText = Line(_jobPanel, Pad, 8f, textW, 16f, GameUi.Text);
+                _jobBar = GameUi.Bar(_jobPanel, new Vector2(Pad, -34f), new Vector2(Mathf.Min(textW, 400f), 10f), 0f, GameUi.Good, null);
+                _jobStop = GameUi.Button(_jobPanel, T("villagepleb_menu_stop_job"), new Vector2(w - Pad - 170f, -13f), new Vector2(170f, 30f), StopJob, true, 15f);
+            }
+            _jobPanel.sizeDelta = new Vector2(w, JobPanelH);
+            _jobPanel.anchoredPosition = new Vector2(0f, y);
+            TickJob();
+        }
+
+        private void DropJobPanel()
+        {
+            if (_jobPanel != null) Object.Destroy(_jobPanel.gameObject);
+            _jobPanel = _jobBar = null;
+            _jobText = null;
+            _jobStop = null;
+            _jobFor = 0L;
+        }
+
+        // A new line only shows once it has held for a moment, so the gaps between one step and the next don't flash up.
+        private void TickJob()
+        {
+            Humanoid c = _shown;
+            if (_jobPanel == null || c == null) return;
+            BrainState st = c.GetComponent<ZNetView>().IsOwner() ? Brain.Get(c) : null;
+            float done = -1f;
+            string text = st == null ? T("villagepleb_menu_shows_elsewhere") : T("villagepleb_menu_job", Words.Show(Work.JobText(st, out done)));
+            if (text != _jobWaiting) { _jobWaiting = text; _jobSince = Time.unscaledTime; }
+            if (_jobShown == null || text != _jobShown && Time.unscaledTime - _jobSince >= 1f) { _jobShown = text; Set(_jobText, text); }
+            bool measured = done >= 0f && text == _jobShown;
+            if (_jobBar.gameObject.activeSelf != measured) _jobBar.gameObject.SetActive(measured);
+            if (measured) GameUi.SetBar(_jobBar, done);
+            bool ordered = st != null && Work.OnOrder(st), mission = st != null && !ordered && Companion.OrderOf(c) == VillagePlebs.Order.Gather && Missions.Current(c) != null;
+            bool stoppable = Mine && (ordered || mission);
+            if (_jobStop.gameObject.activeSelf != stoppable) _jobStop.gameObject.SetActive(stoppable);
+            if (stoppable) Set(GameUi.Label(_jobStop), T(mission ? "villagepleb_menu_drop_mission" : "villagepleb_menu_stop_job"));
+        }
+
+        private void StopJob()
+        {
+            _pending = () =>
+            {
+                BrainState bs = Brain.Claim(_shown, out string why);
+                if (bs == null) { _note = Words.Show(why); return; }
+                if (Work.OnOrder(bs)) Work.StopJob(bs);
+                else Missions.StopCurrent(bs);
+            };
+            _nextCheck = 0f;
+        }
+
         // A rebuilt window waits unseen for a frame while its scroll settles, then takes the old one's place, so a redraw never shows.
         private void Reveal()
         {
@@ -175,7 +243,8 @@ namespace VillagePlebs
             Humanoid c = _shown;
             bool companion = c != null;
             Vector2 screen = GameUi.ScreenSize;
-            float w = Mathf.Min(WindowW, screen.x - 20f), h = Mathf.Min(companion ? 900f : 680f, screen.y - 40f);
+            float jobSpace = companion ? JobPanelH + JobGap : 0f;
+            float w = Mathf.Min(WindowW, screen.x - 20f), h = Mathf.Min(companion ? 900f : 680f, screen.y - 40f - jobSpace);
             string key = (companion ? Companion.IdOf(c).ToString() : "list") + "/" + _tab;
             _sig.Append(key).Append('|').Append((int)w).Append('x').Append((int)h);
             string message = string.IsNullOrEmpty(_note) ? "" : Words.Show(_note);
@@ -201,7 +270,10 @@ namespace VillagePlebs
                     _fresh.alpha = 0f;
                     _fresh.interactable = _fresh.blocksRaycasts = false;
                 }
-                if (message.Length > 0) h = MessagePanel(message, w, h, screen.y);
+                if (message.Length > 0) h = MessagePanel(message, w, h, screen.y - jobSpace);
+                _window.anchoredPosition -= new Vector2(0f, jobSpace / 2f);
+                if (companion) JobPanel(c, w, _window.anchoredPosition.y + h / 2f + JobGap + JobPanelH / 2f);
+                else DropJobPanel();
             }
             _in = _window; _left = Pad; _width = w - Pad * 2f;
 
@@ -505,56 +577,15 @@ namespace VillagePlebs
                 }
                 if (Mine) Btn(Loc("$hud_rename"), x + nameW + 14f, 22f, 120f, 30f, () => { _renaming = true; _focusField = true; _nameField = Companion.NameOf(_shown); }, size: 16f);
             }
-            if (_make)
-            {
-                TMP_Text status = Line(_window, x, 62f, closeX - x - 8f, 18f, GameUi.Good);
-                _live.Add(() => { string s = Companion.StatusOf(c); Set(status, string.IsNullOrEmpty(s) ? T("villagepleb_menu_idle") : Capital(Words.Show(s))); });
-            }
-            if (owner)
-            {
-                BrainState js = Brain.Get(c);
-                bool ordered = Work.OnOrder(js), mission = !ordered && Companion.OrderOf(c) == VillagePlebs.Order.Gather && Missions.Current(c) != null;
-                bool stoppable = ordered || mission;
-                _sig.Append("|J").Append(stoppable && Mine).Append(mission);
-                float jobW = closeX - x - (stoppable && Mine ? 180f : 8f) + 110f;
-                if (_make)
-                {
-                    TMP_Text job = Line(_window, x, 88f, jobW, 16f, GameUi.Text);
-                    RectTransform bar = GameUi.Bar(_window, new Vector2(x, -110f), new Vector2(Mathf.Min(jobW, 400f), 10f), 0f, GameUi.Good, null);
-                    // A new job line only shows once it has held for a moment, so the gaps between one step and the next don't flash up.
-                    // What it showed is kept on the menu, not here, so a redraw carries on where it was.
-                    if (_jobFor != id) { _jobFor = id; _jobShown = _jobWaiting = null; }
-                    if (_jobShown != null) Set(job, _jobShown);
-                    void Show()
-                    {
-                        string text = T("villagepleb_menu_job", Words.Show(Work.JobText(Brain.Get(c), out float done)));
-                        if (text != _jobWaiting) { _jobWaiting = text; _jobSince = Time.unscaledTime; }
-                        if (_jobShown == null || text != _jobShown && Time.unscaledTime - _jobSince >= 1f) { _jobShown = text; Set(job, text); }
-                        bool measured = done >= 0f && text == _jobShown;
-                        if (bar.gameObject.activeSelf != measured) bar.gameObject.SetActive(measured);
-                        if (measured) GameUi.SetBar(bar, done);
-                    }
-                    Show();
-                    _live.Add(Show);
-                }
-                if (stoppable && Mine)
-                    Btn(T(mission ? "villagepleb_menu_drop_mission" : "villagepleb_menu_stop_job"), w - Pad - 170f, 84f, 170f, 30f, () => _pending = () =>
-                    {
-                        BrainState bs = Brain.Claim(_shown, out string why);
-                        if (bs == null) { _note = Words.Show(why); return; }
-                        if (Work.OnOrder(bs)) Work.StopJob(bs);
-                        else Missions.StopCurrent(bs);
-                    }, size: 15f);
-            }
-
             _y = 128f;
             LiveBar(() => c.GetHealth() / Mathf.Max(1f, c.GetMaxHealth()), () => $"{Loc("$se_health")}  {c.GetHealth():0} / {c.GetMaxHealth():0}", HealthRed);
             LiveBar(() => Stamina.Get(c) / Mathf.Max(1f, Stamina.Max(c)), () => $"{Loc("$se_stamina")}  {Stamina.Get(c):0} / {Stamina.Max(c):0}", StaminaYellow);
+            LiveBar(() => Mathf.Clamp01(Carry.Weight(c) / Mathf.Max(1f, Carry.Max(c))), () => $"{T("villagepleb_menu_carrying")}  {Carry.Weight(c):0} / {Carry.Max(c):0}", CarryBrown);
             bool eitr = Eitr.Max(c) > 0f;
             _sig.Append(eitr);
             if (eitr) LiveBar(() => Eitr.Get(c) / Mathf.Max(1f, Eitr.Max(c)), () => $"{Loc("$se_eitr")}  {Eitr.Get(c):0} / {Eitr.Max(c):0}", EitrPurple);
 
-            var yours = Companion.All().Where(h => Companion.IsMine(h, pl) && Vector3.Distance(h.transform.position, pl.transform.position) < 100f).ToList();
+            var yours = Companion.All().Where(h => Companion.IsMine(h, pl)).OrderBy(h => Vector3.Distance(h.transform.position, pl.transform.position)).ToList();
             if (yours.Count > 1)
             {
                 float bw = Mathf.Min(170f, (_width - 6f * (yours.Count - 1)) / yours.Count);
@@ -1027,6 +1058,26 @@ namespace VillagePlebs
             Note(T("villagepleb_menu_duties_cook"), GameUi.Dim);
             EndCard();
 
+            BeginCard(T("villagepleb_menu_picks_up"));
+            Note(T("villagepleb_menu_picks_up_about"), GameUi.Dim);
+            Loot.Kinds list = Loot.List(c);
+            var kinds = new[] { Loot.Kinds.Ore, Loot.Kinds.Wood, Loot.Kinds.Stone, Loot.Kinds.Food, Loot.Kinds.Creature, Loot.Kinds.Gear, Loot.Kinds.Other };
+            float colW = (_width - 16f) / 2f;
+            for (int i = 0; i < kinds.Length; i += 2)
+            {
+                float rowH = 0f;
+                for (int j = i; j < Mathf.Min(i + 2, kinds.Length); j++)
+                {
+                    Loot.Kinds k = kinds[j];
+                    string label = Named("villagepleb_menu_loot_", k);
+                    rowH = Mathf.Max(rowH, CheckAt(label, (list & k) != 0, () => _pending = () => Change(z => z.Set(Loot.ListKey, z.GetInt(Loot.ListKey, (int)Loot.Default) ^ (int)k)),
+                        _left + (j - i) * (colW + 16f), _y, colW));
+                }
+                _y += rowH + 6f;
+            }
+            if (!Loot.On(c)) Note(T("villagepleb_menu_loot_off"), GameUi.Warn);
+            EndCard();
+
             BeginCard(T("villagepleb_menu_its_food"));
             bool frugal = VillagePlebs.Food.Frugal(c);
             Check(T("villagepleb_menu_check_frugal"), frugal, () => _pending = () => Change(cz => cz.Set(VillagePlebs.Food.FrugalKey, !frugal)));
@@ -1082,26 +1133,6 @@ namespace VillagePlebs
 
             BeginCard(T("villagepleb_menu_if_falls"));
             Note(T("villagepleb_menu_if_falls_about", MainConfig.respawnSeconds.Value.ToString("0")), GameUi.Text);
-            EndCard();
-
-            BeginCard(T("villagepleb_menu_picks_up"));
-            Note(T("villagepleb_menu_picks_up_about"), GameUi.Dim);
-            Loot.Kinds list = Loot.List(c);
-            var kinds = new[] { Loot.Kinds.Ore, Loot.Kinds.Wood, Loot.Kinds.Stone, Loot.Kinds.Food, Loot.Kinds.Creature, Loot.Kinds.Gear, Loot.Kinds.Other };
-            float colW = (_width - 16f) / 2f;
-            for (int i = 0; i < kinds.Length; i += 2)
-            {
-                float rowH = 0f;
-                for (int j = i; j < Mathf.Min(i + 2, kinds.Length); j++)
-                {
-                    Loot.Kinds k = kinds[j];
-                    string label = Named("villagepleb_menu_loot_", k);
-                    rowH = Mathf.Max(rowH, CheckAt(label, (list & k) != 0, () => _pending = () => Change(z => z.Set(Loot.ListKey, z.GetInt(Loot.ListKey, (int)Loot.Default) ^ (int)k)),
-                        _left + (j - i) * (colW + 16f), _y, colW));
-                }
-                _y += rowH + 6f;
-            }
-            if (!Loot.On(c)) Note(T("villagepleb_menu_loot_off"), GameUi.Warn);
             EndCard();
         }
 

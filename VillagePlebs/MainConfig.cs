@@ -24,6 +24,7 @@ namespace VillagePlebs
         public static ConfigEntry<float> respawnSeconds;
         public static ConfigEntry<float> baseHealth;
         public static ConfigEntry<float> baseStamina;
+        public static ConfigEntry<float> baseCarry;
         public static ConfigEntry<float> eatBelow;
         public static ConfigEntry<float> startingSkill;
         public static ConfigEntry<float> mmoExp;
@@ -44,6 +45,7 @@ namespace VillagePlebs
             respawnSeconds = config.BindConfigInOrder("Companion", "Respawn Seconds", defaultValue: 30f, "Seconds after falling before it wakes in its bed (or beside you). Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<float>(5f, 600f));
             baseHealth = config.BindConfigInOrder("Companion", "Base Health", defaultValue: 25f, "Its health before food (a player has 25). Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<float>(5f, 500f));
             baseStamina = config.BindConfigInOrder("Companion", "Base Stamina", defaultValue: 75f, "Its stamina before food (a player has 75). Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<float>(10f, 500f));
+            baseCarry = config.BindConfigInOrder("Companion", "Base Carry Weight", defaultValue: 300f, "How much it can carry before what its gear adds, such as a belt (a player carries 300). Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<float>(50f, 3000f));
             eatBelow = config.BindConfigInOrder("Companion", "Eat Below Percent", defaultValue: 10f, "It eats a food it is already under again once its time left drops below this percent (the game allows it from 50). Lower saves food: a meal lasts 80% of its time instead of 50%, and its effect weakens a little towards the end. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<float>(1f, 50f));
             startingSkill = config.BindConfigInOrder("Companion", "Starting Skill", defaultValue: 0f, "The skill level a new companion starts at (a new player: 0). Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<float>(0f, 100f));
             mmoExp = config.BindConfigInOrder("EpicMMO", "Companion Exp", defaultValue: 1f, "With EpicMMO System installed: the experience a companion earns from its kills and its work (chopping, mining, picking), as a multiple of what a player gets for them (EpicMMO's RateExp counts too). 0: companions don't level up, and their levels give nothing. Their kills count for their player as a tame's do (EpicMMO's \"Tames give XP on Mob kill\"). Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<float>(0f, 10f));

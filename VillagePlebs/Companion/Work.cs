@@ -1766,7 +1766,6 @@ namespace VillagePlebs
             VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(me)} upgraded its {what} to level {next} at {station.transform.position:F0}");
             Talk.Tell(me, P("villagepleb_work_upgraded_say", token, next));
             Journal.Upgraded(me, token, next);
-            Portraits.Dirty(me);
             return P("villagepleb_work_upgraded_its", Low(token), next);
         }
     }

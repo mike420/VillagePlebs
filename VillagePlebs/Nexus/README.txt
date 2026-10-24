@@ -67,6 +67,7 @@ Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in
 [*][b]Respawn Seconds[/b] (default 30)
 [*][b]Base Health[/b] (default 25)
 [*][b]Base Stamina[/b] (default 75)
+[*][b]Base Carry Weight[/b] (default 300)
 [*][b]Eat Below Percent[/b] (default 10)
 [*][b]Starting Skill[/b] (default 0)
 [/list]

@@ -313,7 +313,6 @@ namespace VillagePlebs
             string later = Provision(me, center, radius);
             if (fromYou == null) fromYou = later;
             Companion.SaveBag(me);
-            Portraits.Dirty(me);
 
             Stage = "report";
             var did = new List<string>(did0);

@@ -69,7 +69,7 @@ namespace VillagePlebs
             GameObject hover = p.GetHoverObject();
             Humanoid looked = hover != null ? hover.GetComponentInParent<Humanoid>() : null;
             if (looked != null && Companion.Is(looked) && !looked.IsDead() && Companion.CanCommand(looked, p)) return looked;
-            return Companion.All().Where(c => !c.IsDead() && Companion.CanCommand(c, p) && Vector3.Distance(c.transform.position, p.transform.position) < 60f)
+            return Companion.All().Where(c => !c.IsDead() && Companion.CanCommand(c, p))
                 .OrderBy(c => Vector3.Distance(c.transform.position, p.transform.position)).FirstOrDefault();
         }
 

@@ -46,7 +46,6 @@ namespace VillagePlebs
             z.Set(BrTattooKey, tattoos ?? "");
             BodyReplacerLook.Apply(c.gameObject, look, muscle);
             BodyReplacerLook.ApplyTattoos(c.gameObject, tattoos);
-            Portraits.Dirty(c);
         }
 
         public static string StyleName(int hash, List<ItemDrop> styles)
@@ -93,7 +92,6 @@ namespace VillagePlebs
             Vis(c)?.SetHairItem(hash);
             z.Set(ZDOVars.s_hairItem, hash);
             z.Set(ZDOVars.s_noHair, hash == 0);
-            Portraits.Dirty(c);
         }
 
         public static void SetBeard(Humanoid c, int hash)
@@ -102,14 +100,12 @@ namespace VillagePlebs
             Vis(c)?.SetBeardItem(hash);
             z.Set(ZDOVars.s_beardItem, hash);
             z.Set(ZDOVars.s_noBeard, hash == 0);
-            Portraits.Dirty(c);
         }
 
         public static void SetSkin(Humanoid c, float t)
         {
             Companion.Zdo(c).Set(SkinT, t);
             Vis(c)?.SetSkinColor(SkinColor(t));
-            Portraits.Dirty(c);
         }
 
         public static void SetHairColor(Humanoid c, float tone, float shade)
@@ -118,7 +114,6 @@ namespace VillagePlebs
             z.Set(HairT, tone);
             z.Set(HairL, shade);
             Vis(c)?.SetHairColor(HairColor(tone, shade));
-            Portraits.Dirty(c);
         }
 
         public static Vector3 SkinColor(float t) => Utils.ColorToVec3(Color.Lerp(Skin0, Skin1, t));
@@ -208,14 +203,14 @@ namespace VillagePlebs
 
         public static Texture Get(long id) => Shots.TryGetValue(id, out Shot s) && s.Tex != null && s.At > 0f ? s.Tex : null;
 
-        public static void Dirty(Component c) { if (Shots.TryGetValue(Companion.IdOf(c), out Shot s)) s.Sig = ""; }
-
+        // Only what shows in the picture: its body, face and hair, and the armour on its head and shoulders. Not what it holds, which
+        // changes every time it swaps tools at work, so the portrait is only taken again when it actually looks different.
         private static string Signature(Humanoid c)
         {
             ZDO z = Companion.Zdo(c);
             return string.Join("|", z.GetInt(ZDOVars.s_modelIndex, 0), z.GetInt(ZDOVars.s_hairItem, 0), z.GetInt(ZDOVars.s_beardItem, 0), z.GetVec3(ZDOVars.s_skinColor, Vector3.one),
-                z.GetVec3(ZDOVars.s_hairColor, Vector3.one), z.GetInt(ZDOVars.s_helmetItem, 0), z.GetInt(ZDOVars.s_chestItem, 0), z.GetInt(ZDOVars.s_shoulderItem, 0),
-                z.GetInt(ZDOVars.s_rightItem, 0), z.GetInt(ZDOVars.s_leftItem, 0));
+                z.GetVec3(ZDOVars.s_hairColor, Vector3.one), Looks.HairTone(c), Looks.HairShade(c), Looks.BrLook(c), Looks.BrMuscle(c), Looks.BrTattoos(c),
+                z.GetInt(ZDOVars.s_helmetItem, 0), z.GetInt(ZDOVars.s_chestItem, 0), z.GetInt(ZDOVars.s_shoulderItem, 0));
         }
 
         public static void Tick()

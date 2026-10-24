@@ -65,6 +65,7 @@ Settings are in `BepInEx/config/MagicMike.VillagePlebs.cfg`. Change them in game
 | Companion | Respawn Seconds | 30 | Seconds after falling before it wakes in its bed or beside you (synced). |
 | Companion | Base Health | 25 | Its health before food (synced). |
 | Companion | Base Stamina | 75 | Its stamina before food (synced). |
+| Companion | Base Carry Weight | 300 | How much it can carry before what its gear adds, such as a belt (synced). |
 | Companion | Eat Below Percent | 10 | It eats a food again once that food's time left drops below this percent (synced). |
 | Companion | Starting Skill | 0 | The skill level a new companion starts at (synced). |
 | EpicMMO | Companion Exp | 1 | With EpicMMO System: the experience a companion earns, as a multiple of a player's. 0: off (synced). |

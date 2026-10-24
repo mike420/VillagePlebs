@@ -50,7 +50,6 @@
   "villagepleb_menu_same_name": "Vous avez déjà un compagnon nommé {0}. Donnez un autre nom au nouveau, ou allez voir {0}.",
   "villagepleb_menu_hello_took": "Salut ! {0}",
   "villagepleb_menu_hello": "Salut ! Donnez-moi un lit et un coffre, et je m'installe ici.",
-  "villagepleb_menu_idle": "Sans tâche",
   "villagepleb_menu_job": "Tâche : {0}",
   "villagepleb_menu_stop_job": "Arrêter cette tâche",
   "villagepleb_menu_drop_mission": "Abandonner la mission",

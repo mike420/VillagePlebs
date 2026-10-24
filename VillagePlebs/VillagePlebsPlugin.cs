@@ -128,7 +128,7 @@ namespace VillagePlebs
                 if (!_keyHeld && Time.time - _keyDownAt > 0.45f) { _keyHeld = true; Home.ToggleAll(player); }
                 return;
             }
-            if (!_keyHeld) OpenMenuFor(player, Companion.MineNear(player, 100f));
+            if (!_keyHeld) OpenMenuFor(player, Companion.MineNear(player, float.MaxValue));
             _keyDownAt = -1f;
         }
 

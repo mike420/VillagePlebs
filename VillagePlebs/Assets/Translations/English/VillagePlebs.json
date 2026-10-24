@@ -50,7 +50,6 @@
   "villagepleb_menu_same_name": "You already have a companion called {0}. Give the new one another name, or go to {0}.",
   "villagepleb_menu_hello_took": "Hello! {0}",
   "villagepleb_menu_hello": "Hello! Give me a bed and a chest and I'll make my home here.",
-  "villagepleb_menu_idle": "Idle",
   "villagepleb_menu_job": "Job: {0}",
   "villagepleb_menu_stop_job": "Stop this job",
   "villagepleb_menu_drop_mission": "Drop mission",
