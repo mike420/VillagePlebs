@@ -23,8 +23,7 @@ namespace VillagePlebs
         private static Action<GameObject, string, float> _applyLook;
         private static Action<GameObject> _treatAsCreature;
         private static Type _visualType;
-        private static Func<int, string[]> _gameHairs, _gameHairNames, _tattooDesignNames;
-        private static int _gameHairStyle = -1;
+        private static Func<int, string[]> _tattooDesignNames;
         private static Func<string[]> _tattooAreas, _tattooInkNames;
         private static Func<string, int, int> _getTattooDesign, _getTattooInk;
         private static Func<string, int, int, int, string> _setTattoo;
@@ -65,7 +64,7 @@ namespace VillagePlebs
                 _visualType = assembly.GetType("BodyReplacer.EinherjarVisual");
                 FindNewer(api);
                 VillagePlebsPlugin.Instance?.Note("BodyReplacer found: companions can be given its hairstyles and colours"
-                    + (HasGameHair ? ", the game's hairstyles" : "") + (HasTattoos ? ", tattoos" : "") + (HasBeardApi ? ", beards" : ""));
+                    + (HasTattoos ? ", tattoos" : "") + (HasBeardApi ? ", beards" : ""));
             }
             catch (Exception e)
             {
@@ -76,10 +75,6 @@ namespace VillagePlebs
 
         private static void FindNewer(Type api)
         {
-            _gameHairs = TryBind<Func<int, string[]>>(api, "GameHairs");
-            _gameHairNames = TryBind<Func<int, string[]>>(api, "GameHairNames");
-            object style = api.GetField("GameHairStyle", BindingFlags.Public | BindingFlags.Static)?.GetValue(null);
-            _gameHairStyle = style is int s ? s : -1;
             _tattooAreas = TryBind<Func<string[]>>(api, "TattooAreas");
             _tattooDesignNames = TryBind<Func<int, string[]>>(api, "TattooDesignNames");
             _tattooInkNames = TryBind<Func<string[]>>(api, "TattooInkNames");
@@ -123,11 +118,6 @@ namespace VillagePlebs
         {
             if (Available && !string.IsNullOrEmpty(look)) _applyLook(character, look, muscle);
         }
-
-        public static bool HasGameHair { get { Find(); return _gameHairs != null && _gameHairNames != null && _gameHairStyle >= 0; } }
-        public static int GameHairStyle => _gameHairStyle;
-        public static string[] GameHairs(int model) => HasGameHair ? _gameHairs(model) : Array.Empty<string>();
-        public static string[] GameHairNames(int model) => HasGameHair ? _gameHairNames(model) : Array.Empty<string>();
 
         public static bool HasTattoos
         {

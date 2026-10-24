@@ -198,30 +198,15 @@ namespace VillagePlebs
             ApplyToClone();
         }
 
-        private int EinherjarHairIndex(int[] ids, string[] gameHairs)
-        {
-            int style = Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "HairStyle"));
-            if (gameHairs.Length > 0 && style == BodyReplacerLook.GameHairStyle)
-            {
-                int i = Array.FindIndex(gameHairs, h => h.GetStableHashCode() == Current.Hair);
-                if (i >= 0) return ids.Length + i;
-            }
-            return Mathf.Max(0, Array.IndexOf(ids, BodyReplacerLook.ShownHairStyle(Current.Model, style)));
-        }
+        // The style this body shows, among the ones it offers (each body has its own list)
+        private int EinherjarHairIndex(int[] ids) =>
+            Mathf.Max(0, Array.IndexOf(ids, BodyReplacerLook.ShownHairStyle(Current.Model, Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "HairStyle")))));
 
         private void StepEinherjarHair(int by)
         {
             int[] ids = BodyReplacerLook.HairStyleIds(Current.Model);
-            string[] gameHairs = BodyReplacerLook.GameHairs(Current.Model);
-            int count = ids.Length + gameHairs.Length;
-            if (count == 0) return;
-            int next = (EinherjarHairIndex(ids, gameHairs) + by + count) % count;
-            if (next < ids.Length) SetEinherjarField("HairStyle", ids[next]);
-            else
-            {
-                Current.Hair = gameHairs[next - ids.Length].GetStableHashCode();
-                SetEinherjarField("HairStyle", BodyReplacerLook.GameHairStyle);
-            }
+            if (ids.Length == 0) return;
+            SetEinherjarField("HairStyle", ids[(EinherjarHairIndex(ids) + by + ids.Length) % ids.Length]);
             Refresh();
         }
 
@@ -655,9 +640,8 @@ namespace VillagePlebs
             _hairShadeSlider?.SetValueWithoutNotify(Current.HairShade);
             if (_einherjarHairName != null)
             {
-                string[] names = BodyReplacerLook.HairStyleNames(Current.Model), gameNames = BodyReplacerLook.GameHairNames(Current.Model);
-                int shown = EinherjarHairIndex(BodyReplacerLook.HairStyleIds(Current.Model), BodyReplacerLook.GameHairs(Current.Model));
-                _einherjarHairName.text = shown < names.Length ? names[shown] : shown - names.Length < gameNames.Length ? gameNames[shown - names.Length] : "";
+                string[] names = BodyReplacerLook.HairStyleNames(Current.Model);
+                _einherjarHairName.text = names.Length > 0 ? names[Mathf.Min(EinherjarHairIndex(BodyReplacerLook.HairStyleIds(Current.Model)), names.Length - 1)] : "";
             }
             if (_einherjarBeardName != null)
             {

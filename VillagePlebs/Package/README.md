@@ -42,7 +42,7 @@ Thank you for your support, and happy gaming! ⚔️  ...... (A Paypal account i
   * **A journal** of its life, small talk that fits the moment, and a menu with its status (and journal), stats, missions, orders, home, inventory, looks and your plebs.
   * **EpicMMO System:** it earns experience and levels from what it kills and gathers.
   * **StarLevelSystem:** it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.
-  * **Body Replacer (optional):** with Magic Mike's Body Replacer installed, its looks menu also offers that mod's Einherjar bodies, game hairstyles and tattoos.
+  * **Body Replacer (optional):** with Magic Mike's Body Replacer installed, its looks menu also offers that mod's Einherjar bodies, beards and tattoos.
   * **Languages:** English, Russian, German, Chinese, Portuguese (Brazil), Spanish, French, Polish and Turkish, following the game's language setting.
 <br>
 <br>
