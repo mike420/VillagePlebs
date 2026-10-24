@@ -14,7 +14,7 @@ namespace VillagePlebs
         public int Order, Style = 1, Retreat = 30, Kills, Jobs, Radius = 30, Model;
         public int Ration = 12, DutyDest;
         public bool Frugal = true;
-        public bool Potions = true, Protect = true, UseJev = true, Loot = true, Friends, Pantry, Chatty = true, Stow = true, AutoHome = true, HomeSet, Armory = true;
+        public bool Potions = true, Protect = true, UseJev = true, Loot = true, Pantry, Chatty = true, Stow = true, AutoHome = true, HomeSet, Armory = true;
         public Vector3 HomeSpot;
         public string MissionText = "", DutiesText = "";
         public int PickList = (int)VillagePlebs.Loot.Default;
@@ -102,7 +102,7 @@ namespace VillagePlebs
                 Hair = z.GetInt(ZDOVars.s_hairItem, 0), Beard = z.GetInt(ZDOVars.s_beardItem, 0),
                 SkinT = Looks.SkinTone(c), HairT = Looks.HairTone(c), HairL = Looks.HairShade(c), BrLook = Looks.BrLook(c), BrMuscle = Looks.BrMuscle(c), BrTattoos = Looks.BrTattoos(c), Skills = Skill.Text(c), MmoXp = EpicMmo.Xp(c),
                 HasBed = z.GetBool(Keys.HasBed, false), Bed = z.GetVec3(Keys.BedPos, Vector3.zero), LastSeen = c.transform.position,
-                HasGrave = z.GetBool(Grave.HasKey, false), DiedPos = z.GetVec3(Grave.PosKey, Vector3.zero), Loot = z.GetBool(VillagePlebs.Loot.Key, true), Friends = z.GetBool(Keys.Friends, false), Kept = z.GetString(Companion.KeptKey, ""), JournalText = book.JournalText, TallyText = book.TallyText, Since = z.GetInt(Journal.SinceKey, -1), Pantry = z.GetBool(Work.PantryKey, false), HomeSet = z.GetBool(Work.HomeSetKey, false), HomeSpot = z.GetVec3(Work.HomeSpotKey, Vector3.zero), MissionText = book.Missions, DutiesText = z.GetString(Duties.Key, ""), Frugal = z.GetBool(Food.FrugalKey, true), Ration = z.GetInt(Work.RationKey, 12), DutyDest = z.GetInt(Duties.DestKey, 0), Stow = z.GetBool(Work.StowKey, true), AutoHome = z.GetBool(Following.AutoHomeKey, true), Chatty = z.GetBool(Talk.ChattyKey, true), Armory = z.GetBool(VillagePlebs.Armory.Key, true), PickList = z.GetInt(VillagePlebs.Loot.ListKey, (int)VillagePlebs.Loot.Default),
+                HasGrave = z.GetBool(Grave.HasKey, false), DiedPos = z.GetVec3(Grave.PosKey, Vector3.zero), Loot = z.GetBool(VillagePlebs.Loot.Key, true), Kept = z.GetString(Companion.KeptKey, ""), JournalText = book.JournalText, TallyText = book.TallyText, Since = z.GetInt(Journal.SinceKey, -1), Pantry = z.GetBool(Work.PantryKey, false), HomeSet = z.GetBool(Work.HomeSetKey, false), HomeSpot = z.GetVec3(Work.HomeSpotKey, Vector3.zero), MissionText = book.Missions, DutiesText = z.GetString(Duties.Key, ""), Frugal = z.GetBool(Food.FrugalKey, true), Ration = z.GetInt(Work.RationKey, 12), DutyDest = z.GetInt(Duties.DestKey, 0), Stow = z.GetBool(Work.StowKey, true), AutoHome = z.GetBool(Following.AutoHomeKey, true), Chatty = z.GetBool(Talk.ChattyKey, true), Armory = z.GetBool(VillagePlebs.Armory.Key, true), PickList = z.GetInt(VillagePlebs.Loot.ListKey, (int)VillagePlebs.Loot.Default),
             };
         }
 
@@ -118,7 +118,7 @@ namespace VillagePlebs
             z.Set(Skill.Key, Skills ?? "");
             if (MmoXp > 0L) z.Set(EpicMmo.XpKey, MmoXp);
             z.Set(Grave.HasKey, HasGrave); z.Set(Grave.PosKey, DiedPos);
-            z.Set(VillagePlebs.Loot.Key, Loot); z.Set(Keys.Friends, Friends); z.Set(VillagePlebs.Loot.ListKey, PickList); z.Set(Work.PantryKey, Pantry); z.Set(Work.HomeSetKey, HomeSet); z.Set(Work.HomeSpotKey, HomeSpot); z.Set(Duties.Key, DutiesText ?? ""); z.Set(Food.FrugalKey, Frugal); z.Set(Work.RationKey, Ration); z.Set(Duties.DestKey, DutyDest); z.Set(Work.StowKey, Stow); z.Set(Journal.SinceKey, Since); z.Set(Following.AutoHomeKey, AutoHome); z.Set(Talk.ChattyKey, Chatty); z.Set(VillagePlebs.Armory.Key, Armory);
+            z.Set(VillagePlebs.Loot.Key, Loot); z.Set(VillagePlebs.Loot.ListKey, PickList); z.Set(Work.PantryKey, Pantry); z.Set(Work.HomeSetKey, HomeSet); z.Set(Work.HomeSpotKey, HomeSpot); z.Set(Duties.Key, DutiesText ?? ""); z.Set(Food.FrugalKey, Frugal); z.Set(Work.RationKey, Ration); z.Set(Duties.DestKey, DutyDest); z.Set(Work.StowKey, Stow); z.Set(Journal.SinceKey, Since); z.Set(Following.AutoHomeKey, AutoHome); z.Set(Talk.ChattyKey, Chatty); z.Set(VillagePlebs.Armory.Key, Armory);
             VisEquipment vis = c.GetComponent<VisEquipment>();
             if (vis == null) return;
             vis.SetModel(Model);
@@ -141,7 +141,7 @@ namespace VillagePlebs
             ["model"] = Model, ["skin"] = V(Skin), ["haircolor"] = V(HairColor), ["hair"] = Hair, ["beard"] = Beard,
             ["skint"] = SkinT, ["hairt"] = HairT, ["hairl"] = HairL, ["brlook"] = BrLook ?? "", ["brmuscle"] = BrMuscle, ["brtattoos"] = BrTattoos ?? "", ["skills"] = Skills ?? "", ["mmoxp"] = MmoXp.ToString(CultureInfo.InvariantCulture),
             ["hasbed"] = HasBed, ["bed"] = V(Bed), ["seen"] = V(LastSeen),
-            ["dead"] = Dead, ["diedat"] = DiedAt, ["diedpos"] = V(DiedPos), ["grave"] = HasGrave, ["loot"] = Loot, ["friends"] = Friends, ["pick"] = PickList, ["pantry"] = Pantry, ["homeset"] = HomeSet, ["homespot"] = V(HomeSpot), ["missions"] = MissionText ?? "", ["duties"] = DutiesText ?? "", ["frugal"] = Frugal, ["ration"] = Ration, ["dutydest"] = DutyDest, ["stow"] = Stow, ["autohome"] = AutoHome, ["kept"] = Kept ?? "", ["journal"] = JournalText ?? "", ["tally"] = TallyText ?? "", ["since"] = Since, ["chatty"] = Chatty, ["armory"] = Armory,
+            ["dead"] = Dead, ["diedat"] = DiedAt, ["diedpos"] = V(DiedPos), ["grave"] = HasGrave, ["loot"] = Loot, ["pick"] = PickList, ["pantry"] = Pantry, ["homeset"] = HomeSet, ["homespot"] = V(HomeSpot), ["missions"] = MissionText ?? "", ["duties"] = DutiesText ?? "", ["frugal"] = Frugal, ["ration"] = Ration, ["dutydest"] = DutyDest, ["stow"] = Stow, ["autohome"] = AutoHome, ["kept"] = Kept ?? "", ["journal"] = JournalText ?? "", ["tally"] = TallyText ?? "", ["since"] = Since, ["chatty"] = Chatty, ["armory"] = Armory,
         };
 
         private static Profile FromJson(JObject o) => new Profile
@@ -156,7 +156,7 @@ namespace VillagePlebs
             MmoXp = long.TryParse((string)o["mmoxp"] ?? "0", NumberStyles.Integer, CultureInfo.InvariantCulture, out long xp) ? xp : 0L,
             HasBed = (bool?)o["hasbed"] ?? false, Bed = V(o["bed"]), LastSeen = V(o["seen"]),
             Dead = (bool?)o["dead"] ?? false, DiedAt = (double?)o["diedat"] ?? 0, DiedPos = V(o["diedpos"]),
-            HasGrave = (bool?)o["grave"] ?? false, Loot = (bool?)o["loot"] ?? true, Friends = (bool?)o["friends"] ?? false, Kept = (string)o["kept"] ?? "", JournalText = (string)o["journal"] ?? "", TallyText = (string)o["tally"] ?? "", Since = (int?)o["since"] ?? -1, Pantry = (bool?)o["pantry"] ?? false, HomeSet = (bool?)o["homeset"] ?? false, HomeSpot = V(o["homespot"]), MissionText = (string)o["missions"] ?? "", DutiesText = (string)o["duties"] ?? "", Frugal = (bool?)o["frugal"] ?? true, Ration = (int?)o["ration"] ?? 12, DutyDest = (int?)o["dutydest"] ?? 0, Stow = (bool?)o["stow"] ?? true, AutoHome = (bool?)o["autohome"] ?? true, Chatty = (bool?)o["chatty"] ?? true, Armory = (bool?)o["armory"] ?? true, PickList = (int?)o["pick"] ?? (int)VillagePlebs.Loot.Default,
+            HasGrave = (bool?)o["grave"] ?? false, Loot = (bool?)o["loot"] ?? true, Kept = (string)o["kept"] ?? "", JournalText = (string)o["journal"] ?? "", TallyText = (string)o["tally"] ?? "", Since = (int?)o["since"] ?? -1, Pantry = (bool?)o["pantry"] ?? false, HomeSet = (bool?)o["homeset"] ?? false, HomeSpot = V(o["homespot"]), MissionText = (string)o["missions"] ?? "", DutiesText = (string)o["duties"] ?? "", Frugal = (bool?)o["frugal"] ?? true, Ration = (int?)o["ration"] ?? 12, DutyDest = (int?)o["dutydest"] ?? 0, Stow = (bool?)o["stow"] ?? true, AutoHome = (bool?)o["autohome"] ?? true, Chatty = (bool?)o["chatty"] ?? true, Armory = (bool?)o["armory"] ?? true, PickList = (int?)o["pick"] ?? (int)VillagePlebs.Loot.Default,
         };
     }
 }

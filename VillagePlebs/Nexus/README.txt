@@ -36,7 +36,7 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [*][b]Farming:[/b] send it on the Plant crops or Harvest crops errand. With a cultivator it sows seeds in neat rows on the tilled ground at home (matching what already grows there); harvesting needs no tool. It fetches the cultivator and seeds from its own chests, and while you are away it brings in ripe crops and sows the free ground on its own. Works with Plant Everything: it plants and picks the berry bushes, mushrooms and flowers it adds to the cultivator, and follows its crop settings.
 [*][b]Fishing and smelting:[/b] send it fishing and it casts a real rod with the right bait (its Fishing skill grows as it reels in), or have it run the smelters near home: emptying them, feeding fuel and ore from the chests, and taking the bars home.
 [*][b]Needs like a player:[/b] food, stamina, skills that rise, carry weight, weather and rest.
-[*][b]Gear slots of its own[/b], and its bag shows below your inventory: drag items between you, or give and take from its menu.
+[*][b]Gear slots of its own[/b] (swords, knives, polearms, spears, a spare weapon, shield, bow and arrows, axe, pickaxe, hammer, cultivator, fishing rod and bait, armour, belt and food), and its bag shows below your inventory: drag items between you, or give and take from its menu. It puts its tools away when it is done with them.
 [*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status (and journal), stats, missions, orders, home, inventory, looks and your plebs.
 [*][b]EpicMMO System:[/b] it earns experience and levels from what it kills and gathers.
 [*][b]StarLevelSystem:[/b] it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.
@@ -81,7 +81,7 @@ Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in
 
 [size=5][b]Multiplayer[/b][/size]
 
-Everyone in the world needs the mod, [b]the host too[/b]: without it the game deletes saved companions. Each companion belongs to whoever summoned it. The host decides how many companions each player can have, what they do while you're away, respawn time, base health and stamina, when they eat, starting skill and EpicMMO experience.
+Everyone in the world needs the mod, [b]the host too[/b]: without it the game deletes saved companions. Each companion belongs to whoever summoned it, and only they can give it orders. The host decides how many companions each player can have, what they do while you're away, respawn time, base health and stamina, when they eat, starting skill and EpicMMO experience.
 
 Restart the game after installing or updating so the companion registers cleanly.
 

@@ -14,7 +14,7 @@ namespace VillagePlebs
     {
         public const string Master = "vp_master", MasterName = "vp_mastername", Name = "vp_name", Order = "vp_order", Post = "vp_post",
             Style = "vp_style", Retreat = "vp_retreat", Potions = "vp_potions", Protect = "vp_protect", UseJev = "vp_usejev", Status = "vp_status", Id = "vp_id", Kills = "vp_kills",
-            Jobs = "vp_jobs", Radius = "vp_radius", HasBed = "vp_hasbed", BedPos = "vp_bedpos", Friends = "vp_friends";
+            Jobs = "vp_jobs", Radius = "vp_radius", HasBed = "vp_hasbed", BedPos = "vp_bedpos";
     }
 
     internal static class Companion
