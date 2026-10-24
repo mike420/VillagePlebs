@@ -192,7 +192,7 @@ namespace VillagePlebs
                 {
                     case Pickable p when (jobs & Job.Forage) != 0 && p.m_respawnTimeMinutes > 0f && p.m_itemPrefab != null && !(Companion.Zdo(p)?.GetBool(ZDOVars.s_picked, false) ?? true)
                                          && (!hungry || Work.Edible(p) || st.Goal != null && st.Goal.Wants(p.m_itemPrefab.name)):
-                        Add(got, p.m_itemPrefab, p.m_amount);
+                        Add(got, p.m_itemPrefab, p.m_amount + Farming.PickBonus(me, p));
                         foreach (GameObject extra in p.m_extraDrops.GetDropList()) Add(got, extra, 1);
                         p.GetComponent<ZNetView>()?.InvokeRPC(ZNetView.Everybody, "RPC_SetPicked", true);
                         EpicMmo.Worked(me, p, EpicMmo.Work.Pick, away: true);
@@ -356,7 +356,7 @@ namespace VillagePlebs
                 GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;
                 if (!seen.Add(go) || !(go.GetComponent<Pickable>() is Pickable p) || !Farming.Ripe(p)) continue;
                 if (Free(me) <= 1) { full = true; break; }
-                Add(got, p.m_itemPrefab, p.m_amount);
+                Add(got, p.m_itemPrefab, p.m_amount + Farming.PickBonus(me, p));
                 foreach (GameObject extra in p.m_extraDrops.GetDropList()) Add(got, extra, 1);
                 p.GetComponent<ZNetView>()?.InvokeRPC(ZNetView.Everybody, "RPC_SetPicked", true);
                 EpicMmo.Worked(me, p, EpicMmo.Work.Pick, away: true);

@@ -136,6 +136,19 @@ namespace VillagePlebs
             st.NextWorkLook = 0f;
         }
 
+        // You told it to stop: the mission waits an hour, and it picks another.
+        public static void StopCurrent(BrainState st)
+        {
+            Humanoid me = st.Body;
+            List<Mission> list = All(me);
+            Mission cur = list.LastOrDefault(m => m.Status == "active");
+            if (cur == null) return;
+            if (st.Task != null && !st.Task.Ordered) st.Task = null;
+            Drop(st, list, cur, P("villagepleb_missions_you_stopped"));
+            st.Goal = null;
+            st.NextWorkLook = 0f;
+        }
+
         private static void Finish(BrainState st, List<Mission> list, Mission m)
         {
             m.Status = "done"; m.Cost = 0; m.Why = P("villagepleb_missions_day", Journal.Day);

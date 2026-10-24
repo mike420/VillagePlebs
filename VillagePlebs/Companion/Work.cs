@@ -376,18 +376,20 @@ namespace VillagePlebs
                 string key = a.Job == Job.Wood ? "villagepleb_work_job_patch_wood" : a.Job == Job.Forage ? "villagepleb_work_job_patch_forage" : "villagepleb_work_job_patch_rocks";
                 return P(key, a.Done, Mathf.Max(0, a.Left));
             }
+            if (st.Farm != null) return P("villagepleb_work_job_errand", Errands.All.First(e => e.What == st.Farm).Label);
             if (st.PickQueue.Count > 0 || st.Task != null && st.Task.Ordered && st.Task.Kind == Kind.PickUp) return P("villagepleb_work_job_picking_up", st.PickQueue.Count + 1);
             if (st.Task != null && st.Task.Ordered && Time.time < st.CommandUntil) return P("villagepleb_work_job_pointed", Describe(st.Task));
             switch (Companion.OrderOf(me))
             {
                 case Order.Guard: return P("villagepleb_work_job_guard");
                 case Order.Stay: return P("villagepleb_work_job_stay");
-                case Order.Follow: return string.IsNullOrEmpty(st.AutoNote) ? P("villagepleb_work_job_out") : P("villagepleb_work_job_out_note", st.AutoNote);
+                case Order.Follow: return P("villagepleb_work_job_out");
             }
+            // Its mission as written in its book, which holds still while its goals are worked out again.
             Mission m = Missions.Current(me);
-            if (m != null && m.StartCost > 0) progress = Mathf.Clamp01(1f - m.Cost / (float)m.StartCost);
-            return st.Goal == null ? P("villagepleb_work_job_home")
-                 : st.Goal.Raw.Count > 0 ? P("villagepleb_work_job_home_mission_still", st.Goal.What, st.Goal.RawText()) : P("villagepleb_work_job_home_mission", st.Goal.What);
+            if (m == null) return P("villagepleb_work_job_home");
+            if (m.StartCost > 0) progress = Mathf.Clamp01(1f - m.Cost / (float)m.StartCost);
+            return P("villagepleb_work_job_home_mission", m.What);
         }
 
         // Sent home: whatever it was doing (its mission, an old order) waits until it is back.
@@ -578,7 +580,7 @@ namespace VillagePlebs
                     foreach (DropTable.DropData extra in pickable.m_extraDrops.m_drops) if (extra.m_item != null) st.Wanted.Add(extra.m_item.name);
                     st.WorkSpot = pickable.transform.position;
                     bool ripe = !(Companion.Zdo(pickable)?.GetBool(ZDOVars.s_picked, false) ?? true);
-                    pickable.Interact(me, false, false);
+                    Farming.Pick(me, pickable);
                     if (ripe) EpicMmo.Worked(me, pickable, EpicMmo.Work.Pick);
                     Skip(st, pickable, null, 5f);
                     st.Task = null;

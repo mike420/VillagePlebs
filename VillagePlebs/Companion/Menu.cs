@@ -18,7 +18,7 @@ namespace VillagePlebs
 
     public partial class VillagePlebsPlugin
     {
-        private enum Tab { Status, Stats, Missions, Orders, Home, Gear, Looks, Journal, Companions }
+        private enum Tab { Status, Stats, Missions, Orders, Home, Gear, Looks, Companions }
 
         internal static bool MenuOpen;
         internal static float MenuClosedAt = -1f;
@@ -35,7 +35,12 @@ namespace VillagePlebs
         private const float WindowW = 880f, Pad = 26f, CardPad = 14f, CardGap = 10f;
         private static readonly Color HealthRed = new Color(0.9f, 0.25f, 0.18f), StaminaYellow = new Color(1f, 0.78f, 0.22f), EitrPurple = new Color(0.62f, 0.46f, 1f);
 
-        private RectTransform _window, _list, _card;
+        private RectTransform _window, _list, _card, _oldWindow;
+        private CanvasGroup _fresh;
+        private float _lastRebuild;
+        private long _jobFor;
+        private string _jobShown, _jobWaiting;
+        private float _jobSince;
         private TMP_InputField _field;
         private string _drawn = "", _scrollKey = "";
         private readonly Dictionary<string, float> _scrolls = new Dictionary<string, float>();
@@ -86,7 +91,9 @@ namespace VillagePlebs
             if (was && _hirePrice >= 0) Note("Hiring a companion cancelled: nothing paid");
             _hirePrice = -1;
             if (_window != null) Object.Destroy(_window.gameObject);
-            _window = _list = _card = null;
+            if (_oldWindow != null) Object.Destroy(_oldWindow.gameObject);
+            _window = _list = _card = _oldWindow = null;
+            _fresh = null;
             _field = null;
             _drawn = "";
             _live.Clear();
@@ -106,7 +113,7 @@ namespace VillagePlebs
             if (_shown != null && (_shown.IsDead() || Vector3.Distance(_shown.transform.position, player.transform.position) > 100f)) { CloseMenu(); return; }
             else if (global::Menu.IsVisible() || InventoryGui.IsVisible()) { CloseMenu(); return; }
             if (!GameUi.Typing && Time.unscaledTime > _openedAt + 0.2f && ZInput.GetButtonDown("Use")) { CloseMenu(); return; }
-            if (_restoreAgain) { _restoreAgain = false; RestoreScrolls(); }
+            if (_restoreAgain) { _restoreAgain = false; RestoreScrolls(); Reveal(); }
             TickMenu();
             TickLooks();
         }
@@ -127,11 +134,12 @@ namespace VillagePlebs
             float now = Time.unscaledTime;
             if (now >= _nextCheck && !GameUi.Typing && !Input.GetMouseButton(0))
             {
+                bool asked = _nextCheck <= 0f;
                 _nextCheck = now + 0.25f;
                 try
                 {
                     Draw(false);
-                    if (_sig.ToString() != _drawn) Rebuild();
+                    if (_sig.ToString() != _drawn && (asked || now - _lastRebuild >= 1f)) Rebuild();
                 }
                 catch (Exception e) { MenuFailed(e); return; }
             }
@@ -149,6 +157,14 @@ namespace VillagePlebs
             string sig = _sig.ToString();
             Draw(true);
             _drawn = sig;
+            _lastRebuild = Time.unscaledTime;
+        }
+
+        // A rebuilt window waits unseen for a frame while its scroll settles, then takes the old one's place, so a redraw never shows.
+        private void Reveal()
+        {
+            if (_fresh != null) { _fresh.alpha = 1f; _fresh.interactable = _fresh.blocksRaycasts = true; _fresh = null; }
+            if (_oldWindow != null) { Object.Destroy(_oldWindow.gameObject); _oldWindow = null; }
         }
 
         private void Draw(bool make)
@@ -171,12 +187,20 @@ namespace VillagePlebs
                     foreach (ScrollRect s in _window.GetComponentsInChildren<ScrollRect>(true))
                         if (s.content != null) _scrolls[PathIn(_window, s.transform)] = s.content.anchoredPosition.y;
                 _scrollKey = key;
-                if (_window != null) Object.Destroy(_window.gameObject);
+                if (_oldWindow != null) Object.Destroy(_oldWindow.gameObject);
+                _oldWindow = _window;
                 UITooltip.HideTooltip();
                 _live.Clear();
                 _field = null;
                 _list = _card = null;
                 _window = GameUi.Window("VillagePlebsMenu", new Vector2(w, h));
+                _fresh = null;
+                if (_oldWindow != null)
+                {
+                    _fresh = _window.gameObject.AddComponent<CanvasGroup>();
+                    _fresh.alpha = 0f;
+                    _fresh.interactable = _fresh.blocksRaycasts = false;
+                }
                 if (message.Length > 0) h = MessagePanel(message, w, h, screen.y);
             }
             _in = _window; _left = Pad; _width = w - Pad * 2f;
@@ -202,7 +226,6 @@ namespace VillagePlebs
                     case Tab.Home: DrawHome(c); break;
                     case Tab.Gear: DrawGear(c); break;
                     case Tab.Looks: DrawLooks(c, new Vector2(Pad - 6f, -top), area); break;
-                    case Tab.Journal: DrawJournal(c); break;
                     case Tab.Companions: DrawCompanions(); break;
                 }
             if (make && _list != null)
@@ -236,7 +259,14 @@ namespace VillagePlebs
         private static string PathIn(Transform root, Transform t)
         {
             var path = new StringBuilder();
-            for (; t != null && t != root; t = t.parent) path.Insert(0, "/" + t.GetSiblingIndex() + t.name);
+            for (; t != null && t != root; t = t.parent)
+            {
+                int same = 0;
+                Transform parent = t.parent;
+                if (parent != null)
+                    for (int i = 0; i < t.GetSiblingIndex(); i++) if (parent.GetChild(i).name == t.name) same++;
+                path.Insert(0, "/" + t.name + "#" + same);
+            }
             return path.ToString();
         }
 
@@ -453,6 +483,9 @@ namespace VillagePlebs
                 });
             }
             Btn(Loc("$menu_close"), closeX, 18f, 110f, 36f, () => _pending = CloseMenu);
+            int plebs = pl != null ? Profile.Here(pl).Count : 0;
+            _sig.Append("|P").Append(plebs).Append('/').Append(Trading.MostCompanions);
+            if (_make) Line(_window, closeX, 60f, 110f, 16f, GameUi.Dim, TextAlignmentOptions.Center).text = T("villagepleb_menu_pleb_count", plebs, Trading.MostCompanions);
             if (_renaming)
             {
                 if (_make) _field = GameUi.TextField(_window, new Vector2(x, -20f), new Vector2(240f, 38f), _nameField, 24, v => _nameField = v, _ => SaveName(), 20f);
@@ -480,21 +513,38 @@ namespace VillagePlebs
             if (owner)
             {
                 BrainState js = Brain.Get(c);
-                Work.JobText(js, out float jobDone);
-                bool stoppable = js.Area != null || js.PickQueue.Count > 0 || js.Task != null && js.Task.Ordered;
-                _sig.Append("|J").Append(jobDone >= 0f).Append(stoppable && Mine);
+                bool ordered = Work.OnOrder(js), mission = !ordered && Companion.OrderOf(c) == VillagePlebs.Order.Gather && Missions.Current(c) != null;
+                bool stoppable = ordered || mission;
+                _sig.Append("|J").Append(stoppable && Mine).Append(mission);
                 float jobW = closeX - x - (stoppable && Mine ? 180f : 8f) + 110f;
                 if (_make)
                 {
                     TMP_Text job = Line(_window, x, 88f, jobW, 16f, GameUi.Text);
-                    RectTransform bar = jobDone >= 0f ? GameUi.Bar(_window, new Vector2(x, -110f), new Vector2(Mathf.Min(jobW, 400f), 10f), jobDone, GameUi.Good, null) : null;
-                    _live.Add(() =>
+                    RectTransform bar = GameUi.Bar(_window, new Vector2(x, -110f), new Vector2(Mathf.Min(jobW, 400f), 10f), 0f, GameUi.Good, null);
+                    // A new job line only shows once it has held for a moment, so the gaps between one step and the next don't flash up.
+                    // What it showed is kept on the menu, not here, so a redraw carries on where it was.
+                    if (_jobFor != id) { _jobFor = id; _jobShown = _jobWaiting = null; }
+                    if (_jobShown != null) Set(job, _jobShown);
+                    void Show()
                     {
-                        Set(job, T("villagepleb_menu_job", Words.Show(Work.JobText(Brain.Get(c), out float done))));
-                        if (bar != null) GameUi.SetBar(bar, done);
-                    });
+                        string text = T("villagepleb_menu_job", Words.Show(Work.JobText(Brain.Get(c), out float done)));
+                        if (text != _jobWaiting) { _jobWaiting = text; _jobSince = Time.unscaledTime; }
+                        if (_jobShown == null || text != _jobShown && Time.unscaledTime - _jobSince >= 1f) { _jobShown = text; Set(job, text); }
+                        bool measured = done >= 0f && text == _jobShown;
+                        if (bar.gameObject.activeSelf != measured) bar.gameObject.SetActive(measured);
+                        if (measured) GameUi.SetBar(bar, done);
+                    }
+                    Show();
+                    _live.Add(Show);
                 }
-                if (stoppable && Mine) Btn(T("villagepleb_menu_stop_job"), w - Pad - 170f, 84f, 170f, 30f, () => _pending = () => { BrainState bs = Brain.Claim(_shown, out string why); if (bs != null) Work.StopJob(bs); else _note = Words.Show(why); }, size: 15f);
+                if (stoppable && Mine)
+                    Btn(T(mission ? "villagepleb_menu_drop_mission" : "villagepleb_menu_stop_job"), w - Pad - 170f, 84f, 170f, 30f, () => _pending = () =>
+                    {
+                        BrainState bs = Brain.Claim(_shown, out string why);
+                        if (bs == null) { _note = Words.Show(why); return; }
+                        if (Work.OnOrder(bs)) Work.StopJob(bs);
+                        else Missions.StopCurrent(bs);
+                    }, size: 15f);
             }
 
             _y = 128f;
@@ -539,21 +589,7 @@ namespace VillagePlebs
         private void DrawStatus(Humanoid c)
         {
             BrainState st = Brain.Get(c);
-            Decision d = st.Current;
             bool here = c.GetComponent<ZNetView>().IsOwner();
-
-            BeginCard(T("villagepleb_menu_now"));
-            if (!here) Note(T("villagepleb_menu_brain_elsewhere"), GameUi.Dim);
-            else if (st.InCombat)
-            {
-                Note(T("villagepleb_menu_fighting", string.Join(", ", st.Enemies.Where(e => e != null).Select(e => Thing(st.Label(e))))), GameUi.Text, bold: true);
-                Note(Capital(Words.Show(d.Describe(st.Label))), GameUi.Good);
-                if (!string.IsNullOrEmpty(d.Note)) Note(Capital(Words.Show(d.Note)), GameUi.Dim);
-            }
-            else Note(T("villagepleb_menu_not_fighting", MainConfig.engageRange.Value.ToString("0")), GameUi.Dim);
-            _y += 4f;
-            OrderButtons(c);
-            EndCard();
 
             BeginCard(T("villagepleb_menu_food_rest"));
             if (!here) Note(T("villagepleb_menu_shows_elsewhere"), GameUi.Dim);
@@ -613,6 +649,8 @@ namespace VillagePlebs
             if (st.History.Count == 0) Note(T("villagepleb_menu_nothing_yet"), GameUi.Dim);
             foreach (string line in st.History.Take(8)) Note(Capital(Words.Show(line)), GameUi.Text);
             EndCard();
+
+            DrawJournal(c);
         }
 
         private void OrderButtons(Humanoid c)
@@ -1045,6 +1083,26 @@ namespace VillagePlebs
             BeginCard(T("villagepleb_menu_if_falls"));
             Note(T("villagepleb_menu_if_falls_about", MainConfig.respawnSeconds.Value.ToString("0")), GameUi.Text);
             EndCard();
+
+            BeginCard(T("villagepleb_menu_picks_up"));
+            Note(T("villagepleb_menu_picks_up_about"), GameUi.Dim);
+            Loot.Kinds list = Loot.List(c);
+            var kinds = new[] { Loot.Kinds.Ore, Loot.Kinds.Wood, Loot.Kinds.Stone, Loot.Kinds.Food, Loot.Kinds.Creature, Loot.Kinds.Gear, Loot.Kinds.Other };
+            float colW = (_width - 16f) / 2f;
+            for (int i = 0; i < kinds.Length; i += 2)
+            {
+                float rowH = 0f;
+                for (int j = i; j < Mathf.Min(i + 2, kinds.Length); j++)
+                {
+                    Loot.Kinds k = kinds[j];
+                    string label = Named("villagepleb_menu_loot_", k);
+                    rowH = Mathf.Max(rowH, CheckAt(label, (list & k) != 0, () => _pending = () => Change(z => z.Set(Loot.ListKey, z.GetInt(Loot.ListKey, (int)Loot.Default) ^ (int)k)),
+                        _left + (j - i) * (colW + 16f), _y, colW));
+                }
+                _y += rowH + 6f;
+            }
+            if (!Loot.On(c)) Note(T("villagepleb_menu_loot_off"), GameUi.Warn);
+            EndCard();
         }
 
         private static string JobNames(Job j) => string.Join(", ", ((Job[])Enum.GetValues(typeof(Job))).Where(x => x != Job.None && (j & x) != 0).Select(x => Named("villagepleb_menu_jobname_", x)));
@@ -1123,26 +1181,6 @@ namespace VillagePlebs
                 }
                 EndCard();
             }
-
-            BeginCard(T("villagepleb_menu_picks_up"));
-            Note(T("villagepleb_menu_picks_up_about"), GameUi.Dim);
-            Loot.Kinds list = Loot.List(c);
-            var kinds = new[] { Loot.Kinds.Ore, Loot.Kinds.Wood, Loot.Kinds.Stone, Loot.Kinds.Food, Loot.Kinds.Creature, Loot.Kinds.Gear, Loot.Kinds.Other };
-            float colW = (_width - 16f) / 2f;
-            for (int i = 0; i < kinds.Length; i += 2)
-            {
-                float rowH = 0f;
-                for (int j = i; j < Mathf.Min(i + 2, kinds.Length); j++)
-                {
-                    Loot.Kinds k = kinds[j];
-                    string label = Named("villagepleb_menu_loot_", k);
-                    rowH = Mathf.Max(rowH, CheckAt(label, (list & k) != 0, () => _pending = () => Change(z => z.Set(Loot.ListKey, z.GetInt(Loot.ListKey, (int)Loot.Default) ^ (int)k)),
-                        _left + (j - i) * (colW + 16f), _y, colW));
-                }
-                _y += rowH + 6f;
-            }
-            if (!Loot.On(c)) Note(T("villagepleb_menu_loot_off"), GameUi.Warn);
-            EndCard();
         }
 
         private void OpenGear()

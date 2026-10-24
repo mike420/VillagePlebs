@@ -105,6 +105,23 @@ namespace VillagePlebs
             }
         }
 
+        // What the game does for a player picking a ripe crop: its skill (Farming) rises, and with skill comes a chance of a bonus.
+        public static int PickBonus(Humanoid me, Pickable p)
+        {
+            Skills.SkillType skill = p.m_pickRaiseSkill;
+            if (skill == Skills.SkillType.None || (Companion.Zdo(p)?.GetBool(ZDOVars.s_picked, false) ?? true)) return 0;
+            Skill.Raise(me, skill, 1f);
+            return Random.value < Skill.Get(me, skill) / 100f * p.m_maxLevelBonusChance ? p.m_bonusYieldAmount : 0;
+        }
+
+        public static void Pick(Humanoid me, Pickable p)
+        {
+            int bonus = PickBonus(me, p);
+            ZNetView view = p.GetComponent<ZNetView>();
+            if (bonus > 0 && view != null && view.IsValid()) view.InvokeRPC("RPC_Pick", bonus);
+            else p.Interact(me, false, false);
+        }
+
         public static bool Ripe(Pickable p) =>
             p != null && p.m_itemPrefab != null && Goals.IsCrop(Utils.GetPrefabName(p.gameObject)) && !(Companion.Zdo(p)?.GetBool(ZDOVars.s_picked, false) ?? true);
 
@@ -379,6 +396,7 @@ namespace VillagePlebs
                 if (r.m_resItem != null) inv.RemoveItem(r.m_resItem.m_itemData.m_shared.m_name, r.m_amount);
             if (tool.m_shared.m_useDurability) tool.m_durability = Mathf.Max(0f, tool.m_durability - tool.m_shared.m_useDurabilityDrain);
             Mending.Swing(me, tool);
+            Skill.Raise(me, tool.m_shared.m_buildPieces.m_skill != Skills.SkillType.None ? tool.m_shared.m_buildPieces.m_skill : Skills.SkillType.Farming, 1f);
             return true;
         }
     }

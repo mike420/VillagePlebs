@@ -36,7 +36,7 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [*][b]Farming:[/b] send it on the Plant crops or Harvest crops errand. With a cultivator it sows seeds in neat rows on the tilled ground at home (matching what already grows there); harvesting needs no tool. It fetches the cultivator and seeds from its own chests, and while you are away it brings in ripe crops and sows the free ground on its own.
 [*][b]Needs like a player:[/b] food, stamina, skills that rise, carry weight, weather and rest.
 [*][b]Gear slots of its own[/b], and its bag shows below your inventory: drag items between you, or give and take from its menu.
-[*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status, stats, orders, home, inventory, looks and companions.
+[*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status (and journal), stats, missions, orders, home, inventory, looks and your plebs.
 [*][b]EpicMMO System:[/b] it earns experience and levels from what it kills and gathers.
 [*][b]StarLevelSystem:[/b] it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.
 [*][b]Body Replacer (optional):[/b] with Magic Mike's Body Replacer installed, its looks menu also offers that mod's Einherjar bodies, game hairstyles and tattoos.
