@@ -110,7 +110,7 @@ namespace VillagePlebs
             var also = new List<string>();
             var did0 = new List<string>();
             float budget = seconds;
-            int felled = 0, mined = 0, picked = 0, fights = 0;
+            int felled = 0, mined = 0, picked = 0, fights = 0, harvested = 0, sown = 0;
             string fellTo = null;
             Vector3 center = Work.Center(me);
             float radius = Work.RadiusOf(me);
@@ -258,6 +258,9 @@ namespace VillagePlebs
             }
             else Gather(null);
 
+            Stage = "harvest";
+            if (fellTo == null) harvested = Harvest(me, center, radius, got, ref budget, ref full);
+
             Stage = "trip";
             string trip = fellTo == null ? AwayTrip(me, center, radius, got, ref budget) : null;
             if (trip != null) Journal.Trip(me, P("villagepleb_catchup_trip_journal", trip));
@@ -267,6 +270,18 @@ namespace VillagePlebs
             int stored = Store(me, got);
             Armory.CatchUp(st, center, radius);
             cooked += Kitchen.CookAll(me, center, radius);
+
+            Stage = "planting";
+            if (fellTo == null && Farming.HasField(st, center, radius))
+            {
+                Farming.TakeFromChests(me, true);
+                for (int i = 0; i < 150 && budget > 0f && Farming.FindSpot(st, center, radius, out Farming.Crop crop, out Vector3 spot); i++)
+                {
+                    budget -= 5f;
+                    if (Farming.Place(st, crop, spot, Mathf.Max(0f, budget))) sown++;
+                    else Farming.Bad(st, spot);
+                }
+            }
 
             Stage = "crafting";
             var made = new List<string>();
@@ -303,6 +318,8 @@ namespace VillagePlebs
             if (felled > 0) did.Add(P(felled == 1 ? "villagepleb_catchup_felled_one" : "villagepleb_catchup_felled_many", felled));
             if (mined > 0) did.Add(P(mined == 1 ? "villagepleb_catchup_mined_one" : "villagepleb_catchup_mined_many", mined));
             if (picked > 0) did.Add(P(picked == 1 ? "villagepleb_catchup_picked_one" : "villagepleb_catchup_picked_many", picked));
+            if (harvested > 0) did.Add(P(harvested == 1 ? "villagepleb_catchup_harvested_one" : "villagepleb_catchup_harvested_many", harvested));
+            if (sown > 0) did.Add(P(sown == 1 ? "villagepleb_catchup_sown_one" : "villagepleb_catchup_sown_many", sown));
             if (hunted.Count > 0) did.Add(P("villagepleb_catchup_hunted", string.Join(", ", hunted.Select(kv => Amount(kv, true)))));
             if (fights > 0) did.Add(P(fights == 1 ? "villagepleb_catchup_fought_one" : "villagepleb_catchup_fought_many", fights, string.Join(", ", notes.Take(3))));
             if (cooked > 0) did.Add(P(cooked == 1 ? "villagepleb_catchup_cooked_one" : "villagepleb_catchup_cooked_many", cooked));
@@ -325,6 +342,25 @@ namespace VillagePlebs
             Player master = Companion.Master(me);
             if (master != null && master == Player.m_localPlayer) master.Message(MessageHud.MessageType.Center, Words.Show(line));
             Talk.Tell(me, line);
+        }
+
+        private static int Harvest(Humanoid me, Vector3 center, float radius, Dictionary<string, int> got, ref float budget, ref bool full)
+        {
+            int n = 0;
+            var seen = new HashSet<GameObject>();
+            foreach (Collider col in Physics.OverlapSphere(center, radius, ~0, QueryTriggerInteraction.Collide))
+            {
+                if (budget <= 0f) break;
+                GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;
+                if (!seen.Add(go) || !(go.GetComponent<Pickable>() is Pickable p) || !Farming.Ripe(p)) continue;
+                if (Free(me) <= 1) { full = true; break; }
+                Add(got, p.m_itemPrefab, p.m_amount);
+                foreach (GameObject extra in p.m_extraDrops.GetDropList()) Add(got, extra, 1);
+                p.GetComponent<ZNetView>()?.InvokeRPC(ZNetView.Everybody, "RPC_SetPicked", true);
+                EpicMmo.Worked(me, p, EpicMmo.Work.Pick, away: true);
+                budget -= 10f; n++;
+            }
+            return n;
         }
 
         private static string AwayTrip(Humanoid me, Vector3 center, float radius, Dictionary<string, int> got, ref float budget)

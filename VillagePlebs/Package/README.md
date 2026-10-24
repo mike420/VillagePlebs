@@ -28,12 +28,13 @@ Thank you for your support, and happy gaming! ⚔️  ...... (A Paypal account i
 
 ## ⭐ Features:
 
-  * Press `J` to summon your companion or open its menu (`E` on it too). Hold `J`: your companions come with you, or go home.
-  * **Point and command:** aim at something and press `H`: an enemy (it attacks it), a tree, rock or plant (it works it), your chest (it puts its things in), a cart (it pulls it), its tombstone (it fetches its things), a free bed (it makes it its bed), the ground (it waits there), the sky (it comes back).
+  * Press `J` to summon your companion or open its menu (`E` on it too). Hold `J`: your companions come with you, or go home. A new companion gets straight to work on its own mission (making or upgrading its gear) where you summoned it, until you tell it to come with you.
+  * **Point and command:** aim at something and press `H`: an enemy (it attacks it), a tree, rock or plant (it works it), your chest (it puts its things in), a cart (it pulls it), its tombstone (it fetches its things), a free bed (it makes it its bed), the ground (it waits there), the sky (it comes back). It only takes an order it has the tools for, in its bag or its own chests (it fetches them first), and your orders come before its mission; jobs it has no tool for wait while it works on its mission.
   * **Let it decide:** it reads what you are doing. It fights beside you, mines or chops beside you and keeps close while you explore; where a place is too dangerous for its gear it tells you and only defends.
   * **Combat:** timed parries (it learns each creature's swing), dodge rolls, flanking, backstabs, weapon specials, meads, kiting with a bow, and care around bosses.
   * **Follows you anywhere:** through portals, into crypts and caves, onto boats and through doors; it steers round stakes and fires and gets itself unstuck.
   * **Home life:** it takes a free bed and empty chests, works towards better gear (gathering, smelting, crafting and upgrading at your stations), hunts, cooks, keeps its fires burning and repairs its gear and your base. While you are away it catches up on all of it.
+  * **Farming:** send it on the Plant crops or Harvest crops errand. With a cultivator it sows seeds in neat rows on the tilled ground at home (matching what already grows there); harvesting needs no tool. It fetches the cultivator and seeds from its own chests, and while you are away it brings in ripe crops and sows the free ground on its own.
   * **Needs like a player:** food, stamina, skills that rise, carry weight, weather and rest.
   * **Gear slots of its own**, and its bag shows below your inventory: drag items between you, or give and take from its menu.
   * **A journal** of its life, small talk that fits the moment, and a menu with its status, stats, orders, home, inventory, looks and companions.
@@ -52,6 +53,7 @@ Settings are in `BepInEx/config/MagicMike.VillagePlebs.cfg`. Change them in game
 |---|---|---|---|
 | General | Menu Key | J | Tap: your companion's menu (or the summon panel). Hold: your companions near you come with you, or go home. |
 | General | Command Key | H | Point at something and press it to give an order: an enemy, a tree, rock or plant, your chest, a cart, its tombstone, a free bed, the ground or the sky. |
+| General | Assign Key | Y | While choosing a companion's bed and chests (its menu: Home), look at a bed or a chest and press it to give it to the companion; again to take it back. |
 | Companion | Max Companions | 1 | How many companions each player can have for free, summoned from the menu (synced). |
 | Companion | Max Bought Companions | 2 | How many more each player can buy from any trader (Haldor, Hildir, the Bog Witch), 0 to 6. Buying one lets you name them; the coins are taken when they join you (synced). |
 | Companion | Companion Price | 500 | What a trader asks for a companion, in coins (synced). |

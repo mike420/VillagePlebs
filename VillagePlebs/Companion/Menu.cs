@@ -32,7 +32,7 @@ namespace VillagePlebs
         private string _hireCoin;
         private LooksPanel _looks;
 
-        private const float WindowW = 720f, Pad = 26f, CardPad = 14f, CardGap = 10f;
+        private const float WindowW = 880f, Pad = 26f, CardPad = 14f, CardGap = 10f;
         private static readonly Color HealthRed = new Color(0.9f, 0.25f, 0.18f), StaminaYellow = new Color(1f, 0.78f, 0.22f), EitrPurple = new Color(0.62f, 0.46f, 1f);
 
         private RectTransform _window, _list, _card;
@@ -873,7 +873,7 @@ namespace VillagePlebs
                 Btn(T("villagepleb_menu_choose_bed"), _left, _y, _width - (bed ? letGo + 6f : 0f), 34f, () => _pending = () => { Home.StartAssign(c); CloseMenu(); });
                 if (bed) Btn(T("villagepleb_menu_let_bed_go"), _left + _width - letGo, _y, letGo, 34f, () => _pending = () => { Bed b = Home.BedOf(c); if (b != null) Home.ToggleBed(b, c); else Change(cz => cz.Set(Keys.HasBed, false)); });
                 _y += 40f;
-                Note(T("villagepleb_menu_choosing_about", Companion.NameOf(c), MainConfig.menuKey.Value), GameUi.Dim);
+                Note(T("villagepleb_menu_choosing_about", Companion.NameOf(c), MainConfig.menuKey.Value, MainConfig.assignKey.Value), GameUi.Dim);
             }
             EndCard();
 

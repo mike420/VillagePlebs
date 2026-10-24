@@ -4,7 +4,7 @@ using static VillagePlebs.Words;
 
 namespace VillagePlebs
 {
-    internal enum Errand { PutAway, Restock, BetterGear, RepairGear, RepairBase, Fires, Cook }
+    internal enum Errand { PutAway, Restock, BetterGear, RepairGear, RepairBase, Fires, Cook, Plant, Harvest }
 
     internal static class Errands
     {
@@ -17,6 +17,8 @@ namespace VillagePlebs
             (Errand.RepairBase, P("villagepleb_errands_repair_base"), "Fixes damaged walls, floors and the rest with its hammer (makes one if it has none)."),
             (Errand.Fires, P("villagepleb_errands_fires"), "Tops up the fires that are running low with wood."),
             (Errand.Cook, P("villagepleb_errands_cook"), "Puts the raw food it carries on a cooking station near home."),
+            (Errand.Plant, P("villagepleb_errands_plant"), "Sows seeds in neat rows on the tilled ground at home with its cultivator, fetching both from its own chests."),
+            (Errand.Harvest, P("villagepleb_errands_harvest"), "Picks every ripe crop at home and carries the harvest."),
         };
 
         public static string Run(BrainState st, Errand what)
@@ -96,9 +98,10 @@ namespace VillagePlebs
                 {
                     WearNTear damaged = Mending.Damaged(me, center, radius, c => Brain.CanReach(me, c.transform.position, 4f));
                     if (damaged == null) return P("villagepleb_errands_nothing_to_fix");
-                    if (Mending.Hammer(me) == null) Mending.MakeHammer(st);
-                    if (Mending.Hammer(me) == null) return P("villagepleb_errands_need_hammer");
-                    going = Go(st, Work.Kind.Mend, damaged);
+                    if (Mending.Hammer(me) != null) going = Go(st, Work.Kind.Mend, damaged);
+                    else if (Work.OwnChestWith(me, Mending.IsHammer) is Container chest)
+                        going = Work.Ordered(st, Work.Fetching(Work.New(Work.Kind.Mend, damaged, Job.None), chest, Mending.IsHammer));
+                    else return P("villagepleb_errands_need_hammer");
                     return P("villagepleb_errands_mending");
                 }
                 case Errand.Fires:
@@ -110,11 +113,28 @@ namespace VillagePlebs
                 }
                 case Errand.Cook:
                 {
-                    if (!me.GetInventory().GetAllItems().Any(Work.IsCookable)) return P("villagepleb_errands_nothing_raw");
+                    bool raw = me.GetInventory().GetAllItems().Any(Work.IsCookable);
+                    Container larder = raw ? null : Work.OwnChestWith(me, Work.IsCookable);
+                    if (!raw && larder == null) return P("villagepleb_errands_nothing_raw");
                     CookingStation stove = Kitchen.Find(me, center, radius + 20f);
                     if (stove == null) return P("villagepleb_errands_no_stove");
-                    going = Go(st, Work.Kind.Cook, stove, Job.Cook);
+                    going = raw ? Go(st, Work.Kind.Cook, stove, Job.Cook) : Work.Ordered(st, Work.Fetching(Work.New(Work.Kind.Cook, stove, Job.Cook), larder, Work.IsCookable));
                     return P("villagepleb_errands_off_to_cook");
+                }
+                case Errand.Plant:
+                {
+                    if (!Farming.HasField(st, center, radius)) return P("villagepleb_errands_no_tilled");
+                    bool InChests(System.Func<ItemDrop.ItemData, bool> has) => Home.Chests(me).Any(c => c.GetInventory().GetAllItems().Any(has));
+                    if (Farming.Cultivator(me) == null && !InChests(Farming.IsCultivator)) return P("villagepleb_errands_need_cultivator");
+                    if (!Farming.CanSow(me) && !me.GetInventory().GetAllItems().Any(Farming.IsSeedItem) && !InChests(Farming.IsSeedItem)) return P("villagepleb_errands_no_seeds");
+                    going = Work.StartFarm(st, Errand.Plant);
+                    return going ? P("villagepleb_errands_planting") : null;
+                }
+                case Errand.Harvest:
+                {
+                    if (!Farming.RipeNear(center, radius).Any()) return P("villagepleb_errands_nothing_ripe");
+                    going = Work.StartFarm(st, Errand.Harvest);
+                    return going ? P("villagepleb_errands_harvesting") : null;
                 }
             }
             return null;

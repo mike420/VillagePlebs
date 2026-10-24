@@ -17,7 +17,7 @@ namespace VillagePlebs
 
         private static readonly Vector3 PreviewPos = new Vector3(10060f, 5000f, 10000f);
         private const float DragSensitivity = 0.4f;
-        private const float Margin = 8f, ColumnGap = 8f;
+        private const float Margin = 8f, ColumnGap = 8f, ChoicesShare = 0.31f, ButtonsShare = 0.25f;
         private const float SectionGap = 10f, HeaderHeight = 24f, ButtonRowHeight = 42f, PickerRowHeight = 36f, SliderHeight = 24f;
 
         private static readonly MethodInfo UpdateVisuals = AccessTools.Method(typeof(VisEquipment), "UpdateVisuals");
@@ -67,14 +67,15 @@ namespace VillagePlebs
             _hairPicker?.Destroy();
             _hairPicker = null;
             Vector2 size = area.sizeDelta;
-            float colW = (size.x - Margin * 2f - ColumnGap * 2f) / 3f, colH = size.y - Margin * 2f;
+            float spare = size.x - Margin * 2f - ColumnGap * 2f, colH = size.y - Margin * 2f;
+            float choicesW = spare * ChoicesShare, buttonsW = spare * ButtonsShare, previewW = spare - choicesW - buttonsW;
             float x = Margin;
-            RectTransform left = Column("VP_LooksChoices", area, x, colW); x += colW + ColumnGap;
-            RectTransform middle = Column("VP_LooksButtons", area, x, colW); x += colW + ColumnGap;
-            RectTransform right = Column("VP_LooksPreview", area, x, colW);
+            RectTransform left = Column("VP_LooksChoices", area, x, choicesW); x += choicesW + ColumnGap;
+            RectTransform middle = Column("VP_LooksButtons", area, x, buttonsW); x += buttonsW + ColumnGap;
+            RectTransform right = Column("VP_LooksPreview", area, x, previewW);
             BuildChoices(left);
             BuildButtons(middle, about, mine, apply);
-            BuildPreview(right, colW, colH);
+            BuildPreview(right, previewW, colH);
             Refresh();
         }
 
@@ -345,7 +346,7 @@ namespace VillagePlebs
 
             Vector3 face = t > 0f ? EyeCentre() : Vector3.zero;
             Vector3 target = Vector3.Lerp(PreviewPos + Vector3.up * 0.9f, face, t) + Vector3.up * _pan;
-            float a = _rotation * Mathf.Deg2Rad, distance = Mathf.Lerp(5f, 1.1f, t);
+            float a = _rotation * Mathf.Deg2Rad, distance = Mathf.Lerp(4.3f, 1.1f, t);
             var round = new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a));
             _cam.transform.position = target + (round + Vector3.up * Mathf.Lerp(0.3f, 0.05f, t)) * distance;
             _cam.transform.LookAt(target);

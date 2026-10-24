@@ -123,6 +123,19 @@ namespace VillagePlebs
             else Save(me, list);
         }
 
+        // A mission is done the moment the item is in its hands (or its chests), not when it next thinks about its goals.
+        public static void CheckDone(BrainState st)
+        {
+            Humanoid me = st.Body;
+            if (Companion.Zdo(me) == null || !me.GetComponent<ZNetView>().IsOwner() || !Journal.Known(me)) return;
+            List<Mission> list = All(me);
+            Mission cur = list.LastOrDefault(m => m.Status == "active");
+            if (cur == null || !Achieved(me, cur)) return;
+            Finish(st, list, cur);
+            st.NextUpgradeLook = 0f;
+            st.NextWorkLook = 0f;
+        }
+
         private static void Finish(BrainState st, List<Mission> list, Mission m)
         {
             m.Status = "done"; m.Cost = 0; m.Why = P("villagepleb_missions_day", Journal.Day);

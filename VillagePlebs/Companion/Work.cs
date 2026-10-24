@@ -13,7 +13,7 @@ namespace VillagePlebs
 
     internal static class Work
     {
-        internal enum Kind { None, Hit, Pick, PickUp, Store, Upgrade, Craft, Hunt, Cook, Fetch, Fuel, Mend, Armory }
+        internal enum Kind { None, Hit, Pick, PickUp, Store, Upgrade, Craft, Hunt, Cook, Fetch, Fuel, Mend, Armory, Plant }
 
         internal class Task
         {
@@ -22,6 +22,9 @@ namespace VillagePlebs
             public Job Job;
             public ItemDrop.ItemData Item;
             public Recipe Recipe;
+            public Farming.Crop Crop;
+            public Container FetchFrom;
+            public Func<ItemDrop.ItemData, bool> Take;
             public bool ForGoal;
             public bool Edible;
             public bool Trip;
@@ -65,7 +68,29 @@ namespace VillagePlebs
 
         internal static Goal Aim(BrainState st) => st.Goal;
 
-        private static bool Directed(BrainState st) => JobsOf(st.Body) != Job.None || st.Duty != null;
+        private static bool Directed(BrainState st) => st.Ticked != Job.None || st.Duty != null;
+
+        // The ticked jobs it has no tool for: those wait, and it works on its mission instead.
+        internal static Job Unequipped(Humanoid h, Job jobs)
+        {
+            Job missing = Job.None;
+            if ((jobs & Job.Wood) != 0 && Axe(h) == null) missing |= Job.Wood;
+            if ((jobs & (Job.Stone | Job.Ore)) != 0 && Pickaxe(h) == null) missing |= jobs & (Job.Stone | Job.Ore);
+            if ((jobs & Job.Hunt) != 0 && Companion.BestMelee(h) == null && Companion.BestRanged(h) == null) missing |= Job.Hunt;
+            return missing;
+        }
+
+        private static Func<ItemDrop.ItemData, bool> ToolPicker(Humanoid me, Job lacking) => i =>
+            (lacking & Job.Wood) != 0 && i.m_shared.m_damages.m_chop > 0f && i.IsWeapon() && Usable(i)
+            || (lacking & (Job.Stone | Job.Ore)) != 0 && i.m_shared.m_damages.m_pickaxe > 0f && Usable(i)
+            || (lacking & Job.Hunt) != 0 && i.IsWeapon() && !IsTool(i) && Companion.Useful(me, i);
+
+        public static Container OwnChestWith(Humanoid me, Func<ItemDrop.ItemData, bool> has) =>
+            Home.Chests(me).Where(c => !Containers.InUse(c) && c.GetInventory().GetAllItems().Any(has))
+                .OrderBy(c => Vector3.Distance(c.transform.position, me.transform.position)).FirstOrDefault(c => Brain.CanReach(me, c.transform.position));
+
+        // Do t once it has fetched what take picks out of its own chest.
+        public static Task Fetching(Task t, Container from, Func<ItemDrop.ItemData, bool> take) { t.FetchFrom = from; t.Take = take; return t; }
 
         public static Job JobsOf(Component c) => (Job)(Companion.Zdo(c)?.GetInt(Keys.Jobs, 0) ?? 0);
 
@@ -139,7 +164,12 @@ namespace VillagePlebs
                 jobs = st.Duty != null ? st.Duty.Jobs : Job.None;
                 if (st.Hungry) jobs |= Job.Forage | Job.Hunt | Job.Cook;
             }
-            else if (jobs == Job.None) jobs = AutoJobs(me);
+            else
+            {
+                jobs &= ~Unequipped(me, jobs);
+                if (jobs == Job.None) jobs = AutoJobs(me);
+            }
+            st.Ticked = st.OnDuties ? Job.None : JobsOf(me) & ~Unequipped(me, JobsOf(me));
             Vector3 center = Center(me);
             float radius = RadiusOf(me);
             if (TravelHome(st, center, radius, moveTo)) return;
@@ -147,7 +177,7 @@ namespace VillagePlebs
             if (Time.time >= st.NextLoanLook) { st.NextLoanLook = Time.time + 30f; Loans.Return(st); }
 
             if (st.Task != null && !Valid(st, st.Task)) Drop(st);
-            if (st.Task == null && !NextQueued(st)) NextInArea(st);
+            if (st.Task == null && !NextQueued(st) && !NextInArea(st)) NextFarm(st);
             if (st.Task == null && Time.time >= st.NextWorkLook)
             {
                 st.NextWorkLook = Time.time + 1.5f;
@@ -202,11 +232,43 @@ namespace VillagePlebs
             return true;
         }
 
-        public static Task Workable(BrainState st, GameObject go) => go == null ? null : Consider(st, go, Job.Wood | Job.Stone | Job.Ore | Job.Forage, Axe(st.Body), Pickaxe(st.Body), true);
+        // What pointing at go asks of it, with the tools in its bag, else with a better one from its own chest (fetched first).
+        public static Task Workable(BrainState st, GameObject go)
+        {
+            if (go == null) return null;
+            Humanoid me = st.Body;
+            const Job all = Job.Wood | Job.Stone | Job.Ore | Job.Forage;
+            ItemDrop.ItemData axe = Axe(me), pick = Pickaxe(me);
+            Task t = Consider(st, go, all, axe, pick, true);
+            if (t != null) return t;
+            foreach (Container chest in Home.Chests(me).Where(c => !Containers.InUse(c)).OrderBy(c => Vector3.Distance(c.transform.position, me.transform.position)))
+            {
+                List<ItemDrop.ItemData> items = chest.GetInventory().GetAllItems();
+                ItemDrop.ItemData chestAxe = items.Where(i => i.m_shared.m_damages.m_chop > 0f && i.IsWeapon() && Usable(i)).OrderByDescending(i => i.m_shared.m_toolTier).FirstOrDefault();
+                ItemDrop.ItemData chestPick = items.Where(i => i.m_shared.m_damages.m_pickaxe > 0f && Usable(i)).OrderByDescending(i => i.m_shared.m_toolTier).FirstOrDefault();
+                if (chestAxe == null && chestPick == null) continue;
+                t = Consider(st, go, all, chestAxe ?? axe, chestPick ?? pick, true);
+                if (t == null || t.Kind != Kind.Hit || !Brain.CanReach(me, chest.transform.position)) continue;
+                ItemDrop.ItemData tool = t.Job == Job.Wood ? chestAxe : chestPick;
+                if (tool == null) return t;
+                return Fetching(t, chest, i => i == tool);
+            }
+            return null;
+        }
 
         public static bool Ordered(BrainState st, Task t, bool fromYou = true)
         {
             if (t == null || t.Target == null) return false;
+            if (t.FetchFrom != null)
+            {
+                Task fetch = New(Kind.Store, t.FetchFrom, Job.None);
+                fetch.Take = t.Take;
+                t.FetchFrom = null;
+                t.Take = null;
+                if (!Ordered(st, fetch, fromYou)) return false;
+                st.Then = t;
+                return true;
+            }
             Humanoid me = st.Body;
             Order order = Companion.OrderOf(me);
             if ((order == Order.Stay || order == Order.Guard) && !Companion.Write(me, z => z.Set(Keys.Order, (int)Order.Follow))) return false;
@@ -215,13 +277,13 @@ namespace VillagePlebs
             st.Task = t;
             st.Helping = false;
             st.CommandUntil = Time.time + 120f;
-            if (fromYou) { st.RepairAt = null; st.ComeUntil = 0f; st.EmoteUntil = 0f; st.PendingEmote = null; }
+            if (fromYou) { st.RepairAt = null; st.ComeUntil = 0f; st.EmoteUntil = 0f; st.PendingEmote = null; st.Farm = null; st.Then = null; }
             st.Remember(P(fromYou ? "villagepleb_work_you_pointed" : "villagepleb_work_next_in_patch", Describe(t)));
             return true;
         }
 
         public static bool OnOrder(BrainState st) =>
-            st.Area != null || st.PickQueue.Count > 0 || st.Task != null && st.Task.Ordered && Time.time < st.CommandUntil;
+            st.Area != null || st.PickQueue.Count > 0 || st.Farm != null || st.Then != null || st.Task != null && st.Task.Ordered && Time.time < st.CommandUntil;
 
         public static bool Ordered(BrainState st, Kind kind, Component target) => Ordered(st, New(kind, target, Job.None));
 
@@ -315,6 +377,8 @@ namespace VillagePlebs
         {
             st.Area = null;
             st.PickQueue.Clear();
+            st.Farm = null;
+            st.Then = null;
             if (st.Task != null && st.Task.Ordered) st.Task = null;
             st.CommandUntil = 0f;
             SaveArea(st);
@@ -418,6 +482,12 @@ namespace VillagePlebs
 
         public static bool NextQueued(BrainState st)
         {
+            if (st.Then != null)
+            {
+                Task then = st.Then;
+                st.Then = null;
+                if (then.Target != null && Ordered(st, then, false)) return true;
+            }
             st.PickQueue.RemoveAll(d => d == null);
             if (st.PickQueue.Count == 0) return false;
             ItemDrop next = st.PickQueue[0];
@@ -428,9 +498,9 @@ namespace VillagePlebs
         public static bool RunOrdered(BrainState st, Player master, float dt, Action<Vector3, float, bool> moveTo, Action stop, Action<Vector3> lookAt)
         {
             if (Clearing(st, moveTo)) return true;
-            if (st.Task == null || !Valid(st, st.Task)) { Drop(st); if (NextQueued(st) || NextInArea(st)) return true; return Time.time < st.ClearUntil; }
+            if (st.Task == null || !Valid(st, st.Task)) { Drop(st); if (NextQueued(st) || NextInArea(st) || NextFarm(st)) return true; return Time.time < st.ClearUntil; }
             Execute(st, master, dt, moveTo, stop, lookAt);
-            return st.Task != null || st.Area != null || st.PickQueue.Count > 0;
+            return st.Task != null || st.Area != null || st.PickQueue.Count > 0 || st.Farm != null || st.Then != null;
         }
 
         private static void Execute(BrainState st, Player master, float dt, Action<Vector3, float, bool> moveTo, Action stop, Action<Vector3> lookAt)
@@ -438,13 +508,14 @@ namespace VillagePlebs
             Humanoid me = st.Body;
             Task t = st.Task;
             if (t.Ordered) { Action<Vector3, float, bool> walk = moveTo; moveTo = (p, d, run) => walk(p, d, run || Flat(p, me.transform.position) > 3f); }
-            Vector3 at = Point(t.Target, me.transform.position);
+            Vector3 at = t.Kind == Kind.Plant ? t.Pos : Point(t.Target, me.transform.position);
             float dist = Flat(at, me.transform.position);
             if (Time.time - t.Started > (t.Trip ? 240f : t.Ordered ? 180f : 60f) || (dist > 3f && Time.time - t.LastClose > (t.Trip || t.Ordered ? 120f : 20f)))
             {
                 if (t.Kind == Kind.Mend)
                     foreach (Collider col in Physics.OverlapSphere(t.Target.transform.position, 6f, LayerMask.GetMask("piece", "piece_nonsolid")))
                         if (col.GetComponentInParent<WearNTear>() is WearNTear near && near != t.Target) st.Skipped[near.gameObject.GetInstanceID()] = Time.time + 600f;
+                if (t.Kind == Kind.Plant) { Farming.Bad(st, t.Pos); st.Task = null; return; }
                 Skip(st, t.Target, P("villagepleb_work_skip_cant_reach"));
                 return;
             }
@@ -471,6 +542,7 @@ namespace VillagePlebs
                     stop();
                     var pickable = (Pickable)t.Target;
                     if (pickable.m_itemPrefab != null) st.Wanted.Add(pickable.m_itemPrefab.name);
+                    foreach (DropTable.DropData extra in pickable.m_extraDrops.m_drops) if (extra.m_item != null) st.Wanted.Add(extra.m_item.name);
                     st.WorkSpot = pickable.transform.position;
                     bool ripe = !(Companion.Zdo(pickable)?.GetBool(ZDOVars.s_picked, false) ?? true);
                     pickable.Interact(me, false, false);
@@ -521,7 +593,7 @@ namespace VillagePlebs
                     if (dist > 2f) { moveTo(at, 1.2f, dist > 8f); break; }
                     t.LastClose = Time.time;
                     stop();
-                    Store(st, (Container)t.Target);
+                    Store(st, (Container)t.Target, t.Take);
                     st.Task = null;
                     break;
 
@@ -551,6 +623,22 @@ namespace VillagePlebs
                     if (!Mending.Fix(st, (WearNTear)t.Target)) { st.Task = null; break; }
                     WearNTear more = Mending.Damaged(me, me.transform.position, 8f, c => !Skipped(st, c));
                     if (more != null) { t.Target = more; t.Started = Time.time; } else st.Task = null;
+                    break;
+
+                case Kind.Plant:
+                    ItemDrop.ItemData cultivator = Farming.Cultivator(me);
+                    if (cultivator == null) { st.Task = null; break; }
+                    if (st.WorkTool != cultivator) { st.WorkTool = cultivator; st.NextGear = 0f; }
+                    if (dist > 1.4f) { moveTo(at, 0.9f, dist > 6f); break; }
+                    t.LastClose = Time.time;
+                    stop();
+                    lookAt(at);
+                    if (!me.IsItemEquiped(cultivator) || Time.time < st.NextPlant) break;
+                    st.NextPlant = Time.time + 0.8f;
+                    if (!Farming.Place(st, t.Crop, t.Pos)) { Farming.Bad(st, t.Pos); st.Task = null; break; }
+                    if (Farming.FindSpot(st, Center(me), RadiusOf(me), out Farming.Crop nextCrop, out Vector3 nextAt))
+                    { t.Crop = nextCrop; t.Pos = nextAt; t.Target = Heightmap.FindHeightmap(nextAt); t.Started = t.LastClose = Time.time; }
+                    else st.Task = null;
                     break;
 
                 case Kind.Fuel:
@@ -606,7 +694,7 @@ namespace VillagePlebs
         {
             Humanoid me = st.Body;
             float far = Flat(center, me.transform.position);
-            if (far < radius + 60f || Time.time < st.TripUntil || st.Area != null) { st.TripStart = 0f; return false; }
+            if (far < radius + 60f || Time.time < st.TripUntil || OnOrder(st)) { st.TripStart = 0f; return false; }
             if (st.TripStart == 0f) { st.TripStart = Time.time; st.Task = null; st.Remember(P("villagepleb_work_set_off_home")); }
             moveTo(center, 2f, true);
             Brain.Status(st, P("villagepleb_work_status_heading_home"));
@@ -663,7 +751,8 @@ namespace VillagePlebs
             return t.Kind switch
             {
                 Kind.Hit => P(t.Job == Job.Wood ? "villagepleb_work_do_chopping" : "villagepleb_work_do_mining", what),
-                Kind.Pick => P("villagepleb_work_do_picking", what),
+                Kind.Pick => P(t.Target != null && Goals.IsCrop(Utils.GetPrefabName(t.Target.gameObject)) ? "villagepleb_work_do_harvesting" : "villagepleb_work_do_picking", what),
+                Kind.Plant => P("villagepleb_work_do_planting", t.Crop?.Plant.m_name ?? ""),
                 Kind.PickUp => P("villagepleb_work_do_picking_up", what),
                 Kind.Store => P(Home.IdOn(t.Target) == 0L ? "villagepleb_work_do_store_yours" : "villagepleb_work_do_store_its"),
                 Kind.Craft => P("villagepleb_work_do_making", t.Recipe?.m_item?.m_itemData.m_shared.m_name ?? "", ((CraftingStation)t.Target).m_name),
@@ -833,6 +922,16 @@ namespace VillagePlebs
                     Container yours = YourFood(me, center, radius, c => !Skipped(st, c));
                     if (yours != null) { st.Remember(P("villagepleb_work_to_your_food")); return New(Kind.Fetch, yours, Job.None); }
                 }
+            }
+
+            Job lacking = st.OnDuties ? Job.None : Unequipped(me, JobsOf(me));
+            if (lacking != Job.None && Time.time >= st.NextToolLook)
+            {
+                st.NextToolLook = Time.time + 60f;
+                Func<ItemDrop.ItemData, bool> tool = ToolPicker(me, lacking);
+                Container toolChest = Home.Chests(me).Where(c => !Containers.InUse(c) && !Skipped(st, c) && c.GetInventory().GetAllItems().Any(tool))
+                                          .FirstOrDefault(c => Brain.CanReach(me, c.transform.position));
+                if (toolChest != null) { Task fetch = New(Kind.Store, toolChest, Job.None); fetch.Take = tool; return fetch; }
             }
 
             if (Time.time >= st.NextArmoryLook)
@@ -1310,12 +1409,73 @@ namespace VillagePlebs
             return n;
         }
 
-        public static bool Keeps(Humanoid h, ItemDrop.ItemData i) => Gear.InSlot(i) || h.IsItemEquiped(i) || Companion.Useful(h, i) || IsTool(i) || IsCookable(i) || Mending.IsHammer(i);
+        public static bool Keeps(Humanoid h, ItemDrop.ItemData i) => Gear.InSlot(i) || h.IsItemEquiped(i) || Companion.Useful(h, i) || IsTool(i) || IsCookable(i) || Mending.IsHammer(i)
+                                                                    || Farming.IsCultivator(i) || Farming.IsSeed(h, i);
+
+        // The plant or harvest errand, one step at a time: carry in the crop it just picked, fetch a cultivator or seeds
+        // from its own chest, then the next ripe crop or free spot. When there is nothing left it says so and stops.
+        public static bool NextFarm(BrainState st)
+        {
+            if (st.Farm == null) return false;
+            Humanoid me = st.Body;
+            Vector3 center = Center(me);
+            float radius = RadiusOf(me);
+            string done = null;
+            bool plant = st.Farm == Errand.Plant;
+            if (BagFull(me)) done = P("villagepleb_work_farm_bag_full");
+            else
+            {
+                ItemDrop crop = ItemDrops().Where(d => d != null && st.Wanted.Contains(Utils.GetPrefabName(d.gameObject)) && Vector3.Distance(d.transform.position, st.WorkSpot) < 4f
+                                                       && !Skipped(st, d) && me.GetInventory().CanAddItem(d.m_itemData))
+                                           .OrderBy(d => Vector3.Distance(d.transform.position, me.transform.position)).FirstOrDefault();
+                if (crop != null) return Ordered(st, New(Kind.PickUp, crop, Job.Loot), false);
+                if (plant)
+                {
+                    if (st.FarmTrips < 3 && Farming.SeedChest(st, center, radius, c => !Skipped(st, c) && Brain.CanReach(me, c.transform.position)) is Container chest)
+                    {
+                        st.FarmTrips++;
+                        return Ordered(st, New(Kind.Store, chest, Job.None), false);
+                    }
+                    if (Farming.Cultivator(me) == null) done = P("villagepleb_errands_need_cultivator");
+                    else if (Farming.FindSpot(st, center, radius, out Farming.Crop seed, out Vector3 spot))
+                    {
+                        Task sow = New(Kind.Plant, Heightmap.FindHeightmap(spot), Job.None);
+                        sow.Crop = seed;
+                        sow.Pos = spot;
+                        return Ordered(st, sow, false);
+                    }
+                    else done = Farming.CanSow(me) ? P("villagepleb_work_farm_sown") : P("villagepleb_work_farm_out_of_seeds");
+                }
+                else
+                {
+                    Pickable ripe = Farming.RipeNear(center, radius).Where(p => !Skipped(st, p)).OrderBy(p => Vector3.Distance(p.transform.position, me.transform.position)).FirstOrDefault();
+                    if (ripe != null) return Ordered(st, New(Kind.Pick, ripe, Job.Forage), false);
+                    done = P("villagepleb_work_farm_harvested");
+                }
+            }
+            st.Farm = null;
+            Talk.Tell(me, done);
+            return false;
+        }
+
+        public static bool StartFarm(BrainState st, Errand what)
+        {
+            Order order = Companion.OrderOf(st.Body);
+            if ((order == Order.Stay || order == Order.Guard) && !Companion.Write(st.Body, z => z.Set(Keys.Order, (int)Order.Follow))) return false;
+            st.Area = null;
+            st.PickQueue.Clear();
+            st.RepairAt = null; st.ComeUntil = 0f; st.EmoteUntil = 0f; st.PendingEmote = null;
+            if (st.Task != null && st.Task.Ordered) st.Task = null;
+            st.Farm = what;
+            st.FarmTrips = 0;
+            st.CommandUntil = Time.time + 120f;
+            return NextFarm(st);
+        }
 
         private static bool HasRoom(Container chest, Humanoid h) =>
             chest.GetInventory().HaveEmptySlot() || h.GetInventory().GetAllItems().Any(i => !Keeps(h, i) && chest.GetInventory().CanAddItem(i, 1));
 
-        public static void Store(BrainState st, Container chest)
+        public static void Store(BrainState st, Container chest, Func<ItemDrop.ItemData, bool> take = null)
         {
             Humanoid me = st.Body;
             if (chest == null || Containers.InUse(chest)) return;
@@ -1344,7 +1504,7 @@ namespace VillagePlebs
                 foreach (ItemDrop.ItemData item in its.GetAllItems().ToList())
                 {
                     if (!mine.HaveEmptySlot() && !mine.CanAddItem(item)) break;
-                    if (Wants(me, item, jobs)) { item.m_equipped = false; mine.MoveItemToThis(its, item); took++; }
+                    if (Wants(me, item, jobs) || take != null && take(item)) { item.m_equipped = false; mine.MoveItemToThis(its, item); took++; }
                 }
                 if (stows)
                     foreach (ItemDrop.ItemData item in its.GetAllItems().OrderBy(i => i.m_stack).ToList())
@@ -1385,6 +1545,7 @@ namespace VillagePlebs
             if (IsCookable(item)) return have.Where(Food.IsFood).Sum(f => f.m_stack) < 10 && have.Where(IsCookable).Sum(f => f.m_stack) < 10;
             if (type == ItemDrop.ItemData.ItemType.Consumable && Companion.Useful(me, item)) return Companion.HealingPotions(me).Sum(p => p.m_stack) < 3;
             if ((jobs & Job.Wood) != 0 && item.m_shared.m_damages.m_chop > 0f && item.IsWeapon() && Axe(me) == null) return true;
+            if (Farming.Wants(me, item)) return true;
             if ((jobs & (Job.Stone | Job.Ore)) != 0 && item.m_shared.m_damages.m_pickaxe > 0f && Pickaxe(me) == null) return true;
             return false;
         }

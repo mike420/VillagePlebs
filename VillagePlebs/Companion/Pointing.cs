@@ -143,6 +143,7 @@ namespace VillagePlebs
 
             GameObject thing = WorkObject(hit.collider) ?? go;
             Work.Task work = Work.Workable(w, thing);
+            bool fetching = work?.FetchFrom != null;
             if (work != null && Work.Ordered(w, work))
             {
                 List<Component> patch = Work.OrderArea(w, work);
@@ -152,6 +153,7 @@ namespace VillagePlebs
                 int more = patch.Count(c => c != work.Target);
                 Talk.Say(who, P(more == 0 ? (work.Kind == Work.Kind.Pick ? "villagepleb_pointing_will_pick" : "villagepleb_pointing_on_it_calm")
                     : work.Kind == Work.Kind.Pick ? "villagepleb_pointing_will_pick_all" : work.Job == Job.Wood ? "villagepleb_pointing_will_chop" : "villagepleb_pointing_will_mine"));
+                if (fetching) Talk.Say(who, P("villagepleb_pointing_fetch_tool"));
                 MarkTask(w, who, doing);
                 return true;
             }

@@ -148,6 +148,11 @@ namespace VillagePlebs
         public readonly Dictionary<int, float> Skipped = new Dictionary<int, float>();
         public readonly Dictionary<string, int> Gathered = new Dictionary<string, int>();
         public float NextEnemyScan, NextGear, NextAsk, LastAsk, HealthAtAsk = 1f;
+        public float NextPlant, NextToolLook, NextMissionCheck;
+        public Work.Task Then;
+        public Job Ticked;
+        public Errand? Farm;
+        public int FarmTrips;
         public float NextStuckCheck, StuckDistance = float.MaxValue;
         public Vector3 StuckFrom;
         public int StuckFor;
@@ -419,6 +424,7 @@ namespace VillagePlebs
             if (Time.time >= st.NextBagSave) { st.NextBagSave = Time.time + 30f; Companion.SaveBag(me); }
             if (Ride.Tick(st, master)) return true;
             Loot.PassBy(st);
+            if (Time.time >= st.NextMissionCheck) { st.NextMissionCheck = Time.time + 1f; Missions.CheckDone(st); }
             if (Time.time >= st.NextGear) { st.NextGear = Time.time + 0.5f; Companion.Maintain(me, st.Current.Ranged, st.InCombat ? null : st.WorkTool, st.InCombat ? st.Current.Target : null); }
             if (gear != null && Containers.InUse(gear)) { ai.StopMoving(); Blocking(me) = false; SetStatus(st, P("villagepleb_brain_status_gear_open")); return true; }
             if (!st.Asleep && Carts.Tick(st, (p, dd, run) => MoveTo(ai, dt, p, dd, run), () => ai.StopMoving())) return true;
@@ -501,7 +507,7 @@ namespace VillagePlebs
                 default:
                     if (master == null) { st.Ai.StopMoving(); { string friend = Companion.Zdo(me).GetString(Keys.MasterName, ""); SetStatus(st, string.IsNullOrEmpty(friend) ? P("villagepleb_brain_status_waiting_friend") : P("villagepleb_brain_status_waiting_for", friend)); } break; }
                     float d = Vector3.Distance(master.transform.position, me.transform.position);
-                    if ((Time.time < st.CommandUntil || st.Area != null) && (st.Task != null || st.PickQueue.Count > 0 || st.Area != null))
+                    if ((Time.time < st.CommandUntil || st.Area != null || st.Farm != null) && (st.Task != null || st.PickQueue.Count > 0 || st.Area != null || st.Farm != null || st.Then != null))
                     {
                         if (Work.RunOrdered(st, master, dt, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run), () => st.Ai.StopMoving(), p => LookAt(st.Ai, p))) break;
                         st.CommandUntil = 0f;

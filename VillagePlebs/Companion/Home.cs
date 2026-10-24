@@ -20,6 +20,17 @@ namespace VillagePlebs
             _nextHint = 0f;
         }
 
+        private static void Assign(GameObject hover)
+        {
+            if (hover == null || AssignFor == null) return;
+            Bed bed = hover.GetComponentInParent<Bed>();
+            if (bed != null) { ToggleBed(bed, AssignFor); return; }
+            Container chest = hover.GetComponentInParent<Container>();
+            if (chest == null) return;
+            if (NotStorage(chest) && chest.GetComponentInParent<Piece>() != null) VillagePlebsPlugin.Tell(T("villagepleb_home_not_a_chest", Companion.NameOf(AssignFor)));
+            else if (IsChest(chest)) ToggleChest(chest, AssignFor);
+        }
+
         public static void StopAssign(string why = null)
         {
             if (AssignFor != null && why != null) VillagePlebsPlugin.Tell(why);
@@ -218,7 +229,8 @@ namespace VillagePlebs
             if (AssignFor != null)
             {
                 if (AssignFor == null || AssignFor.IsDead() || Input.GetKeyDown(KeyCode.Escape) || MainConfig.menuKey.Value.IsDown()) StopAssign(T("villagepleb_home_done_assigning"));
-                else if (Time.time >= _nextHint) { _nextHint = Time.time + 6f; VillagePlebsPlugin.Tell(T("villagepleb_home_assigning", Companion.NameOf(AssignFor), MainConfig.menuKey.Value)); }
+                else if (MainConfig.assignKey.Value.IsDown()) Assign(p.GetHoverObject());
+                else if (Time.time >= _nextHint) { _nextHint = Time.time + 6f; VillagePlebsPlugin.Tell(T("villagepleb_home_assigning", Companion.NameOf(AssignFor), MainConfig.menuKey.Value, MainConfig.assignKey.Value)); }
             }
             if (Time.time < _nextTick) return;
             _nextTick = Time.time + 1f;
@@ -335,7 +347,6 @@ namespace VillagePlebs
         private static bool Prefix(Bed __instance, bool repeat, ref bool __result)
         {
             if (repeat) return true;
-            if (Home.AssignFor != null) { Home.ToggleBed(__instance, Home.AssignFor); __result = true; return false; }
             if (Home.IdOn(__instance) == 0L) return true;
             VillagePlebsPlugin.Tell(T("villagepleb_home_this_bed_of", Home.Named(Companion.Zdo(__instance).GetString(Home.HomeName, ""), "villagepleb_home_a_companion")));
             __result = true;
@@ -348,28 +359,8 @@ namespace VillagePlebs
     {
         private static void Postfix(Bed __instance, ref string __result)
         {
-            if (Home.AssignFor != null) { __result += "\n<color=#7fe0c8>[E] " + T(Home.IdOn(__instance) == Companion.IdOf(Home.AssignFor) ? "villagepleb_home_take_back_from" : "villagepleb_home_give_to", Companion.NameOf(Home.AssignFor)) + "</color>"; return; }
+            if (Home.AssignFor != null) { __result += "\n<color=#7fe0c8>[" + MainConfig.assignKey.Value + "] " + T(Home.IdOn(__instance) == Companion.IdOf(Home.AssignFor) ? "villagepleb_home_take_back_from" : "villagepleb_home_give_to", Companion.NameOf(Home.AssignFor)) + "</color>"; return; }
             if (Home.IdOn(__instance) != 0L) __result = T("villagepleb_home_bed_of", Home.Named(Companion.Zdo(__instance).GetString(Home.HomeName, ""), "villagepleb_home_a_companion_start"));
-        }
-    }
-
-    [HarmonyPatch(typeof(Container), nameof(Container.Interact))]
-    internal static class Container_Interact_Assign
-    {
-        [HarmonyPriority(Priority.First)]
-        private static bool Prefix(Container __instance, bool hold, ref bool __result)
-        {
-            if (hold || Home.AssignFor == null) return true;
-            if (Home.NotStorage(__instance) && __instance.GetComponentInParent<Piece>() != null)
-            {
-                VillagePlebsPlugin.Tell(T("villagepleb_home_not_a_chest", Companion.NameOf(Home.AssignFor)));
-                __result = true;
-                return false;
-            }
-            if (!Home.IsChest(__instance)) return true;
-            Home.ToggleChest(__instance, Home.AssignFor);
-            __result = true;
-            return false;
         }
     }
 
@@ -379,7 +370,7 @@ namespace VillagePlebs
         private static void Postfix(Container __instance, ref string __result)
         {
             if (!Home.IsChest(__instance)) return;
-            if (Home.AssignFor != null) { __result += "\n<color=#7fe0c8>[E] " + T(Home.IdOn(__instance) == Companion.IdOf(Home.AssignFor) ? "villagepleb_home_take_back_from" : "villagepleb_home_give_to", Companion.NameOf(Home.AssignFor)) + "</color>"; return; }
+            if (Home.AssignFor != null) { __result += "\n<color=#7fe0c8>[" + MainConfig.assignKey.Value + "] " + T(Home.IdOn(__instance) == Companion.IdOf(Home.AssignFor) ? "villagepleb_home_take_back_from" : "villagepleb_home_give_to", Companion.NameOf(Home.AssignFor)) + "</color>"; return; }
             if (Home.IdOn(__instance) != 0L) __result += "\n<color=#7fe0c8>" + T("villagepleb_home_chest_of", Home.Named(Companion.Zdo(__instance).GetString(Home.HomeName, ""), "villagepleb_home_a_companion_start")) + "</color>";
         }
     }

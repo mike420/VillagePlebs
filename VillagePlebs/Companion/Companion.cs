@@ -129,7 +129,8 @@ namespace VillagePlebs
             zdo.Set(Keys.Master, p.GetPlayerID());
             zdo.Set(Keys.MasterName, p.GetPlayerName());
             zdo.Set(Keys.Name, string.IsNullOrEmpty(name) ? "Rádvar" : name);
-            zdo.Set(Keys.Order, (int)Order.Follow);
+            zdo.Set(Keys.Order, (int)Order.Gather);
+            zdo.Set(Keys.Post, pos);
             zdo.Set(Keys.Style, (int)Style.Auto);
             zdo.Set(Following.MigratedKey, true);
             zdo.Set(Keys.Retreat, 30);
