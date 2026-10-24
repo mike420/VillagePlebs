@@ -693,6 +693,7 @@
   "villagepleb_pointing_comes_back": "{0} comes back to you",
   "villagepleb_pointing_all_come_back": "Your companions come back to you",
   "villagepleb_pointing_nothing_worth": "There's nothing worth getting from that.",
+  "villagepleb_pointing_worked_ground": "That sits on ground you've worked, so I'll leave it be.",
   "villagepleb_pointing_need_axe": "I need an axe for that. Give me one (my Inventory tab).",
   "villagepleb_pointing_axe_too_weak": "My axe isn't good enough for that tree. I need a better one.",
   "villagepleb_pointing_need_pickaxe": "I need a pickaxe for that. Give me one (my Inventory tab).",

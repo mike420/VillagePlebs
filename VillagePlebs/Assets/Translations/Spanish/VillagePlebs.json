@@ -693,6 +693,7 @@
   "villagepleb_pointing_comes_back": "{0} vuelve contigo",
   "villagepleb_pointing_all_come_back": "Tus compañeros vuelven contigo",
   "villagepleb_pointing_nothing_worth": "De eso no se saca nada que valga la pena.",
+  "villagepleb_pointing_worked_ground": "Eso está en terreno que has trabajado, así que lo dejo.",
   "villagepleb_pointing_need_axe": "Para eso necesito un hacha. Dame una (mi pestaña Inventario).",
   "villagepleb_pointing_axe_too_weak": "Mi hacha no basta para ese árbol. Necesito una mejor.",
   "villagepleb_pointing_need_pickaxe": "Para eso necesito un pico. Dame uno (mi pestaña Inventario).",

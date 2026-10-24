@@ -176,7 +176,7 @@ namespace VillagePlebs
                 Component t = (Component)go.GetComponent<TreeLog>() ?? (Component)go.GetComponent<TreeBase>() ?? (Component)go.GetComponent<MineRock5>() ?? (Component)go.GetComponent<MineRock>()
                               ?? (Component)go.GetComponent<Destructible>() ?? go.GetComponent<Pickable>();
                 if (t == null) continue;
-                if (t is Pickable ? Vector3.Distance(t.transform.position, center) > radius : Work.InBase(t.transform.position)) continue;
+                if (t is Pickable ? Vector3.Distance(t.transform.position, center) > radius : Work.InBase(t.transform.position) || Groundwork.OnWorkedGround(go)) continue;
                 targets.Add(t);
             }
             targets = targets.OrderBy(t => hungry && Work.Edible(t) ? 0 : st.Goal != null && Work.Drops(t).Any(st.Goal.Wants) ? 1 : 2)

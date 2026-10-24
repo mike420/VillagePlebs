@@ -693,6 +693,7 @@
   "villagepleb_pointing_comes_back": "{0}回到你身边",
   "villagepleb_pointing_all_come_back": "你的同伴们回到你身边",
   "villagepleb_pointing_nothing_worth": "那上面没什么值得拿的。",
+  "villagepleb_pointing_worked_ground": "那在你整过的地上，我就不碰了。",
   "villagepleb_pointing_need_axe": "这需要一把斧头。给我一把吧（我的物品栏页）。",
   "villagepleb_pointing_axe_too_weak": "我的斧头砍不动那棵树。我需要一把更好的。",
   "villagepleb_pointing_need_pickaxe": "这需要一把镐。给我一把吧（我的物品栏页）。",

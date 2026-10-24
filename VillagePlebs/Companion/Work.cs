@@ -1171,6 +1171,7 @@ namespace VillagePlebs
         internal static Task Consider(BrainState st, GameObject go, Job jobs, ItemDrop.ItemData axe, ItemDrop.ItemData pick, bool ordered = false)
         {
             if (!ordered && Breaks(go) && InBase(go)) return null;
+            if (Groundwork.OnWorkedGround(go)) return null;
             if (go.GetComponent<Piece>() != null || go.GetComponent<Character>() != null) return null;
             if ((jobs & Job.Wood) != 0 && axe != null)
             {

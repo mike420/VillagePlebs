@@ -54,6 +54,7 @@ namespace VillagePlebs
         private static string WhyNot(Humanoid who, GameObject go)
         {
             if (go == null || go.GetComponent<Piece>() != null) return null;
+            if (Groundwork.OnWorkedGround(go)) return P("villagepleb_pointing_worked_ground");
             ItemDrop.ItemData axe = Work.Axe(who), pick = Work.Pickaxe(who);
             int treeTier = go.GetComponent<TreeBase>()?.m_minToolTier ?? go.GetComponent<TreeLog>()?.m_minToolTier ?? -1;
             int rockTier = go.GetComponent<MineRock5>()?.m_minToolTier ?? go.GetComponent<MineRock>()?.m_minToolTier ?? -1;

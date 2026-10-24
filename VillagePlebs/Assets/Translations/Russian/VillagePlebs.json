@@ -693,6 +693,7 @@
   "villagepleb_pointing_comes_back": "{0} возвращается к вам",
   "villagepleb_pointing_all_come_back": "Ваши спутники возвращаются к вам",
   "villagepleb_pointing_nothing_worth": "С этого нечего взять.",
+  "villagepleb_pointing_worked_ground": "Это на земле, которую ты обработал, так что я это не трону.",
   "villagepleb_pointing_need_axe": "Для этого мне нужен топор. Дай мне его (моя вкладка «Инвентарь»).",
   "villagepleb_pointing_axe_too_weak": "Мой топор не возьмёт это дерево. Нужен получше.",
   "villagepleb_pointing_need_pickaxe": "Для этого мне нужна кирка. Дай мне её (моя вкладка «Инвентарь»).",
