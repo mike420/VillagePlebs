@@ -18,7 +18,7 @@ namespace VillagePlebs
 
     public partial class VillagePlebsPlugin
     {
-        private enum Tab { Status, Stats, Orders, Home, Gear, Looks, Journal, Companions }
+        private enum Tab { Status, Stats, Missions, Orders, Home, Gear, Looks, Journal, Companions }
 
         internal static bool MenuOpen;
         internal static float MenuClosedAt = -1f;
@@ -197,6 +197,7 @@ namespace VillagePlebs
                 {
                     case Tab.Status: DrawStatus(c); break;
                     case Tab.Stats: DrawStats(c); break;
+                    case Tab.Missions: DrawMissions(c); break;
                     case Tab.Orders: DrawOrders(c); break;
                     case Tab.Home: DrawHome(c); break;
                     case Tab.Gear: DrawGear(c); break;
@@ -842,6 +843,47 @@ namespace VillagePlebs
             }
         }
 
+        private void DrawMissions(Humanoid c)
+        {
+            BrainState st = Brain.Get(c);
+            bool living = Companion.OrderOf(c) == VillagePlebs.Order.Gather;
+            BeginCard(T("villagepleb_menu_missions"));
+            Goal goal = st.Goal;
+            List<Mission> missions = Missions.All(c);
+            Mission current = missions.LastOrDefault(m => m.Status == "active");
+            if (!c.GetComponent<ZNetView>().IsOwner()) Note(T("villagepleb_menu_shows_elsewhere"), GameUi.Dim);
+            else if (goal == null) Note(T(living ? "villagepleb_menu_no_mission" : "villagepleb_menu_mission_at_home"), GameUi.Dim);
+            else
+            {
+                if (current != null && current.StartCost > 0)
+                {
+                    float done = Mathf.Clamp01(1f - current.Cost / (float)current.StartCost);
+                    Note(T("villagepleb_menu_mission_since", current.Day, Mathf.RoundToInt(done * 100f)), GameUi.Dim);
+                    if (_make) GameUi.Bar(_in, new Vector2(_left, -_y), new Vector2(_width, 12f), done, GameUi.Good, null);
+                    _y += 18f;
+                }
+                string what = Capital(Words.Show(goal.What));
+                Note(goal.Station != null ? T("villagepleb_menu_goal_at", what, Words.Mid(Loc(goal.Station.m_name))) : what, GameUi.Text, bold: true);
+                if (goal.Raw.Count > 0) Note(T("villagepleb_menu_gathering", Words.Show(goal.RawText())), GameUi.Text);
+                if (goal.Steps.Count > 0) Note(T("villagepleb_menu_then_makes", string.Join(", ", goal.Steps.Select(s => Words.Mid(Loc(s.Key.m_item.m_itemData.m_shared.m_name))))), GameUi.Text);
+                if (goal.Smelt.Count > 0) Note(T(goal.Smelt.Count == 1 ? "villagepleb_menu_smelt_one" : "villagepleb_menu_smelt_many", Capital(And(goal.Smelt.Select(Thing).ToList()))), GameUi.Dim);
+                if (goal.Ask.Count > 0) Note(T("villagepleb_menu_needs_from_you", string.Join(", ", goal.Ask.Select(Thing))), GameUi.Warn);
+                var next = st.Candidates.Where(g => g != goal).Take(2).Select(g => Words.Show(g.What)).ToList();
+                if (next.Count == 1) Note(T("villagepleb_menu_after_that", next[0]), GameUi.Dim);
+                else if (next.Count > 1) Note(T("villagepleb_menu_after_that_two", next[0], next[1]), GameUi.Dim);
+            }
+            var past = missions.Where(m => m.Status != "active").Reverse().Take(5).ToList();
+            if (past.Count > 0)
+            {
+                _y += 4f;
+                Note(T("villagepleb_menu_lately"), GameUi.Dim);
+                foreach (Mission m in past)
+                    Note(m.Status == "done" ? T("villagepleb_menu_mission_done", Words.Show(m.What), Words.Show(m.Why)) : T("villagepleb_menu_mission_dropped", Words.Show(m.What), Words.Show(m.Why)), m.Status == "done" ? GameUi.Good : GameUi.Text);
+            }
+            Note(T("villagepleb_menu_missions_about"), GameUi.Dim);
+            EndCard();
+        }
+
         private void DrawHome(Humanoid c)
         {
             ZDO z = Companion.Zdo(c);
@@ -887,42 +929,6 @@ namespace VillagePlebs
             EndCard();
 
             bool living = Companion.OrderOf(c) == VillagePlebs.Order.Gather;
-            BeginCard(T("villagepleb_menu_missions"));
-            Goal goal = st.Goal;
-            List<Mission> missions = Missions.All(c);
-            Mission current = missions.LastOrDefault(m => m.Status == "active");
-            if (!c.GetComponent<ZNetView>().IsOwner()) Note(T("villagepleb_menu_shows_elsewhere"), GameUi.Dim);
-            else if (goal == null) Note(T(living ? "villagepleb_menu_no_mission" : "villagepleb_menu_mission_at_home"), GameUi.Dim);
-            else
-            {
-                if (current != null && current.StartCost > 0)
-                {
-                    float done = Mathf.Clamp01(1f - current.Cost / (float)current.StartCost);
-                    Note(T("villagepleb_menu_mission_since", current.Day, Mathf.RoundToInt(done * 100f)), GameUi.Dim);
-                    if (_make) GameUi.Bar(_in, new Vector2(_left, -_y), new Vector2(_width, 12f), done, GameUi.Good, null);
-                    _y += 18f;
-                }
-                string what = Capital(Words.Show(goal.What));
-                Note(goal.Station != null ? T("villagepleb_menu_goal_at", what, Words.Mid(Loc(goal.Station.m_name))) : what, GameUi.Text, bold: true);
-                if (goal.Raw.Count > 0) Note(T("villagepleb_menu_gathering", Words.Show(goal.RawText())), GameUi.Text);
-                if (goal.Steps.Count > 0) Note(T("villagepleb_menu_then_makes", string.Join(", ", goal.Steps.Select(s => Words.Mid(Loc(s.Key.m_item.m_itemData.m_shared.m_name))))), GameUi.Text);
-                if (goal.Smelt.Count > 0) Note(T(goal.Smelt.Count == 1 ? "villagepleb_menu_smelt_one" : "villagepleb_menu_smelt_many", Capital(And(goal.Smelt.Select(Thing).ToList()))), GameUi.Dim);
-                if (goal.Ask.Count > 0) Note(T("villagepleb_menu_needs_from_you", string.Join(", ", goal.Ask.Select(Thing))), GameUi.Warn);
-                var next = st.Candidates.Where(g => g != goal).Take(2).Select(g => Words.Show(g.What)).ToList();
-                if (next.Count == 1) Note(T("villagepleb_menu_after_that", next[0]), GameUi.Dim);
-                else if (next.Count > 1) Note(T("villagepleb_menu_after_that_two", next[0], next[1]), GameUi.Dim);
-            }
-            var past = missions.Where(m => m.Status != "active").Reverse().Take(5).ToList();
-            if (past.Count > 0)
-            {
-                _y += 4f;
-                Note(T("villagepleb_menu_lately"), GameUi.Dim);
-                foreach (Mission m in past)
-                    Note(m.Status == "done" ? T("villagepleb_menu_mission_done", Words.Show(m.What), Words.Show(m.Why)) : T("villagepleb_menu_mission_dropped", Words.Show(m.What), Words.Show(m.Why)), m.Status == "done" ? GameUi.Good : GameUi.Text);
-            }
-            Note(T("villagepleb_menu_missions_about"), GameUi.Dim);
-            EndCard();
-
             BeginCard(T("villagepleb_menu_living"));
             if (!living)
             {
@@ -994,6 +1000,7 @@ namespace VillagePlebs
             EndCard();
 
             Job jobs = Work.JobsOf(c);
+            Goal goal = st.Goal;
             BeginCard(T(duties.Any(x => x.On) ? "villagepleb_menu_other_jobs" : "villagepleb_menu_jobs"));
             Job auto = Work.AutoJobs(c);
             Note(jobs == Job.None
