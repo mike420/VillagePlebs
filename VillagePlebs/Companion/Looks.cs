@@ -10,7 +10,7 @@ namespace VillagePlebs
     {
         private const string SkinT = "vp_skin_t", HairT = "vp_hair_t", HairL = "vp_hair_l";
         public const string BrLookKey = "vp_brlook", BrMuscleKey = "vp_brmuscle";
-        public const string BrTattooKey = "vp_brtattoos";
+        public const string BrTattooKey = "vp_brtattoos", BrBeardKey = "vp_brbeard";
 
         private static readonly Color Skin0 = new Color(1f, 1f, 1f), Skin1 = new Color(0.32f, 0.23f, 0.17f);
         private static readonly Color Hair0 = new Color(1f, 0.86f, 0.55f), Hair1 = new Color(0.45f, 0.24f, 0.11f);
@@ -38,16 +38,21 @@ namespace VillagePlebs
         public static string BrLook(Component c) => Companion.Zdo(c)?.GetString(BrLookKey, "") ?? "";
         public static float BrMuscle(Component c) => Companion.Zdo(c)?.GetFloat(BrMuscleKey, -1f) ?? -1f;
         public static string BrTattoos(Component c) => Companion.Zdo(c)?.GetString(BrTattooKey, "") ?? "";
+        public static int BrBeard(Component c) => Companion.Zdo(c)?.GetInt(BrBeardKey, 0) ?? 0;
 
-        public static void SetBrLook(Humanoid c, string look, float muscle, string tattoos)
+        public static void SetBrLook(Humanoid c, string look, float muscle, string tattoos, int beard)
         {
             ZDO z = Companion.Zdo(c);
             z.Set(BrLookKey, look ?? "");
             z.Set(BrMuscleKey, muscle);
             z.Set(BrTattooKey, tattoos ?? "");
+            z.Set(BrBeardKey, beard);
             BodyReplacerLook.Apply(c.gameObject, look, muscle);
             BodyReplacerLook.ApplyTattoos(c.gameObject, tattoos);
+            BodyReplacerLook.ApplyBeard(c.gameObject, beard);
         }
+
+        public static bool HasBrLook(string look, string tattoos, int beard) => !string.IsNullOrEmpty(look) || !string.IsNullOrEmpty(tattoos) || beard > 0;
 
         public static string StyleName(int hash, List<ItemDrop> styles)
         {
@@ -154,17 +159,20 @@ namespace VillagePlebs
             public string BrLook;
             public float BrMuscle;
             public string BrTattoos;
+            public int BrBeard;
         }
 
         public static Look Of(Component c) =>
-            new Look { Model = Model(c), Hair = Hair(c), Beard = Beard(c), Skin = SkinTone(c), HairTone = HairTone(c), HairShade = HairShade(c), BrLook = BrLook(c), BrMuscle = BrMuscle(c), BrTattoos = BrTattoos(c) };
+            new Look { Model = Model(c), Hair = Hair(c), Beard = Beard(c), Skin = SkinTone(c), HairTone = HairTone(c), HairShade = HairShade(c), BrLook = BrLook(c), BrMuscle = BrMuscle(c), BrTattoos = BrTattoos(c), BrBeard = BrBeard(c) };
 
         public static Look Random()
         {
             List<ItemDrop> hairs = Hairs(), beards = Beards();
-            var l = new Look { Model = UnityEngine.Random.Range(0, 2), Skin = UnityEngine.Random.Range(0f, 0.9f), HairTone = UnityEngine.Random.value, HairShade = UnityEngine.Random.Range(0.35f, 1f) };
+            var l = new Look { Model = UnityEngine.Random.Range(0, 2), Skin = UnityEngine.Random.Range(0f, 0.9f), HairTone = UnityEngine.Random.value, HairShade = UnityEngine.Random.Range(0.35f, 1f), BrMuscle = -1f };
             if (hairs.Count > 0) l.Hair = hairs[UnityEngine.Random.Range(0, hairs.Count)].name.GetStableHashCode();
             if (l.Model == 0 && beards.Count > 0 && UnityEngine.Random.value < 0.85f) l.Beard = beards[UnityEngine.Random.Range(0, beards.Count)].name.GetStableHashCode();
+            int brBeards = BodyReplacerLook.HasBeards(0) ? BodyReplacerLook.BeardNames().Length : 0;
+            if (l.Model == 0 && brBeards > 1 && UnityEngine.Random.value < 0.85f) l.BrBeard = UnityEngine.Random.Range(1, brBeards);
             return l;
         }
 
@@ -187,7 +195,7 @@ namespace VillagePlebs
             SetHairColor(c, l.HairTone, l.HairShade);
             SetHair(c, l.Hair);
             SetBeard(c, l.Model == 0 ? l.Beard : 0);
-            if (!string.IsNullOrEmpty(l.BrLook) || !string.IsNullOrEmpty(l.BrTattoos)) SetBrLook(c, l.BrLook, l.BrMuscle, l.BrTattoos);
+            if (HasBrLook(l.BrLook, l.BrTattoos, l.BrBeard)) SetBrLook(c, l.BrLook, l.BrMuscle, l.BrTattoos, l.BrBeard);
             if (!fresh) SetModel(c, l.Model);
         }
 

@@ -29,6 +29,9 @@ namespace VillagePlebs
         private static Func<string, int, int> _getTattooDesign, _getTattooInk;
         private static Func<string, int, int, int, string> _setTattoo;
         private static Action<GameObject, string> _applyTattoos;
+        private static Func<int, bool> _hasBeards;
+        private static Func<string[]> _beardNames;
+        private static Action<GameObject, int> _applyBeard;
 
         public static bool Available { get { Find(); return _applyLook != null; } }
 
@@ -62,7 +65,7 @@ namespace VillagePlebs
                 _visualType = assembly.GetType("BodyReplacer.EinherjarVisual");
                 FindNewer(api);
                 VillagePlebsPlugin.Instance?.Note("BodyReplacer found: companions can be given its hairstyles and colours"
-                    + (HasGameHair ? ", the game's hairstyles" : "") + (HasTattoos ? " and tattoos" : ""));
+                    + (HasGameHair ? ", the game's hairstyles" : "") + (HasTattoos ? ", tattoos" : "") + (HasBeardApi ? ", beards" : ""));
             }
             catch (Exception e)
             {
@@ -84,6 +87,9 @@ namespace VillagePlebs
             _getTattooInk = TryBind<Func<string, int, int>>(api, "GetTattooInk");
             _setTattoo = TryBind<Func<string, int, int, int, string>>(api, "SetTattoo");
             _applyTattoos = TryBind<Action<GameObject, string>>(api, "ApplyTattoos");
+            _hasBeards = TryBind<Func<int, bool>>(api, "HasBeards");
+            _beardNames = TryBind<Func<string[]>>(api, "BeardNames");
+            _applyBeard = TryBind<Action<GameObject, int>>(api, "ApplyBeard");
         }
 
         private static T TryBind<T>(Type api, string name) where T : Delegate
@@ -140,6 +146,14 @@ namespace VillagePlebs
         public static string SetTattoo(string tattoos, int area, int design, int ink) => HasTattoos ? _setTattoo(tattoos, area, design, ink) : tattoos;
 
         public static void ApplyTattoos(GameObject character, string tattoos) { if (HasTattoos) _applyTattoos(character, tattoos ?? ""); }
+
+        private static bool HasBeardApi { get { Find(); return _hasBeards != null && _beardNames != null && _applyBeard != null; } }
+
+        // Beards drawn by BodyReplacer on its own body for this model (its male): index 0 is none, then the beards.
+        public static bool HasBeards(int model) => HasBeardApi && _hasBeards(model);
+        public static string[] BeardNames() => HasBeardApi ? _beardNames() : Array.Empty<string>();
+
+        public static void ApplyBeard(GameObject character, int beard) { if (HasBeardApi) _applyBeard(character, beard); }
 
         public static bool Drawn(GameObject character)
         {
