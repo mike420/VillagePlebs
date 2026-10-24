@@ -787,7 +787,7 @@ namespace VillagePlebs
             {
                 Kind.Hit => P(t.Job == Job.Wood ? "villagepleb_work_do_chopping" : "villagepleb_work_do_mining", what),
                 Kind.Pick => P(t.Target != null && Goals.IsCrop(Utils.GetPrefabName(t.Target.gameObject)) ? "villagepleb_work_do_harvesting" : "villagepleb_work_do_picking", what),
-                Kind.Plant => P("villagepleb_work_do_planting", t.Crop?.Plant.m_name ?? ""),
+                Kind.Plant => P("villagepleb_work_do_planting", t.Crop?.Label ?? ""),
                 Kind.PickUp => P("villagepleb_work_do_picking_up", what),
                 Kind.Store => P(Home.IdOn(t.Target) == 0L ? "villagepleb_work_do_store_yours" : "villagepleb_work_do_store_its"),
                 Kind.Craft => P("villagepleb_work_do_making", t.Recipe?.m_item?.m_itemData.m_shared.m_name ?? "", ((CraftingStation)t.Target).m_name),

@@ -392,9 +392,6 @@ namespace VillagePlebs
                     if (d > 15f) buttons.Add((T("villagepleb_menu_call"), false, () => { Humanoid h2 = here; _pending = () => { if (Home.Follow(h2)) Brain.TeleportBehind(h2, Player.m_localPlayer, "villagepleb_brain_was_called_to"); }; }));
                     buttons.Add((T("villagepleb_menu_open"), true, () => { Humanoid h2 = here; _pending = () => { _tab = Tab.Status; OpenMenuFor(Player.m_localPlayer, h2); }; }));
                     HeadingRow(prof.Name, buttons.ToArray());
-                    string doing = Companion.StatusOf(here);
-                    string whereNow = d <= 15f ? T("villagepleb_menu_here_with_you") : Words.Show(Remote.Where(here.transform.position, me.transform.position));
-                    Note(string.IsNullOrEmpty(doing) ? whereNow + "." : T("villagepleb_menu_where_doing", whereNow, Words.Show(doing)), GameUi.Good);
                     long hid = prof.Id;
                     bool armed = _forgetArmed == hid;
                     if (armed) Note(T("villagepleb_menu_release_hint"), GameUi.Warn);
@@ -630,23 +627,30 @@ namespace VillagePlebs
                 float s = GameUi.CellSpace, top = _y;
                 for (int i = 0; i < 3; i++)
                 {
-                    if (i < meals.Count) AppendItem(meals[i].Item).Append(Mathf.CeilToInt(meals[i].Time / 60f));
                     if (!_make) continue;
-                    var pos = new Vector2(_left + i * s, -top);
-                    if (i >= meals.Count) { GameUi.EmptyCell(_in, pos); continue; }
-                    InventoryElement e = GameUi.Cell(_in, pos, meals[i].Item, T("villagepleb_menu_minutes_short", Mathf.CeilToInt(meals[i].Time / 60f)), false, null);
-                    GuiBar left = e.m_durability;
-                    left.gameObject.SetActive(true);
+                    InventoryElement e = GameUi.Slot(_in, new Vector2(_left + i * s, -top), null);
                     int k = i;
-                    void Show() { List<Food.Meal> now = Food.Meals(c); if (k < now.Count) { left.SetValue(now[k].Fraction); left.SetColor(now[k].Fraction < 0.2f ? GameUi.Warn : GameUi.Good); } }
+                    void Show()
+                    {
+                        List<Food.Meal> now = Food.Meals(c);
+                        Food.Meal m = k < now.Count ? now[k] : null;
+                        GameUi.Fill(e, m?.Item, m != null ? T("villagepleb_menu_minutes_short", Mathf.CeilToInt(m.Time / 60f)) : null);
+                        if (m == null) return;
+                        e.m_durability.gameObject.SetActive(true);
+                        e.m_durability.SetValue(m.Fraction);
+                        e.m_durability.SetColor(m.Fraction < 0.2f ? GameUi.Warn : GameUi.Good);
+                    }
                     Show();
                     _live.Add(Show);
                 }
-                if (meals.Count == 0) Note(T("villagepleb_menu_hungry", MainConfig.baseHealth.Value.ToString("0"), MainConfig.baseStamina.Value.ToString("0")), GameUi.Warn, indent: 3f * s + 10f);
-                else Note(T("villagepleb_menu_meals", string.Join(", ", meals.Select(m => T("villagepleb_menu_meal", Loc(m.Item.m_shared.m_name), Mathf.CeilToInt(m.Time / 60f))))), GameUi.Text, indent: 3f * s + 10f);
+                LiveText(() =>
+                {
+                    List<Food.Meal> now = Food.Meals(c);
+                    return now.Count == 0 ? Tint(T("villagepleb_menu_hungry", MainConfig.baseHealth.Value.ToString("0"), MainConfig.baseStamina.Value.ToString("0")), GameUi.Warn)
+                         : T("villagepleb_menu_meals", string.Join(", ", now.Select(m => T("villagepleb_menu_meal", Loc(m.Item.m_shared.m_name), Mathf.CeilToInt(m.Time / 60f)))));
+                }, GameUi.Text, indent: 3f * s + 10f);
                 _y = Mathf.Max(_y, top + 64f) + 8f;
-                if (Rest.IsRested(c)) Note(T("villagepleb_menu_rested", Mathf.CeilToInt(Rest.Left(c) / 60f)), GameUi.Good);
-                else Note(T("villagepleb_menu_not_rested"), GameUi.Dim);
+                LiveText(() => Rest.IsRested(c) ? Tint(T("villagepleb_menu_rested", Mathf.CeilToInt(Rest.Left(c) / 60f)), GameUi.Good) : Tint(T("villagepleb_menu_not_rested"), GameUi.Dim), GameUi.Text);
             }
             EndCard();
 
@@ -677,8 +681,7 @@ namespace VillagePlebs
             EndCard();
 
             BeginCard(T("villagepleb_menu_recently"));
-            if (st.History.Count == 0) Note(T("villagepleb_menu_nothing_yet"), GameUi.Dim);
-            foreach (string line in st.History.Take(8)) Note(Capital(Words.Show(line)), GameUi.Text);
+            LiveText(() => st.History.Count == 0 ? Tint(T("villagepleb_menu_nothing_yet"), GameUi.Dim) : string.Join("\n", st.History.Take(8).Select(l => Capital(Words.Show(l)))), GameUi.Text);
             EndCard();
 
             DrawJournal(c);
@@ -711,51 +714,57 @@ namespace VillagePlebs
         {
             BrainState st = Brain.Get(c);
             bool here = c.GetComponent<ZNetView>().IsOwner();
-            List<Food.Meal> meals = Food.Meals(c);
-
-            BeginCard(T("villagepleb_menu_body"));
-            Stats((Loc("$se_health"), null, () => $"{c.GetHealth():0}/{c.GetMaxHealth():0}"),
-                  (Loc("$se_stamina"), null, () => $"{Stamina.Get(c):0}/{Stamina.Max(c):0}"),
-                  (Loc("$se_eitr"), null, () => Eitr.Max(c) > 0f ? $"{Eitr.Get(c):0}/{Eitr.Max(c):0}" : "-"),
-                  (T("villagepleb_menu_carrying"), null, () => $"{Carry.Weight(c):0}/{Carry.Max(c):0}"));
-            float regen = meals.Sum(m => m.Item.m_shared.m_foodRegen) * (Rest.IsRested(c) ? 1.5f : 1f);
-            Note(T("villagepleb_menu_before_food", MainConfig.baseHealth.Value.ToString("0"), MainConfig.baseStamina.Value.ToString("0")), GameUi.Dim);
-            Note(regen > 0f ? T(Rest.IsRested(c) ? "villagepleb_menu_heals_rested" : "villagepleb_menu_heals", regen.ToString("0.#")) : T("villagepleb_menu_heals_nothing"), regen > 0f ? GameUi.Text : GameUi.Warn);
-            EndCard();
 
             if (EpicMmo.On) DrawLevel(c);
 
             BeginCard(Loc("$hud_food"));
             if (!here) Note(T("villagepleb_menu_shows_elsewhere"), GameUi.Dim);
-            else if (meals.Count == 0) Note(T("villagepleb_menu_nothing_eaten"), GameUi.Warn);
-            foreach (Food.Meal m in meals)
+            else LiveText(() =>
             {
-                ItemDrop.ItemData.SharedData f = m.Item.m_shared;
-                string gives = f.m_foodEitr > 0f ? T("villagepleb_menu_food_gives_eitr", f.m_food.ToString("0"), f.m_foodStamina.ToString("0"), f.m_foodEitr.ToString("0"), f.m_foodRegen.ToString("0.#"))
-                                                 : T("villagepleb_menu_food_gives", f.m_food.ToString("0"), f.m_foodStamina.ToString("0"), f.m_foodRegen.ToString("0.#"));
-                Note($"{Loc(f.m_name)}:  {gives}  ·  {T("villagepleb_menu_min_left", Mathf.CeilToInt(m.Time / 60f))}", GameUi.Text);
-            }
+                List<Food.Meal> now = Food.Meals(c);
+                if (now.Count == 0) return Tint(T("villagepleb_menu_nothing_eaten"), GameUi.Warn);
+                return string.Join("\n", now.Select(m =>
+                {
+                    ItemDrop.ItemData.SharedData f = m.Item.m_shared;
+                    string gives = f.m_foodEitr > 0f ? T("villagepleb_menu_food_gives_eitr", f.m_food.ToString("0"), f.m_foodStamina.ToString("0"), f.m_foodEitr.ToString("0"), f.m_foodRegen.ToString("0.#"))
+                                                     : T("villagepleb_menu_food_gives", f.m_food.ToString("0"), f.m_foodStamina.ToString("0"), f.m_foodRegen.ToString("0.#"));
+                    return $"{Loc(f.m_name)}:  {gives}  ·  {T("villagepleb_menu_min_left", Mathf.CeilToInt(m.Time / 60f))}";
+                }));
+            }, GameUi.Text);
             EndCard();
 
             BeginCard(T("villagepleb_menu_fighting_card"));
-            ItemDrop.ItemData melee = Companion.BestMelee(c), bow = Companion.BestRanged(c), shield = Companion.Shield(c);
-            Stats((Loc("$item_armor"), $"{Companion.Armor(c):0}", null),
-                  (T("villagepleb_menu_block"), shield != null ? $"{shield.GetBlockPower(Skill.Get(c, Skills.SkillType.Blocking) / 100f):0}" : melee != null ? $"{melee.GetBlockPower(Skill.Get(c, Skills.SkillType.Blocking) / 100f):0}" : "-", null),
-                  (T("villagepleb_menu_kills"), Companion.Zdo(c).GetInt(Keys.Kills, 0).ToString(), null),
-                  (T("villagepleb_menu_fights"), here ? st.Fights.ToString() : "-", null));
-            if (melee != null) Note(T("villagepleb_menu_damage_hit", Loc(melee.m_shared.m_name), Damage(c, melee), Words.Mid(Loc("$skill_" + melee.m_shared.m_skillType.ToString().ToLower()))), GameUi.Text);
-            else Note(T("villagepleb_menu_no_weapon"), GameUi.Warn);
-            if (bow != null) Note(T("villagepleb_menu_damage_shot", Loc(bow.m_shared.m_name), Damage(c, bow)), GameUi.Text);
-            Note(shield != null ? T("villagepleb_menu_blocks_shield", Words.Mid(Loc(shield.m_shared.m_name))) : melee != null ? T("villagepleb_menu_blocks_weapon") : T("villagepleb_menu_blocks_nothing"), GameUi.Dim);
-            if (here && st.Parries + st.Blocks > 0) Note(T("villagepleb_menu_session_parries", st.Parries, st.Blocks), GameUi.Text);
-            var tally = Journal.Tally(c);
-            var feared = tally.Where(kv => kv.Key.StartsWith("killedby:")).Select(kv => Words.Mid(Thing(kv.Key.Substring(9)))).Distinct().ToList();
-            if (feared.Count > 0) Note(T("villagepleb_menu_careful_with", string.Join(", ", feared)), GameUi.Dim);
+            string Block()
+            {
+                ItemDrop.ItemData sh = Companion.Shield(c), me = Companion.BestMelee(c);
+                float skill = Skill.Get(c, Skills.SkillType.Blocking) / 100f;
+                return sh != null ? $"{sh.GetBlockPower(skill):0}" : me != null ? $"{me.GetBlockPower(skill):0}" : "-";
+            }
+            Stats((Loc("$item_armor"), null, () => $"{Companion.Armor(c):0}"),
+                  (T("villagepleb_menu_block"), null, Block),
+                  (T("villagepleb_menu_kills"), null, () => Companion.Zdo(c)?.GetInt(Keys.Kills, 0).ToString() ?? "-"),
+                  (T("villagepleb_menu_fights"), null, () => c.GetComponent<ZNetView>().IsOwner() ? Brain.Get(c).Fights.ToString() : "-"));
+            LiveText(() =>
+            {
+                ItemDrop.ItemData melee = Companion.BestMelee(c), bow = Companion.BestRanged(c), shield = Companion.Shield(c);
+                var lines = new List<string>
+                {
+                    melee != null ? T("villagepleb_menu_damage_hit", Loc(melee.m_shared.m_name), Damage(c, melee), Words.Mid(Loc("$skill_" + melee.m_shared.m_skillType.ToString().ToLower())))
+                                  : Tint(T("villagepleb_menu_no_weapon"), GameUi.Warn),
+                };
+                if (bow != null) lines.Add(T("villagepleb_menu_damage_shot", Loc(bow.m_shared.m_name), Damage(c, bow)));
+                lines.Add(Tint(shield != null ? T("villagepleb_menu_blocks_shield", Words.Mid(Loc(shield.m_shared.m_name))) : melee != null ? T("villagepleb_menu_blocks_weapon") : T("villagepleb_menu_blocks_nothing"), GameUi.Dim));
+                BrainState bs = c.GetComponent<ZNetView>().IsOwner() ? Brain.Get(c) : null;
+                if (bs != null && bs.Parries + bs.Blocks > 0) lines.Add(T("villagepleb_menu_session_parries", bs.Parries, bs.Blocks));
+                var feared = Journal.Tally(c).Where(kv => kv.Key.StartsWith("killedby:")).Select(kv => Words.Mid(Thing(kv.Key.Substring(9)))).Distinct().ToList();
+                if (feared.Count > 0) lines.Add(Tint(T("villagepleb_menu_careful_with", string.Join(", ", feared)), GameUi.Dim));
+                return string.Join("\n", lines.Select(l => Words.Show(l)));
+            }, GameUi.Text);
             EndCard();
 
             BeginCard(T("villagepleb_menu_last_fights"));
-            if (!here || st.FightLog.Count == 0) Note(here ? T("villagepleb_menu_none_this_session") : T("villagepleb_menu_shows_elsewhere"), GameUi.Dim);
-            else foreach (string f in st.FightLog) Note(f, GameUi.Text);
+            if (!here) Note(T("villagepleb_menu_shows_elsewhere"), GameUi.Dim);
+            else LiveText(() => st.FightLog.Count == 0 ? Tint(T("villagepleb_menu_none_this_session"), GameUi.Dim) : string.Join("\n", st.FightLog.Select(f => Words.Show(f))), GameUi.Text);
             EndCard();
 
             BeginCard(T("villagepleb_menu_resistances"));
@@ -874,7 +883,7 @@ namespace VillagePlebs
                 Style.Balanced => T("villagepleb_menu_style_balanced_about"),
                 _ => T("villagepleb_menu_style_auto_about"),
             }, GameUi.Text);
-            if (style == Style.Auto && !string.IsNullOrEmpty(Brain.Get(c)?.AutoNote)) Note(T("villagepleb_menu_right_now", Words.Show(Brain.Get(c).AutoNote)), GameUi.Good);
+            if (style == Style.Auto) LiveText(() => string.IsNullOrEmpty(Brain.Get(c)?.AutoNote) ? "" : T("villagepleb_menu_right_now", Words.Show(Brain.Get(c).AutoNote)), GameUi.Good);
             _y += 4f;
             int retreat = Companion.RetreatOf(c);
             Stepper(T("villagepleb_menu_falls_back"), T("villagepleb_menu_percent_health", retreat), () => Change(z => z.Set(Keys.Retreat, Mathf.Clamp(retreat - 5, 0, 90))), () => Change(z => z.Set(Keys.Retreat, Mathf.Clamp(retreat + 5, 0, 90))));
@@ -909,38 +918,55 @@ namespace VillagePlebs
             BrainState st = Brain.Get(c);
             bool living = Companion.OrderOf(c) == VillagePlebs.Order.Gather;
             BeginCard(T("villagepleb_menu_missions"));
-            Goal goal = st.Goal;
-            List<Mission> missions = Missions.All(c);
-            Mission current = missions.LastOrDefault(m => m.Status == "active");
             if (!c.GetComponent<ZNetView>().IsOwner()) Note(T("villagepleb_menu_shows_elsewhere"), GameUi.Dim);
-            else if (goal == null) Note(T(living ? "villagepleb_menu_no_mission" : "villagepleb_menu_mission_at_home"), GameUi.Dim);
             else
             {
-                if (current != null && current.StartCost > 0)
+                Mission Current() => Missions.All(c).LastOrDefault(m => m.Status == "active");
+                float Done(Mission m) => m != null && m.StartCost > 0 ? Mathf.Clamp01(1f - m.Cost / (float)m.StartCost) : -1f;
+                LiveText(() =>
                 {
-                    float done = Mathf.Clamp01(1f - current.Cost / (float)current.StartCost);
-                    Note(T("villagepleb_menu_mission_since", current.Day, Mathf.RoundToInt(done * 100f)), GameUi.Dim);
-                    if (_make) GameUi.Bar(_in, new Vector2(_left, -_y), new Vector2(_width, 12f), done, GameUi.Good, null);
-                    _y += 18f;
+                    Goal goal = st.Goal;
+                    if (goal == null) return Tint(T(Companion.OrderOf(c) == VillagePlebs.Order.Gather ? "villagepleb_menu_no_mission" : "villagepleb_menu_mission_at_home"), GameUi.Dim);
+                    Mission m = Current();
+                    return Done(m) >= 0f ? Tint(T("villagepleb_menu_mission_since", m.Day, Mathf.RoundToInt(Done(m) * 100f)), GameUi.Dim) : "";
+                }, GameUi.Text);
+                if (_make)
+                {
+                    RectTransform bar = GameUi.Bar(_in, new Vector2(_left, -_y), new Vector2(_width, 12f), 0f, GameUi.Good, null);
+                    void Show()
+                    {
+                        float done = st.Goal != null ? Done(Current()) : -1f;
+                        if (bar.gameObject.activeSelf != done >= 0f) bar.gameObject.SetActive(done >= 0f);
+                        if (done >= 0f) GameUi.SetBar(bar, done);
+                    }
+                    Show();
+                    _live.Add(Show);
                 }
-                string what = Capital(Words.Show(goal.What));
-                Note(goal.Station != null ? T("villagepleb_menu_goal_at", what, Words.Mid(Loc(goal.Station.m_name))) : what, GameUi.Text, bold: true);
-                if (goal.Raw.Count > 0) Note(T("villagepleb_menu_gathering", Words.Show(goal.RawText())), GameUi.Text);
-                if (goal.Steps.Count > 0) Note(T("villagepleb_menu_then_makes", string.Join(", ", goal.Steps.Select(s => Words.Mid(Loc(s.Key.m_item.m_itemData.m_shared.m_name))))), GameUi.Text);
-                if (goal.Smelt.Count > 0) Note(T(goal.Smelt.Count == 1 ? "villagepleb_menu_smelt_one" : "villagepleb_menu_smelt_many", Capital(And(goal.Smelt.Select(Thing).ToList()))), GameUi.Dim);
-                if (goal.Ask.Count > 0) Note(T("villagepleb_menu_needs_from_you", string.Join(", ", goal.Ask.Select(Thing))), GameUi.Warn);
-                var next = st.Candidates.Where(g => g != goal).Take(2).Select(g => Words.Show(g.What)).ToList();
-                if (next.Count == 1) Note(T("villagepleb_menu_after_that", next[0]), GameUi.Dim);
-                else if (next.Count > 1) Note(T("villagepleb_menu_after_that_two", next[0], next[1]), GameUi.Dim);
+                _y += 18f;
+                LiveText(() =>
+                {
+                    Goal goal = st.Goal;
+                    if (goal == null) return "";
+                    string what = Capital(Words.Show(goal.What));
+                    var lines = new List<string> { "<b>" + Words.Show(goal.Station != null ? T("villagepleb_menu_goal_at", what, Words.Mid(Loc(goal.Station.m_name))) : what) + "</b>" };
+                    if (goal.Raw.Count > 0) lines.Add(T("villagepleb_menu_gathering", Words.Show(goal.RawText())));
+                    if (goal.Steps.Count > 0) lines.Add(T("villagepleb_menu_then_makes", string.Join(", ", goal.Steps.Select(x => Words.Mid(Loc(x.Key.m_item.m_itemData.m_shared.m_name))))));
+                    if (goal.Smelt.Count > 0) lines.Add(Tint(T(goal.Smelt.Count == 1 ? "villagepleb_menu_smelt_one" : "villagepleb_menu_smelt_many", Capital(And(goal.Smelt.Select(Thing).ToList()))), GameUi.Dim));
+                    if (goal.Ask.Count > 0) lines.Add(Tint(T("villagepleb_menu_needs_from_you", string.Join(", ", goal.Ask.Select(Thing))), GameUi.Warn));
+                    var next = st.Candidates.Where(g => g != goal).Take(2).Select(g => Words.Show(g.What)).ToList();
+                    if (next.Count == 1) lines.Add(Tint(T("villagepleb_menu_after_that", next[0]), GameUi.Dim));
+                    else if (next.Count > 1) lines.Add(Tint(T("villagepleb_menu_after_that_two", next[0], next[1]), GameUi.Dim));
+                    return string.Join("\n", lines.Select(l => Words.Show(l)));
+                }, GameUi.Text);
             }
-            var past = missions.Where(m => m.Status != "active").Reverse().Take(5).ToList();
-            if (past.Count > 0)
+            LiveText(() =>
             {
-                _y += 4f;
-                Note(T("villagepleb_menu_lately"), GameUi.Dim);
-                foreach (Mission m in past)
-                    Note(m.Status == "done" ? T("villagepleb_menu_mission_done", Words.Show(m.What), Words.Show(m.Why)) : T("villagepleb_menu_mission_dropped", Words.Show(m.What), Words.Show(m.Why)), m.Status == "done" ? GameUi.Good : GameUi.Text);
-            }
+                var past = Missions.All(c).Where(m => m.Status != "active").Reverse().Take(5).ToList();
+                if (past.Count == 0) return "";
+                return Tint(T("villagepleb_menu_lately"), GameUi.Dim) + "\n" + string.Join("\n", past.Select(m => m.Status == "done"
+                    ? Tint(Words.Show(T("villagepleb_menu_mission_done", Words.Show(m.What), Words.Show(m.Why))), GameUi.Good)
+                    : Words.Show(T("villagepleb_menu_mission_dropped", Words.Show(m.What), Words.Show(m.Why)))));
+            }, GameUi.Text);
             Note(T("villagepleb_menu_missions_about"), GameUi.Dim);
             EndCard();
         }
@@ -963,8 +989,8 @@ namespace VillagePlebs
             if (chests.Count == 0) Note(T("villagepleb_menu_no_chests"), GameUi.Dim);
             foreach (Container ch in chests)
             {
-                Inventory inv = ch.GetInventory();
-                Note(T("villagepleb_menu_chest_slots", Loc(ch.m_name), inv.NrOfItems(), inv.GetWidth() * inv.GetHeight()), GameUi.Text);
+                Container chest = ch;
+                LiveText(() => chest == null ? "" : T("villagepleb_menu_chest_slots", Loc(chest.m_name), chest.GetInventory().NrOfItems(), chest.GetInventory().GetWidth() * chest.GetInventory().GetHeight()), GameUi.Text);
             }
             _y += 4f;
             if (Mine && (!bed || chests.Count == 0))
@@ -1042,7 +1068,11 @@ namespace VillagePlebs
                 Stepper(T(toYours ? "villagepleb_menu_keep_in_yours" : "villagepleb_menu_keep_in_its"), Duties.Amount(dd, e.Target),
                     () => Change(cz => { var l = Duties.Read(cz); var x = l.First(a => a.Duty == dd); x.Target = Mathf.Clamp(x.Target - step, step, max); Duties.Write(cz, l); }),
                     () => Change(cz => { var l = Duties.Read(cz); var x = l.First(a => a.Duty == dd); x.Target = Mathf.Clamp(x.Target + step, step, max); Duties.Write(cz, l); }), sub);
-                Note(Duties.Status(c, e, working), e == working ? GameUi.Good : GameUi.Dim, indent: sub);
+                LiveText(() =>
+                {
+                    Duties.Entry now = Duties.Read(Companion.Zdo(c)).FirstOrDefault(x => x.Duty == dd), active = Duties.Active(c);
+                    return now == null ? "" : Tint(Duties.Status(c, now, active), active != null && active.Duty == dd ? GameUi.Good : GameUi.Dim);
+                }, GameUi.Text, indent: sub);
                 if (dd == Duty.Wood && Work.Axe(c) == null) Note(T("villagepleb_menu_needs_axe"), GameUi.Warn, indent: sub);
                 if (dd == Duty.Mining && Work.Pickaxe(c) == null) Note(T("villagepleb_menu_needs_pickaxe"), GameUi.Warn, indent: sub);
                 if (dd == Duty.Food && Companion.BestRanged(c) == null && Companion.BestMelee(c) == null) Note(T("villagepleb_menu_needs_weapon"), GameUi.Warn, indent: sub);
@@ -1075,7 +1105,7 @@ namespace VillagePlebs
             Check(T("villagepleb_menu_check_frugal"), frugal, () => _pending = () => Change(cz => cz.Set(VillagePlebs.Food.FrugalKey, !frugal)));
             Note(T(frugal ? "villagepleb_menu_frugal_on" : "villagepleb_menu_frugal_off"), GameUi.Dim);
             int ration = Work.RationOf(c);
-            Note(Work.UsesPantry(c) ? T("villagepleb_menu_today_took", VillagePlebs.Food.AteToday(c), Work.TakenToday(c), ration) : T("villagepleb_menu_today", VillagePlebs.Food.AteToday(c)), GameUi.Text);
+            LiveText(() => Work.UsesPantry(c) ? T("villagepleb_menu_today_took", VillagePlebs.Food.AteToday(c), Work.TakenToday(c), Work.RationOf(c)) : T("villagepleb_menu_today", VillagePlebs.Food.AteToday(c)), GameUi.Text);
             if (Work.UsesPantry(c))
                 Stepper(T("villagepleb_menu_most_a_day"), T("villagepleb_menu_n_food", ration), () => Change(cz => cz.Set(Work.RationKey, Mathf.Clamp(ration - 2, 2, 60))), () => Change(cz => cz.Set(Work.RationKey, Mathf.Clamp(ration + 2, 2, 60))));
             EndCard();
@@ -1109,8 +1139,8 @@ namespace VillagePlebs
             EndCard();
 
             BeginCard(T("villagepleb_menu_gathered"));
-            if (st.Gathered.Count == 0) Note(T("villagepleb_menu_nothing_yet"), GameUi.Dim);
-            else Note(string.Join(", ", st.Gathered.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Value} {Words.Mid(Thing(kv.Key))}")), GameUi.Text);
+            LiveText(() => st.Gathered.Count == 0 ? Tint(T("villagepleb_menu_nothing_yet"), GameUi.Dim)
+                                                  : string.Join(", ", st.Gathered.OrderByDescending(kv => kv.Value).Select(kv => $"{kv.Value} {Words.Mid(Thing(kv.Key))}")), GameUi.Text);
             EndCard();
 
             BeginCard(T("villagepleb_menu_away"));
@@ -1142,17 +1172,17 @@ namespace VillagePlebs
                 Gear.Slot[] slots = Gear.All.Where(s => s.Y == row).ToArray();
                 for (int j = 0; j < slots.Length; j++)
                 {
-                    ItemDrop.ItemData inSlot = Gear.In(c, slots[j]);
-                    AppendItem(inSlot);
                     if (!_make) continue;
                     var pos = new Vector2(_left + j * space, -_y);
                     Gear.Slot slot = slots[j];
-                    if (inSlot == null) GameUi.EmptyCell(_in, pos);
-                    else GameUi.Cell(_in, pos, inSlot, null, false, mine ? () =>
+                    InventoryElement e = GameUi.Slot(_in, pos, mine ? () =>
                     {
                         _pending = () => { ItemDrop.ItemData now = _shown != null ? Gear.In(_shown, slot) : null; if (now != null && !Companion.Take(_shown, Player.m_localPlayer, now, out string why) && why != null) _note = Words.Show(why); };
                         _nextCheck = 0f;
                     } : (Action)null);
+                    void Show() => GameUi.Fill(e, Gear.In(c, slot));
+                    Show();
+                    _live.Add(Show);
                     Line(_in, pos.x - (space - 64f) / 2f, _y + 66f, space, 14f, GameUi.Dim, TextAlignmentOptions.Top).text = Words.Show(slots[j].Label);
                 }
                 _y += 64f + 24f;
@@ -1161,23 +1191,25 @@ namespace VillagePlebs
             EndCard();
 
             Inventory its = c.GetInventory();
-            BeginCard(T("villagepleb_menu_its_bag", Gear.BagCount(its), its.GetWidth() * Gear.BagRows, Carry.Weight(c).ToString("0"), Carry.Max(c).ToString("0")));
-            if (Carry.Over(c)) Note(T("villagepleb_menu_too_heavy"), GameUi.Warn);
+            BeginCard();
+            LiveHeading(() => T("villagepleb_menu_its_bag", Gear.BagCount(c.GetInventory()), c.GetInventory().GetWidth() * Gear.BagRows, Carry.Weight(c).ToString("0"), Carry.Max(c).ToString("0")));
+            LiveText(() => Carry.Over(c) ? T("villagepleb_menu_too_heavy") : "", GameUi.Warn);
             int width = its.GetWidth(), height = Mathf.Min(Gear.BagRows, its.GetHeight());
+            _sig.Append("|bag").Append(width).Append('x').Append(height);
             for (int y = 0; y < height; y++)
                 for (int x = 0; x < width; x++)
                 {
-                    ItemDrop.ItemData item = its.GetItemAt(x, y);
-                    AppendItem(item);
                     if (!_make) continue;
                     var pos = new Vector2(_left + x * space, -_y - y * space);
                     int cx = x, cy = y;
-                    if (item == null) GameUi.EmptyCell(_in, pos);
-                    else GameUi.Cell(_in, pos, item, null, false, mine ? () =>
+                    InventoryElement e = GameUi.Slot(_in, pos, mine ? () =>
                     {
                         _pending = () => { ItemDrop.ItemData now = _shown != null ? _shown.GetInventory().GetItemAt(cx, cy) : null; if (now != null && !Companion.Take(_shown, Player.m_localPlayer, now, out string why) && why != null) _note = Words.Show(why); };
                         _nextCheck = 0f;
                     } : (Action)null);
+                    void Show() => GameUi.Fill(e, c.GetInventory().GetItemAt(cx, cy));
+                    Show();
+                    _live.Add(Show);
                 }
             _y += height * space + 4f;
             Note(T("villagepleb_menu_bag_about"), GameUi.Dim);
@@ -1185,19 +1217,26 @@ namespace VillagePlebs
 
             if (mine && p != null)
             {
-                var giveable = p.GetInventory().GetAllItems().Where(i => !p.IsItemEquiped(i) && !i.m_equipped).ToList();
+                List<ItemDrop.ItemData> Giveable() => p.GetInventory().GetAllItems().Where(i => !p.IsItemEquiped(i) && !i.m_equipped).ToList();
+                var giveable = Giveable();
                 BeginCard(T("villagepleb_menu_give_gear"));
                 if (giveable.Count == 0) Note(T("villagepleb_menu_give_gear_none"), GameUi.Dim);
                 else
                 {
                     int per = Mathf.Max(1, Mathf.FloorToInt((_width + space - 64f) / space));
+                    _sig.Append("|give").Append(giveable.Count);
                     for (int i = 0; i < giveable.Count; i++)
                     {
-                        ItemDrop.ItemData it = giveable[i];
-                        AppendItem(it);
-                        if (_make)
-                            GameUi.Cell(_in, new Vector2(_left + i % per * space, -_y - i / per * space), it, null, false,
-                                () => { _pending = () => { if (!Companion.Give(_shown, Player.m_localPlayer, it, out string why) && why != null) _note = Words.Show(why); }; _nextCheck = 0f; });
+                        if (!_make) continue;
+                        int k = i;
+                        InventoryElement e = GameUi.Slot(_in, new Vector2(_left + i % per * space, -_y - i / per * space), () =>
+                        {
+                            _pending = () => { List<ItemDrop.ItemData> now = Giveable(); if (k < now.Count && !Companion.Give(_shown, Player.m_localPlayer, now[k], out string why) && why != null) _note = Words.Show(why); };
+                            _nextCheck = 0f;
+                        });
+                        void Show() { List<ItemDrop.ItemData> now = Giveable(); GameUi.Fill(e, k < now.Count ? now[k] : null); }
+                        Show();
+                        _live.Add(Show);
                     }
                     _y += (giveable.Count + per - 1) / per * space + 4f;
                     Note(T("villagepleb_menu_click_to_give"), GameUi.Dim);
@@ -1255,32 +1294,43 @@ namespace VillagePlebs
 
         private void DrawJournal(Humanoid c)
         {
-            var tally = Journal.Tally(c);
-            int Tally(string k) => tally.TryGetValue(k, out int n) ? n : 0;
+            Dictionary<string, int> Tallies() => Journal.Tally(c);
+            int Tally(string k) { Dictionary<string, int> t = Tallies(); return t.TryGetValue(k, out int n) ? n : 0; }
             BeginCard(T("villagepleb_menu_saga"));
-            Stats((T("villagepleb_menu_days_with_you"), Journal.DaysWithYou(c).ToString(), null), (T("villagepleb_menu_kills"), Tally("kills").ToString(), null), (T("villagepleb_menu_parries"), Tally("parries").ToString(), null), (T("villagepleb_menu_falls"), Tally("deaths").ToString(), null));
-            var slain = new Dictionary<string, int>();
-            foreach (var kv in tally.Where(x => x.Key.StartsWith("kill:"))) { string who = Words.Mid(Thing(OldCreature(kv.Key.Substring(5)))); slain[who] = (slain.TryGetValue(who, out int had) ? had : 0) + kv.Value; }
-            var kills = slain.OrderByDescending(kv => kv.Value).Take(6).Select(kv => $"{kv.Value} {kv.Key}").ToList();
-            if (kills.Count > 0) Note(T("villagepleb_menu_most_slain", string.Join(", ", kills)), GameUi.Text);
-            var bosses = tally.Where(kv => kv.Key.StartsWith("boss:")).Select(kv => Thing(OldCreature(kv.Key.Substring(5)))).Distinct().ToList();
-            Note(bosses.Count > 0 ? T("villagepleb_menu_bosses", string.Join(", ", bosses)) : T("villagepleb_menu_no_boss"), bosses.Count > 0 ? GameUi.Good : GameUi.Dim);
-            Note(T("villagepleb_menu_made_counts", Tally("made"), Tally("upgraded"), Tally("trips")), GameUi.Text);
-            var lands = tally.Where(kv => kv.Key.StartsWith("place:") && kv.Key != "place:dungeon").Select(kv => Thing(OldLand(kv.Key.Substring(6)))).Distinct().ToList();
-            int dungeons = Tally("place:dungeon");
-            if (lands.Count > 0) Note(dungeons == 0 ? T("villagepleb_menu_has_seen", string.Join(", ", lands)) : T(dungeons == 1 ? "villagepleb_menu_has_seen_dungeon" : "villagepleb_menu_has_seen_dungeons", string.Join(", ", lands), dungeons), GameUi.Dim);
+            Stats((T("villagepleb_menu_days_with_you"), null, () => Journal.DaysWithYou(c).ToString()), (T("villagepleb_menu_kills"), null, () => Tally("kills").ToString()),
+                  (T("villagepleb_menu_parries"), null, () => Tally("parries").ToString()), (T("villagepleb_menu_falls"), null, () => Tally("deaths").ToString()));
+            LiveText(() =>
+            {
+                Dictionary<string, int> tally = Tallies();
+                int Count(string k) => tally.TryGetValue(k, out int n) ? n : 0;
+                var lines = new List<string>();
+                var slain = new Dictionary<string, int>();
+                foreach (var kv in tally.Where(x => x.Key.StartsWith("kill:"))) { string who = Words.Mid(Thing(OldCreature(kv.Key.Substring(5)))); slain[who] = (slain.TryGetValue(who, out int had) ? had : 0) + kv.Value; }
+                var kills = slain.OrderByDescending(kv => kv.Value).Take(6).Select(kv => $"{kv.Value} {kv.Key}").ToList();
+                if (kills.Count > 0) lines.Add(T("villagepleb_menu_most_slain", string.Join(", ", kills)));
+                var bosses = tally.Where(kv => kv.Key.StartsWith("boss:")).Select(kv => Thing(OldCreature(kv.Key.Substring(5)))).Distinct().ToList();
+                lines.Add(bosses.Count > 0 ? Tint(Words.Show(T("villagepleb_menu_bosses", string.Join(", ", bosses))), GameUi.Good) : Tint(T("villagepleb_menu_no_boss"), GameUi.Dim));
+                lines.Add(T("villagepleb_menu_made_counts", Count("made"), Count("upgraded"), Count("trips")));
+                var lands = tally.Where(kv => kv.Key.StartsWith("place:") && kv.Key != "place:dungeon").Select(kv => Thing(OldLand(kv.Key.Substring(6)))).Distinct().ToList();
+                int dungeons = Count("place:dungeon");
+                if (lands.Count > 0) lines.Add(Tint(Words.Show(dungeons == 0 ? T("villagepleb_menu_has_seen", string.Join(", ", lands)) : T(dungeons == 1 ? "villagepleb_menu_has_seen_dungeon" : "villagepleb_menu_has_seen_dungeons", string.Join(", ", lands), dungeons)), GameUi.Dim));
+                return string.Join("\n", lines.Select(l => Words.Show(l)));
+            }, GameUi.Text);
             EndCard();
 
             BeginCard(T("villagepleb_menu_moments"));
-            var entries = Journal.Entries(c);
-            if (entries.Count == 0) Note(T("villagepleb_menu_no_moments"), GameUi.Dim);
-            foreach (string e in Enumerable.Reverse(entries).Take(40))
+            // Each moment with its day in a column to the left, the words wrapping under themselves.
+            LiveText(() =>
             {
-                int bar = e.IndexOf('|');
-                string day = bar > 0 ? e.Substring(0, bar) : "?", text = bar > 0 ? e.Substring(bar + 1) : e;
-                if (_make) Line(_in, _left, _y, 76f, 16f, GameUi.Dim).text = T("villagepleb_menu_day", day);
-                Note(text, GameUi.Text, indent: 82f);
-            }
+                var entries = Journal.Entries(c);
+                if (entries.Count == 0) return Tint(T("villagepleb_menu_no_moments"), GameUi.Dim);
+                return string.Join("\n", Enumerable.Reverse(entries).Take(40).Select(e =>
+                {
+                    int bar = e.IndexOf('|');
+                    string day = bar > 0 ? e.Substring(0, bar) : "?", text = bar > 0 ? e.Substring(bar + 1) : e;
+                    return Tint(Words.Show(T("villagepleb_menu_day", day)), GameUi.Dim) + "<pos=82><indent=82>" + Words.Show(text) + "</indent>";
+                }));
+            }, GameUi.Text);
             EndCard();
         }
 
@@ -1288,14 +1338,59 @@ namespace VillagePlebs
         {
             _sig.Append("\n[").Append(title);
             _y = CardPad;
+            _left = CardPad;
+            if (_cardW > 0f) _width = _cardW - CardPad * 2f;
             if (_make)
             {
                 _card = GameUi.Box(_list, new Vector2(0f, -_listY), new Vector2(_cardW, 40f));
                 _in = _card;
-                _left = CardPad;
-                _width = _cardW - CardPad * 2f;
             }
             if (title != null) Heading(title);
+        }
+
+        private static TMP_Text _measure;
+
+        // How tall some words come out at this width: a note that changes its words only lays the menu out again when this changes.
+        private static float Measure(string text, float w, float size, float spacing)
+        {
+            if (_measure == null)
+            {
+                _measure = GameUi.Label(GameUi.Canvas, "", new Vector2(-20000f, 20000f), new Vector2(10f, 10f), size, Color.clear);
+                _measure.gameObject.name = "VillagePlebsMeasure";
+            }
+            _measure.fontSize = size;
+            _measure.paragraphSpacing = spacing;
+            return Mathf.Ceil(_measure.GetPreferredValues(text, w, 0f).y);
+        }
+
+        private static string Tint(string text, Color c) => string.IsNullOrEmpty(text) ? text : $"<color=#{ColorUtility.ToHtmlStringRGBA(c)}>{text}</color>";
+
+        // A note whose words change while the menu is open: rewritten in place, like the bars, rather than drawing the menu again.
+        private void LiveText(Func<string> text, Color color, float size = 17f, float indent = 0f, float spacing = 5f)
+        {
+            float w = _width - indent;
+            string now = Words.Show(text() ?? "");
+            float h = now.Length == 0 ? 0f : Measure(now, w, size, spacing);
+            _sig.Append("|L").Append(h);
+            if (_make)
+            {
+                TMP_Text t = GameUi.Label(_in, now, new Vector2(_left + indent, -_y), new Vector2(w, Mathf.Max(h, 1f)), size, color);
+                t.paragraphSpacing = spacing;
+                void Show() { string s = Words.Show(text() ?? ""); if (t.text != s) t.text = s; }
+                _live.Add(Show);
+            }
+            if (h > 0f) _y += h + 5f;
+        }
+
+        private void LiveHeading(Func<string> title)
+        {
+            _sig.Append("|H");
+            if (_make)
+            {
+                TMP_Text t = GameUi.HeaderBar(_in, Words.Show(title()), new Vector2(_left, -_y), new Vector2(_width, 32f), 18f);
+                _live.Add(() => Set(t, title()));
+            }
+            _y += 40f;
         }
 
         private void EndCard()

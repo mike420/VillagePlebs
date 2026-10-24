@@ -392,6 +392,41 @@ namespace VillagePlebs
 
         internal static Transform HudRoot => Hud.instance != null && Hud.instance.m_rootObject != null ? Hud.instance.m_rootObject.transform : null;
 
+        // A slot that stays put while what is in it changes: filled now and again with Fill, clicks go to whatever is in it then.
+        internal static InventoryElement Slot(Transform parent, Vector2 pos, Action click)
+        {
+            InventoryElement e = EmptyCell(parent, pos);
+            UIInputHandler input = e.GetComponentInChildren<UIInputHandler>(true);
+            if (input != null && click != null) input.m_onLeftClick = _ => click();
+            return e;
+        }
+
+        internal static void Fill(InventoryElement e, ItemDrop.ItemData item, string amount = null)
+        {
+            if (item == null)
+            {
+                e.m_icon.enabled = false;
+                e.m_durability.gameObject.SetActive(false);
+                e.m_equiped.enabled = e.m_quality.enabled = e.m_amount.enabled = false;
+                if (e.m_tooltip != null) e.m_tooltip.enabled = false;
+                return;
+            }
+            e.m_icon.enabled = true;
+            Sprite icon = item.GetIcon();
+            if (e.m_icon.sprite != icon) e.m_icon.sprite = icon;
+            e.m_icon.color = Color.white;
+            bool worn = item.m_shared.m_useDurability && item.m_durability < item.GetMaxDurability();
+            if (e.m_durability.gameObject.activeSelf != worn) e.m_durability.gameObject.SetActive(worn);
+            if (worn) e.m_durability.SetValue(item.GetDurabilityPercentage());
+            e.m_equiped.enabled = item.m_equipped;
+            e.m_quality.enabled = amount == null && item.m_shared.m_maxQuality > 1;
+            if (e.m_quality.enabled) e.m_quality.text = item.m_quality.ToString();
+            e.m_amount.enabled = amount != null || item.m_shared.m_maxStackSize > 1;
+            string count = amount ?? $"{item.m_stack}/{item.m_shared.m_maxStackSize}";
+            if (e.m_amount.text != count) e.m_amount.text = count;
+            if (e.m_tooltip != null) { e.m_tooltip.enabled = true; e.m_tooltip.Set(item.m_shared.m_name, item.GetTooltip()); }
+        }
+
         internal static InventoryElement Cell(Transform parent, Vector2 pos, ItemDrop.ItemData item, string amount, bool selected, Action click)
         {
             GameObject go = Object.Instantiate(_cell, parent, false);

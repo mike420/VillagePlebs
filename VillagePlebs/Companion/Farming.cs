@@ -7,13 +7,18 @@ namespace VillagePlebs
 {
     internal static class Farming
     {
+        // Something the cultivator plants that ends up picked: a crop that grows (Plant), or a bush, mushroom or flower placed
+        // ready-made (Pickable, as Plant Everything adds them). Its spacing is read live, since Plant Everything can change it.
         internal class Crop
         {
             public Piece Piece;
             public Plant Plant;
             public string Name;
-            public float Reach, Step;
+            public float Reach;
             public readonly HashSet<string> Grown = new HashSet<string>();
+            public float Room => Plant != null ? Plant.m_growRadius : Reach;
+            public float Step => Mathf.Max(0.5f, Room + Reach + 0.05f);
+            public string Label => Plant != null ? Plant.m_name : Piece.m_name;
         }
 
         private class Field
@@ -27,7 +32,8 @@ namespace VillagePlebs
         private static readonly int Space = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "piece_nonsolid");
         private static readonly int Roof = LayerMask.GetMask("Default", "static_solid", "piece");
         private static readonly AccessTools.FieldRef<Piece, long> Creator = AccessTools.FieldRefAccess<Piece, long>("m_creator");
-        private static readonly Dictionary<PieceTable, List<Crop>> Known = new Dictionary<PieceTable, List<Crop>>();
+        private class Table { public List<Crop> Crops; public int Sig; public float CheckedAt; }
+        private static readonly Dictionary<PieceTable, Table> Known = new Dictionary<PieceTable, Table>();
         private static readonly Dictionary<long, Field> Fields = new Dictionary<long, Field>();
         private static readonly List<Crop> None = new List<Crop>();
 
@@ -49,15 +55,16 @@ namespace VillagePlebs
         {
             if (_seeds == null && ObjectDB.instance != null && ObjectDB.instance.m_items.Count > 0)
             {
-                _seeds = new HashSet<string>();
+                var seeds = new HashSet<string>();
                 foreach (GameObject go in ObjectDB.instance.m_items)
                 {
                     ItemDrop d = go != null ? go.GetComponent<ItemDrop>() : null;
                     if (d == null) continue;
                     foreach (Crop c in Crops(d.m_itemData.m_shared.m_buildPieces))
                         foreach (Piece.Requirement r in c.Piece.m_resources)
-                            if (r.m_resItem != null && !Food.IsFood(r.m_resItem.m_itemData)) _seeds.Add(r.m_resItem.m_itemData.m_shared.m_name);
+                            if (r.m_resItem != null && !Food.IsFood(r.m_resItem.m_itemData)) seeds.Add(r.m_resItem.m_itemData.m_shared.m_name);
                 }
+                _seeds = seeds;
             }
             return _seeds != null && _seeds.Contains(i.m_shared.m_name);
         }
@@ -122,29 +129,42 @@ namespace VillagePlebs
             else p.Interact(me, false, false);
         }
 
+        // A crop ready to pick: one that grew from a seed, or a bush or the like a player planted (Plant Everything), grown back.
         public static bool Ripe(Pickable p) =>
-            p != null && p.m_itemPrefab != null && Goals.IsCrop(Utils.GetPrefabName(p.gameObject)) && !(Companion.Zdo(p)?.GetBool(ZDOVars.s_picked, false) ?? true);
+            p != null && p.m_itemPrefab != null && (Goals.IsCrop(Utils.GetPrefabName(p.gameObject)) || Planted(p)) && !(Companion.Zdo(p)?.GetBool(ZDOVars.s_picked, false) ?? true);
 
+        private static bool Planted(Pickable p) => p.m_respawnTimeMinutes > 0f && p.GetComponent<Piece>() is Piece piece && piece.IsPlacedByPlayer();
+
+        // The cultivator's crops, worked out again whenever its pieces change (Plant Everything adds and takes them away with its settings).
         public static List<Crop> Crops(PieceTable table)
         {
             if (table == null) return None;
-            if (Known.TryGetValue(table, out List<Crop> list)) return list;
-            list = new List<Crop>();
+            if (Known.TryGetValue(table, out Table known) && Time.time - known.CheckedAt < 5f) return known.Crops;
+            int sig = table.m_pieces.Count;
+            foreach (GameObject go in table.m_pieces) sig = sig * 31 + (go != null ? go.GetInstanceID() : 0);
+            if (known != null && known.Sig == sig) { known.CheckedAt = Time.time; return known.Crops; }
+            var list = new List<Crop>();
             foreach (GameObject go in table.m_pieces)
             {
                 Piece piece = go != null ? go.GetComponent<Piece>() : null;
-                Plant plant = go != null ? go.GetComponent<Plant>() : null;
-                if (piece == null || plant == null || !(plant.m_needCultivatedGround || piece.m_cultivatedGroundOnly) || piece.m_resources.Length == 0) continue;
-                if (plant.m_grownPrefabs.Any(g => g != null && g.GetComponent<TreeBase>() != null)) continue;
+                if (piece == null || piece.m_resources.Length == 0) continue;
+                Plant plant = go.GetComponent<Plant>();
                 var crop = new Crop { Piece = piece, Plant = plant, Name = go.name };
                 float reach = Reach(go);
-                foreach (GameObject grown in plant.m_grownPrefabs)
-                    if (grown != null) { crop.Grown.Add(grown.name); reach = Mathf.Max(reach, Reach(grown) * plant.m_maxScale); }
+                if (plant != null)
+                {
+                    // Not trees, not vines that need a wall to climb, and only what grows into something to pick (whether it needs tilled ground or not).
+                    if (plant.m_grownPrefabs == null || plant.m_attachDistance > 0f || plant.m_grownPrefabs.Any(g => g != null && g.GetComponent<TreeBase>() != null)) continue;
+                    if (!plant.m_grownPrefabs.Any(g => g != null && g.GetComponent<Pickable>() != null)) continue;
+                    foreach (GameObject grown in plant.m_grownPrefabs)
+                        if (grown != null) { crop.Grown.Add(grown.name); reach = Mathf.Max(reach, Reach(grown) * plant.m_maxScale); }
+                }
+                else if (!(go.GetComponent<Pickable>() is Pickable placed) || placed.m_itemPrefab == null) continue;
                 crop.Reach = Mathf.Clamp(reach, 0.05f, 1.5f);
-                crop.Step = plant.m_growRadius + crop.Reach + 0.05f;
                 list.Add(crop);
             }
-            Known[table] = list;
+            Known[table] = new Table { Crops = list, Sig = sig, CheckedAt = Time.time };
+            _seeds = null;
             return list;
         }
 
@@ -351,17 +371,19 @@ namespace VillagePlebs
             Heightmap hm = Heightmap.FindHeightmap(p);
             if (hm == null || !hm.IsCultivated(p)) { block = "not tilled"; return Fit.Blocked; }
             if (!PrivateArea.CheckAccess(p, 0f, false)) { block = "someone's ward"; return Fit.Blocked; }
-            if (Physics.Raycast(p + Vector3.up * 0.1f, Vector3.up, out RaycastHit roof, 100f, Roof)) { block = "under " + roof.collider.name; return Fit.Blocked; }
+            Plant plant = crop.Plant;
+            if (plant != null && Physics.Raycast(p + Vector3.up * 0.1f, Vector3.up, out RaycastHit roof, 100f, Roof)) { block = "under " + roof.collider.name; return Fit.Blocked; }
             Heightmap.Biome biome = hm.GetBiome(p);
-            if ((biome & crop.Plant.m_biome) == 0) return Fit.Climate;
+            if (plant != null && (biome & plant.m_biome) == 0) return Fit.Climate;
             if (crop.Piece.m_onlyInBiome != Heightmap.Biome.None && (biome & crop.Piece.m_onlyInBiome) == 0) return Fit.Climate;
             bool shielded = ShieldGenerator.IsInsideShield(p);
-            if (!crop.Plant.m_tolerateHeat && biome == Heightmap.Biome.AshLands && !shielded) return Fit.Climate;
-            if (!crop.Plant.m_tolerateCold && (biome == Heightmap.Biome.DeepNorth || biome == Heightmap.Biome.Mountain) && !shielded) return Fit.Climate;
-            foreach (Collider col in Physics.OverlapSphere(p, crop.Plant.m_growRadius, Space))
+            if (plant != null && !plant.m_tolerateHeat && biome == Heightmap.Biome.AshLands && !shielded) return Fit.Climate;
+            if (plant != null && !plant.m_tolerateCold && (biome == Heightmap.Biome.DeepNorth || biome == Heightmap.Biome.Mountain) && !shielded) return Fit.Climate;
+            foreach (Collider col in Physics.OverlapSphere(p, crop.Room, Space))
             {
+                // A growing crop minds anything in its room but a sickly plant (as the game does); one placed ready-made minds everything.
                 Plant other = col.GetComponent<Plant>();
-                if (other == null || other.GetStatus() == Plant.Status.Healthy) { block = $"{col.name} ({LayerMask.LayerToName(col.gameObject.layer)}) in the way"; return Fit.Blocked; }
+                if (plant == null || other == null || other.GetStatus() == Plant.Status.Healthy) { block = $"{col.name} ({LayerMask.LayerToName(col.gameObject.layer)}) in the way"; return Fit.Blocked; }
             }
             foreach (Collider col in Physics.OverlapSphere(p, crop.Reach + 2f, Space))
             {
