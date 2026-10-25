@@ -517,7 +517,7 @@ namespace VillagePlebs
             {
                 _eyes = null;
                 foreach (SkinnedMeshRenderer r in _clone.GetComponentsInChildren<SkinnedMeshRenderer>())
-                    if (r.name.EndsWith("_EYES", StringComparison.Ordinal)) { _eyes = r; break; }
+                    if (r.name.EndsWith("_EYES", StringComparison.OrdinalIgnoreCase)) { _eyes = r; break; }
             }
             if (_eyes != null) return _eyes.bounds.center;
             Transform eye = Utils.FindChild(_clone.transform, "EyePos");
