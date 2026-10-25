@@ -202,7 +202,8 @@ namespace VillagePlebs
         // The style this body shows, among the ones it offers (each body has its own list), then BodyReplacer's added hairstyles
         private int EinherjarHairIndex(int[] ids, string[] added)
         {
-            int i = string.IsNullOrEmpty(Current.BrHair) ? -1 : Array.IndexOf(added, Current.BrHair);
+            string shown = BodyReplacerLook.ShownCustomHair(Current.Model, Current.BrLook, Current.BrHair);
+            int i = string.IsNullOrEmpty(shown) ? -1 : Array.IndexOf(added, shown);
             if (i >= 0) return ids.Length + i;
             return Mathf.Max(0, Array.IndexOf(ids, BodyReplacerLook.ShownHairStyle(Current.Model, Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "HairStyle")))));
         }
@@ -216,7 +217,7 @@ namespace VillagePlebs
             int next = (EinherjarHairIndex(ids, added) + by + count) % count;
             if (next < ids.Length)
             {
-                Current.BrHair = "";
+                Current.BrHair = added.Length > 0 ? BodyReplacerLook.CustomHairNone : "";
                 SetEinherjarField("HairStyle", ids[next]);
             }
             else

@@ -33,6 +33,8 @@ namespace VillagePlebs
         private static Action<GameObject, int> _applyBeard;
         private static Func<int, string[]> _customHairs, _customHairNames;
         private static Action<GameObject, string> _applyCustomHair;
+        private static Func<int, string, string, string> _shownCustomHair;
+        private static string _customHairNone = "";
 
         public static bool Available { get { Find(); return _applyLook != null; } }
 
@@ -90,6 +92,8 @@ namespace VillagePlebs
             _customHairs = TryBind<Func<int, string[]>>(api, "CustomHairs");
             _customHairNames = TryBind<Func<int, string[]>>(api, "CustomHairNames");
             _applyCustomHair = TryBind<Action<GameObject, string>>(api, "ApplyCustomHair");
+            _shownCustomHair = TryBind<Func<int, string, string, string>>(api, "ShownCustomHair");
+            _customHairNone = api.GetField("CustomHairNone", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as string ?? "";
         }
 
         private static T TryBind<T>(Type api, string name) where T : Delegate
@@ -157,6 +161,12 @@ namespace VillagePlebs
         public static string[] CustomHairNames(int model) => HasCustomHairApi ? _customHairNames(model) : Array.Empty<string>();
 
         public static void ApplyCustomHair(GameObject character, string hair) { if (HasCustomHairApi) _applyCustomHair(character, hair ?? ""); }
+
+        // The added hairstyle the body actually shows for this look (its own pick, or the body's first when it has no styles of its own left)
+        // What BodyReplacer keeps for "No Hair" among its added hairstyles (empty: it gives a body its own styles instead)
+        public static string CustomHairNone { get { Find(); return _customHairNone; } }
+
+        public static string ShownCustomHair(int model, string look, string hair) => _shownCustomHair != null ? _shownCustomHair(model, look ?? "", hair ?? "") : hair ?? "";
 
         public static bool Drawn(GameObject character)
         {
