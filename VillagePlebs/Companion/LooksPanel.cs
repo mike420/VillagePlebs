@@ -63,6 +63,7 @@ namespace VillagePlebs
             Current = Looks.Of(c);
             if (string.IsNullOrEmpty(Current.BrLook)) Current.BrLook = BodyReplacerLook.DefaultLook();
             if (Current.BrTattoos == null) Current.BrTattoos = "";
+            if (Current.BrHair == null) Current.BrHair = "";
         }
 
         public void Build(RectTransform area, string about, bool mine, Action apply)
@@ -198,15 +199,31 @@ namespace VillagePlebs
             ApplyToClone();
         }
 
-        // The style this body shows, among the ones it offers (each body has its own list)
-        private int EinherjarHairIndex(int[] ids) =>
-            Mathf.Max(0, Array.IndexOf(ids, BodyReplacerLook.ShownHairStyle(Current.Model, Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "HairStyle")))));
+        // The style this body shows, among the ones it offers (each body has its own list), then BodyReplacer's added hairstyles
+        private int EinherjarHairIndex(int[] ids, string[] added)
+        {
+            int i = string.IsNullOrEmpty(Current.BrHair) ? -1 : Array.IndexOf(added, Current.BrHair);
+            if (i >= 0) return ids.Length + i;
+            return Mathf.Max(0, Array.IndexOf(ids, BodyReplacerLook.ShownHairStyle(Current.Model, Mathf.RoundToInt(BodyReplacerLook.Get(Current.BrLook, "HairStyle")))));
+        }
 
         private void StepEinherjarHair(int by)
         {
             int[] ids = BodyReplacerLook.HairStyleIds(Current.Model);
-            if (ids.Length == 0) return;
-            SetEinherjarField("HairStyle", ids[(EinherjarHairIndex(ids) + by + ids.Length) % ids.Length]);
+            string[] added = BodyReplacerLook.CustomHairs(Current.Model);
+            int count = ids.Length + added.Length;
+            if (count == 0) return;
+            int next = (EinherjarHairIndex(ids, added) + by + count) % count;
+            if (next < ids.Length)
+            {
+                Current.BrHair = "";
+                SetEinherjarField("HairStyle", ids[next]);
+            }
+            else
+            {
+                Current.BrHair = added[next - ids.Length];
+                ApplyToClone();
+            }
             Refresh();
         }
 
@@ -404,7 +421,7 @@ namespace VillagePlebs
 
         private static bool Same(Looks.Look a, Looks.Look b) =>
             a.Model == b.Model && a.Hair == b.Hair && a.Beard == b.Beard && Mathf.Approximately(a.Skin, b.Skin) && Mathf.Approximately(a.HairTone, b.HairTone)
-            && Mathf.Approximately(a.HairShade, b.HairShade) && (a.BrLook ?? "") == (b.BrLook ?? "") && Mathf.Approximately(a.BrMuscle, b.BrMuscle) && (a.BrTattoos ?? "") == (b.BrTattoos ?? "") && a.BrBeard == b.BrBeard;
+            && Mathf.Approximately(a.HairShade, b.HairShade) && (a.BrLook ?? "") == (b.BrLook ?? "") && Mathf.Approximately(a.BrMuscle, b.BrMuscle) && (a.BrTattoos ?? "") == (b.BrTattoos ?? "") && a.BrBeard == b.BrBeard && (a.BrHair ?? "") == (b.BrHair ?? "");
 
         // Head and shoulders of the preview body, from the front, in the preview's studio light: the companion's portrait.
         public Texture2D Snapshot(int size = 160)
@@ -559,6 +576,7 @@ namespace VillagePlebs
             BodyReplacerLook.Apply(_clone, Current.BrLook, Current.BrMuscle);
             BodyReplacerLook.ApplyTattoos(_clone, Current.BrTattoos);
             BodyReplacerLook.ApplyBeard(_clone, Current.BrBeard);
+            BodyReplacerLook.ApplyCustomHair(_clone, Current.BrHair);
             CurrentModelIndex?.SetValue(vis, -1);
             vis.SetModel(Current.Model);
             vis.SetHairItem(Current.Hair);
@@ -617,6 +635,7 @@ namespace VillagePlebs
             look.BrMuscle = Current.BrMuscle;
             look.BrTattoos = Current.BrTattoos;
             look.BrBeard = Current.BrBeard;
+            look.BrHair = Current.BrHair;
             Current = look;
             Refresh();
             ApplyToClone();
@@ -641,7 +660,9 @@ namespace VillagePlebs
             if (_einherjarHairName != null)
             {
                 string[] names = BodyReplacerLook.HairStyleNames(Current.Model);
-                _einherjarHairName.text = names.Length > 0 ? names[Mathf.Min(EinherjarHairIndex(BodyReplacerLook.HairStyleIds(Current.Model)), names.Length - 1)] : "";
+                string[] addedNames = BodyReplacerLook.CustomHairNames(Current.Model);
+                int shown = EinherjarHairIndex(BodyReplacerLook.HairStyleIds(Current.Model), BodyReplacerLook.CustomHairs(Current.Model));
+                _einherjarHairName.text = shown < names.Length ? names[shown] : shown - names.Length < addedNames.Length ? addedNames[shown - names.Length] : "";
             }
             if (_einherjarBeardName != null)
             {

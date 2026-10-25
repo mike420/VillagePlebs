@@ -31,6 +31,8 @@ namespace VillagePlebs
         private static Func<int, bool> _hasBeards;
         private static Func<string[]> _beardNames;
         private static Action<GameObject, int> _applyBeard;
+        private static Func<int, string[]> _customHairs, _customHairNames;
+        private static Action<GameObject, string> _applyCustomHair;
 
         public static bool Available { get { Find(); return _applyLook != null; } }
 
@@ -64,7 +66,7 @@ namespace VillagePlebs
                 _visualType = assembly.GetType("BodyReplacer.EinherjarVisual");
                 FindNewer(api);
                 VillagePlebsPlugin.Instance?.Note("BodyReplacer found: companions can be given its hairstyles and colours"
-                    + (HasTattoos ? ", tattoos" : "") + (HasBeardApi ? ", beards" : ""));
+                    + (HasCustomHairApi ? ", its new hairstyles" : "") + (HasTattoos ? ", tattoos" : "") + (HasBeardApi ? ", beards" : ""));
             }
             catch (Exception e)
             {
@@ -85,6 +87,9 @@ namespace VillagePlebs
             _hasBeards = TryBind<Func<int, bool>>(api, "HasBeards");
             _beardNames = TryBind<Func<string[]>>(api, "BeardNames");
             _applyBeard = TryBind<Action<GameObject, int>>(api, "ApplyBeard");
+            _customHairs = TryBind<Func<int, string[]>>(api, "CustomHairs");
+            _customHairNames = TryBind<Func<int, string[]>>(api, "CustomHairNames");
+            _applyCustomHair = TryBind<Action<GameObject, string>>(api, "ApplyCustomHair");
         }
 
         private static T TryBind<T>(Type api, string name) where T : Delegate
@@ -144,6 +149,14 @@ namespace VillagePlebs
         public static string[] BeardNames() => HasBeardApi ? _beardNames() : Array.Empty<string>();
 
         public static void ApplyBeard(GameObject character, int beard) { if (HasBeardApi) _applyBeard(character, beard); }
+
+        private static bool HasCustomHairApi { get { Find(); return _customHairs != null && _customHairNames != null && _applyCustomHair != null; } }
+
+        // BodyReplacer's added hairstyles for this model's body (by asset name), offered after its own styles
+        public static string[] CustomHairs(int model) => HasCustomHairApi ? _customHairs(model) : Array.Empty<string>();
+        public static string[] CustomHairNames(int model) => HasCustomHairApi ? _customHairNames(model) : Array.Empty<string>();
+
+        public static void ApplyCustomHair(GameObject character, string hair) { if (HasCustomHairApi) _applyCustomHair(character, hair ?? ""); }
 
         public static bool Drawn(GameObject character)
         {
