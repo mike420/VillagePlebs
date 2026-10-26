@@ -26,7 +26,7 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [size=5][b]Features[/b][/size]
 
 [list]
-[*]Press [b]J[/b] to summon your companion or open its menu ([b]E[/b] on it too). Hold [b]J[/b]: your companions come with you, or go home. A new companion gets straight to work on its own mission (making or upgrading its gear) where you summoned it, until you tell it to come with you.
+[*]Press [b]J[/b] to summon your companion or open its menu ([b]E[/b] on it too). Hold [b]J[/b]: your companions come with you, or go home. A new companion gets straight to work on its own mission (making or upgrading its gear; one that needs bars waits until there is a smelter near home) where you summoned it, until you tell it to come with you.
 [*][b]Command wheel:[/b] [b]Left Shift + Q[/b] opens a wheel for the companion you look at: its orders and errands round the outside, how it fights inside. Hover a wedge and it grows; let go or click to choose.
 [*][b]Point and command:[/b] aim at something and press [b]H[/b]: an enemy (it attacks it), a tree, rock or plant (it works it), your chest (it puts its things in), a cart (it pulls it), its tombstone (it fetches its things), a free bed (it makes it its bed), the ground (it waits there), the sky (it comes back). It only takes an order it has the tools for, in its bag or its own chests (it fetches them first), and your orders come before its mission; jobs it has no tool for wait while it works on its mission.
 [*][b]Let it decide:[/b] it reads what you are doing. It fights beside you, mines or chops beside you and keeps close while you explore; where a place is too dangerous for its gear it tells you and only defends.
@@ -35,6 +35,8 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [*][b]Home life:[/b] it takes a free bed and empty chests, works towards better gear (gathering, smelting, crafting and upgrading at your stations), hunts, cooks, keeps its fires burning and repairs its gear and your base. It never chops, mines or breaks rocks inside a base: it heads out past it for wood and stone, and it never digs the ground or mines rocks standing on ground you have worked with the hoe or cultivator. While you are away it catches up on all of it.
 [*][b]Farming:[/b] send it on the Plant crops or Harvest crops errand. With a cultivator it sows seeds in neat rows on the tilled ground at home (matching what already grows there); harvesting needs no tool. It fetches the cultivator and seeds from its own chests, and while you are away it brings in ripe crops and sows the free ground on its own. Works with Plant Everything: it plants and picks the berry bushes, mushrooms and flowers it adds to the cultivator, and follows its crop settings.
 [*][b]Fishing and smelting:[/b] send it fishing and it casts a real rod with the right bait (its Fishing skill grows as it reels in), or have it run the smelters near home: emptying them, feeding fuel and ore from the chests, and taking the bars home.
+[*][b]Sailing:[/b] stand by a free ship and choose Sail a ship (on the wheel or in its menu: Orders). It takes the helm and a chart opens: click where it should go, and it plots a course round the coasts. Once it sets sail it takes no other orders and does no missions (the wind is always behind it, its ship takes no damage except from the Ashlands sea unless you turn Ships Take Damage on, and it keeps going even when you are far away). Arriving somewhere it stays aboard until you send it on: Sail a ship again sends it somewhere new or home, and Go home sails it home. Once home it steps ashore and carries on with its orders and missions. Aboard with it, you can take the helm yourself: it hands it over and rides along with you. [b]Docks:[/b] the chart lists the world's docks, shared by every player (the host keeps them in [b]BepInEx/VillagePlebs/Docks[/b]; on a dedicated server without the mod each player keeps their own instead). Click one to send the ship there, where it takes a free berth clear of the ships already in; name a clicked spot to add one, and the end of any voyage away from home is kept as a dock too. You can ride along. The sea chart is worked out from the world seed the first time (a few seconds) and kept in [b]BepInEx/VillagePlebs/Sea[/b].
+[*][b]Go shopping:[/b] the Go shopping errand (once you have found Haldor, Hildir or the Bog Witch) lists what the traders you have found sell. Tick what you want and press Buy now: it pays from the coins in its bag, is gone for 15 minutes, and comes back with the goods (what does not fit in its bag is set down at its feet).
 [*][b]Needs like a player:[/b] food, stamina, skills that rise, carry weight, weather and rest.
 [*][b]Gear slots of its own[/b] (swords, knives, polearms, spears, a spare weapon, shield, bow and arrows, axe, pickaxe, hammer, cultivator, fishing rod and bait, armour, belt and food), and its bag shows below your inventory: drag items between you, or give and take from its menu. It puts its tools away when it is done with them.
 [*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status (and journal), stats, missions, orders, home, inventory, looks and your plebs.
@@ -76,6 +78,11 @@ Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in
 [b]EpicMMO[/b]
 [list]
 [*][b]Companion Exp[/b] (default 1)
+[/list]
+
+[b]Sailing[/b]
+[list]
+[*][b]Ships Take Damage[/b] (default Off)
 [/list]
 
 

@@ -25,6 +25,7 @@ namespace VillagePlebs
             ("e:Plant", "Plant crops on the tilled ground at home.", new[] { "plant", "sow", "farm" }, null),
             ("e:Fish", "Go fishing near home.", new[] { "go fishing", "fishing", "catch fish", "fish" }, null),
             ("e:Smelt", "Run the smelters near home.", new[] { "smelt", "smelter", "furnace", "kiln" }, null),
+            ("e:Shop", "Go shopping at the traders.", new[] { "go shopping", "shopping", "shop", "buy" }, null),
             ("follow", "Follow the player and fight beside them (go on an adventure together).", new[] { "follow", "come with", "with me", "let's go", "lets go", "adventure", "join" }, Words.P("villagepleb_talk_reply_follow")),
             ("come", "Come to the player right now.", new[] { "come here", "come", "here", "to me", "over here" }, Words.P("villagepleb_talk_reply_come")),
             ("stay", "Stay where it is.", new[] { "stay", "wait", "hold", "stop" }, Words.P("villagepleb_talk_reply_stay")),

@@ -142,6 +142,8 @@ namespace VillagePlebs
             why = null;
             if (z == null || p == null) return false;
             if (z.GetInt(ZDOVars.s_inUse, 0) == 1) { why = Words.P("villagepleb_companion_gear_open"); return false; }
+            if (Sailing.Away(z)) { why = Words.P("villagepleb_sail_busy", z.GetString(Keys.Name, "")); return false; }
+            if (Shopping.Away(z)) { why = Words.P("villagepleb_shop_busy", z.GetString(Keys.Name, "")); return false; }
             if (!z.IsOwner()) z.SetOwner(ZDOMan.GetSessionID());
             Vector3 spot = p.transform.position - p.transform.forward * 2f + Vector3.up * 0.3f;
             z.SetPosition(spot);

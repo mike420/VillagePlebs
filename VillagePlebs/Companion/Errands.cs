@@ -4,7 +4,7 @@ using static VillagePlebs.Words;
 
 namespace VillagePlebs
 {
-    internal enum Errand { PutAway, Restock, BetterGear, RepairGear, RepairBase, Fires, Cook, Plant, Harvest, Fish, Smelt }
+    internal enum Errand { PutAway, Restock, BetterGear, RepairGear, RepairBase, Fires, Cook, Plant, Harvest, Fish, Smelt, Shop }
 
     internal static class Errands
     {
@@ -21,16 +21,23 @@ namespace VillagePlebs
             (Errand.Harvest, P("villagepleb_errands_harvest"), "Picks every ripe crop at home and carries the harvest."),
             (Errand.Fish, P("villagepleb_errands_fish"), "Fishes near home with a rod and the right bait (from its own chests) until the bait runs out or its bag is full."),
             (Errand.Smelt, P("villagepleb_errands_smelt"), "Empties the smelters near home, feeds them fuel and ore from its bag and the chests, and takes what they made home."),
+            (Errand.Shop, P("villagepleb_errands_shop"), "Pick what to buy from the traders you have found: it pays from the coins in its bag and is back with them in 15 minutes."),
         };
 
         public static string Run(BrainState st, Errand what)
         {
             Humanoid me = st?.Body;
             if (me == null) return P("villagepleb_errands_not_here");
+            // Shopping needs no home: it opens the list of what the traders sell.
+            if (what == Errand.Shop) return Shopping.Open(st);
             if (!Work.HasHome(me)) return P("villagepleb_errands_no_home");
             Vector3 center = Work.Center(me);
             float radius = Work.RadiusOf(me);
             if (Vector3.Distance(center, me.transform.position) > radius + 40f) return P("villagepleb_errands_too_far");
+            // A new errand takes the place of the one it was on.
+            st.Farm = null;
+            st.Then = null;
+            if (st.Task != null && st.Task.Ordered) st.Task = null;
             string said = Do(st, what, center, radius, out bool going);
             if (said != null) Talk.Say(me, said);
             Activity.Log(me, $"errand ({what}): {said ?? "on its way"}");
@@ -119,7 +126,17 @@ namespace VillagePlebs
                     Container larder = raw ? null : Work.OwnChestWith(me, Work.IsCookable);
                     if (!raw && larder == null) return P("villagepleb_errands_nothing_raw");
                     CookingStation stove = Kitchen.Find(me, center, radius + 20f);
-                    if (stove == null) return P("villagepleb_errands_no_stove");
+                    if (stove == null)
+                    {
+                        // A cooking station whose fire is out: it lights it, then cooks (fetching the food from its chest first if need be).
+                        var food = raw ? me.GetInventory().GetAllItems() : larder.GetInventory().GetAllItems();
+                        var cold = Kitchen.ToLight(me, center, radius + 20f, food);
+                        if (cold.Fire == null) return P("villagepleb_errands_no_stove");
+                        Work.Task cook = raw ? Work.New(Work.Kind.Cook, cold.Stove, Job.Cook) : Work.Fetching(Work.New(Work.Kind.Cook, cold.Stove, Job.Cook), larder, Work.IsCookable);
+                        going = Work.Ordered(st, Work.LightFire(cold.Fire));
+                        if (going) st.Then = cook;
+                        return P("villagepleb_errands_lighting_fire");
+                    }
                     going = raw ? Go(st, Work.Kind.Cook, stove, Job.Cook) : Work.Ordered(st, Work.Fetching(Work.New(Work.Kind.Cook, stove, Job.Cook), larder, Work.IsCookable));
                     return P("villagepleb_errands_off_to_cook");
                 }

@@ -269,13 +269,13 @@ namespace VillagePlebs
             foreach (var kv in st.LootDrops)
             {
                 ItemDrop d = kv.Key;
-                if (Time.time - kv.Value < 0.6f || !inv.CanAddItem(d.m_itemData)) continue;
+                if (Time.time - kv.Value < 0.6f || !inv.CanAddItem(d.m_itemData) || Steer.InDeepWater(d.transform.position)) continue;
                 float dist = Vector3.Distance(d.transform.position, me.transform.position);
                 if (dist < 40f && dist < best) { best = dist; next = d; }
             }
             foreach (ItemDrop d in Drops())
             {
-                if (d == null || !inv.CanAddItem(d.m_itemData) || !Wants(me, d)) continue;
+                if (d == null || !inv.CanAddItem(d.m_itemData) || !Wants(me, d) || Steer.InDeepWater(d.transform.position)) continue;
                 foreach (Spot s in st.LootSpots)
                 {
                     float fromSpot = Vector3.Distance(d.transform.position, s.Pos);
@@ -323,19 +323,24 @@ namespace VillagePlebs
 
         private static float Fuel(Fireplace f) => Companion.Zdo(f)?.GetFloat(ZDOVars.s_fuel, 0f) ?? 0f;
 
+        public static bool HasFuel(Humanoid me, ItemDrop fuel) => Have(me, fuel) > 0;
+
         private static int Have(Humanoid me, ItemDrop fuel)
         {
             string name = fuel.m_itemData.m_shared.m_name;
             return me.GetInventory().CountItems(name) + Home.Chests(me).Sum(c => c.GetInventory().CountItems(name));
         }
 
-        public static void Feed(BrainState st, Fireplace f)
+        // light: lighting it to cook on, so a few of its fuel do even if it keeps the rest for its mission.
+        public static void Feed(BrainState st, Fireplace f, bool light = false)
         {
             Humanoid me = st.Body;
             ZNetView view = f.GetComponent<ZNetView>();
             if (view == null || !view.IsValid() || f.m_fuelItem == null) return;
             string name = f.m_fuelItem.m_itemData.m_shared.m_name;
-            int want = Mathf.Min(Mathf.Min(6, Spare(me, f.m_fuelItem)), Mathf.FloorToInt(f.m_maxFuel - Fuel(f)));
+            int spare = Spare(me, f.m_fuelItem);
+            if (light) spare = Mathf.Max(spare, Mathf.Min(3, Have(me, f.m_fuelItem)));
+            int want = Mathf.Min(Mathf.Min(6, spare), Mathf.FloorToInt(f.m_maxFuel - Fuel(f)));
             int added = 0;
             for (int i = 0; i < want; i++)
             {
@@ -413,7 +418,59 @@ namespace VillagePlebs
             return $"nearest fire {Utils.GetPrefabName(f.gameObject)} {Vector3.Distance(f.transform.position, s.transform.position):0.0} m off (flat {Vector2.Distance(new Vector2(f.transform.position.x, f.transform.position.z), new Vector2(s.transform.position.x, s.transform.position.z)):0.0}), fuel {fuel:0.#}/{f.m_maxFuel:0}, burning {f.IsBurning()}";
         }
 
-        internal static bool Usable(CookingStation s) => s != null && (!s.m_requireFire || (bool)FireLit.Invoke(s, null));
+        internal static bool Usable(CookingStation s) => s != null && (!s.m_requireFire || (bool)FireLit.Invoke(s, null)) && (!s.m_useFuel || OwnFuel(s) > 0f);
+
+        // What a station that burns its own fuel (an oven) has left in it.
+        private static float OwnFuel(CookingStation s) => Companion.Zdo(s)?.GetFloat(ZDOVars.s_fuel, 0f) ?? 0f;
+
+        // Fuels a station that burns its own (an oven), from its bag, then its chests, as a player puts it in: a few at a time.
+        public static void Fuel(BrainState st, CookingStation s)
+        {
+            Humanoid me = st.Body;
+            ZNetView view = s.GetComponent<ZNetView>();
+            if (view == null || !view.IsValid() || !s.m_useFuel || s.m_fuelItem == null) return;
+            string name = s.m_fuelItem.m_itemData.m_shared.m_name;
+            int want = Mathf.Min(4, Mathf.FloorToInt(s.m_maxFuel - OwnFuel(s))), added = 0;
+            for (int i = 0; i < want; i++)
+            {
+                if (me.GetInventory().CountItems(name) > 0) me.GetInventory().RemoveItem(name, 1);
+                else
+                {
+                    Container chest = Home.Chests(me).FirstOrDefault(c => !Containers.InUse(c) && c.GetInventory().CountItems(name) > 0);
+                    if (chest == null || !Containers.Take(chest) || chest.GetInventory().CountItems(name) <= 0) break;
+                    chest.GetInventory().RemoveItem(name, 1);
+                }
+                view.InvokeRPC("RPC_AddFuel");
+                added++;
+            }
+            if (added > 0) st.Remember(P("villagepleb_life2_remember_fuel", added, Words.Low(name)));
+        }
+
+        // A cooking station that would cook this food but for its fire being out (or, an oven, its own fuel run out), and what to light:
+        // the fire under it, or the station itself. It has the fuel for it.
+        public static (CookingStation Stove, Component Fire) ToLight(Humanoid me, Vector3 center, float radius, IEnumerable<ItemDrop.ItemData> food)
+        {
+            var raw = food.ToList();
+            if (raw.Count == 0) return (null, null);
+            var fires = UnityEngine.Object.FindObjectsByType<Fireplace>(FindObjectsSortMode.None)
+                .Where(f => f != null && !f.m_infiniteFuel && f.m_canRefill && f.m_fuelItem != null && !f.IsBurning() && Fires.HasFuel(me, f.m_fuelItem)).ToList();
+            foreach (CookingStation s in UnityEngine.Object.FindObjectsByType<CookingStation>(FindObjectsSortMode.None)
+                         .Where(s => (s.m_requireFire || s.m_useFuel) && Vector3.Distance(s.transform.position, center) < radius + 10f && !Usable(s) && raw.Any(i => Raw(s, i)) && (int)FreeSlot.Invoke(s, null) >= 0)
+                         .OrderBy(s => Vector3.Distance(s.transform.position, center)))
+            {
+                if (s.m_useFuel && OwnFuel(s) <= 0f)
+                {
+                    if (s.m_fuelItem != null && Fires.HasFuel(me, s.m_fuelItem) && Brain.CanReach(me, s.transform.position, 2f)) return (s, s);
+                    continue;
+                }
+                if (!s.m_requireFire) continue;
+                Fireplace fire = fires.Where(f => Flat(f.transform.position, s.transform.position) < 2.5f).OrderBy(f => Vector3.Distance(f.transform.position, s.transform.position)).FirstOrDefault();
+                if (fire != null && Brain.CanReach(me, fire.transform.position, 2f)) return (s, fire);
+            }
+            return (null, null);
+        }
+
+        private static float Flat(Vector3 a, Vector3 b) { a.y = 0f; b.y = 0f; return Vector3.Distance(a, b); }
 
         public static CookingStation Find(Humanoid me, Vector3 center, float radius)
         {

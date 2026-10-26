@@ -346,3 +346,23 @@ namespace VillagePlebs
         }
     }
 }
+
+namespace VillagePlebs
+{
+    // TEMPORARY: finds what makes a TextMeshPro text called "Value" with no font (the "LiberationSans SDF ... assigned to Value" warning
+    // seen after saving in the F7 panel). Logs the text's place in the scene and who made it, once per place. Remove once found.
+    [HarmonyLib.HarmonyPatch(typeof(TMPro.TextMeshProUGUI), "LoadFontAsset")]
+    internal static class Temp_FindValueText
+    {
+        private static readonly System.Collections.Generic.HashSet<string> Seen = new System.Collections.Generic.HashSet<string>();
+
+        private static void Prefix(TMPro.TextMeshProUGUI __instance)
+        {
+            if (__instance == null || __instance.font != null || __instance.name != "Value") return;
+            string path = __instance.name;
+            for (UnityEngine.Transform t = __instance.transform.parent; t != null; t = t.parent) path = t.name + "/" + path;
+            if (!Seen.Add(path)) return;
+            VillagePlebsPlugin.Instance?.Warn("[font check] text \"Value\" with no font at: " + path + "\n" + System.Environment.StackTrace);
+        }
+    }
+}

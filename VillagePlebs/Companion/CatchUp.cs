@@ -77,7 +77,7 @@ namespace VillagePlebs
             ZDO z = Companion.Zdo(me);
             long last = z.GetLong(LastKey, 0L);
             Stamp(me);
-            if (last <= 0L || Companion.OrderOf(me) != Order.Gather) return;
+            if (last <= 0L || Companion.OrderOf(me) != Order.Gather || Sailing.AtHelm(me) || Shopping.Away(me)) return;
             float away = (float)(ZNet.instance.GetTimeSeconds() - last);
             if (away < MinAway) return;
             VillagePlebsPlugin.Instance.StartCoroutine(Run(st, Mathf.Min(away, MaxAway), away));

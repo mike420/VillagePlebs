@@ -19,12 +19,17 @@ namespace VillagePlebs
         private class Slice
         {
             public string Group, Label, About, Icon;
-            public bool Inner;
+            public bool Inner, WhileSailing;
             public Func<Humanoid, bool> Active;
             public Action<Player, Humanoid> Do;
+            // For a companion too far away to be loaded, chosen from its portrait: only these orders work, through its record.
+            public Func<ZDO, bool> FarActive;
+            // Shown but not to be chosen just now (Go shopping before any trader is found).
+            public Func<bool> Enabled;
+            public Action<Player, ZDO> FarDo;
             public float Start, Size;
             public RectTransform Body, Glyph, Dot;
-            public Image Fill;
+            public Image Fill, Look;
             public float Grow;
         }
 
@@ -38,6 +43,7 @@ namespace VillagePlebs
         private static readonly Color Ink = new Color(0.85f, 0.8f, 0.65f, 1f);
         private static readonly Color Bright = new Color(1f, 0.95f, 0.8f, 1f);
         private static readonly Color Good = new Color(0.55f, 0.85f, 0.45f, 1f);
+        private static readonly Color Faded = new Color(0.1f, 0.08f, 0.06f, 0.55f);
 
         private static GameObject _canvas;
         private static Canvas _canvasComp;
@@ -49,11 +55,19 @@ namespace VillagePlebs
         private static readonly Dictionary<string, Sprite> Icons = new Dictionary<string, Sprite>();
         private static Sprite _outerRing, _innerRing, _dot;
         private static Humanoid _target;
+        // A companion too far away to be loaded, chosen from its portrait: most of the wheel dims, Go home and Sail still work.
+        private static ZDO _far;
+        private static long _farId;
+        private class Chip { public Humanoid Who; public RectTransform Body; public Image Back, Frame; public RawImage Face; public TMP_Text Initial, Name, Note; public long Id; public bool FarSailing; }
+        private const float ChipW = 118f, ChipH = 146f, ChipGap = 10f, Face = 84f;
+        private static readonly List<Chip> Chips = new List<Chip>();
+        private static RectTransform _strip;
+        private static Chip _chipHover;
         private static Slice _hover;
         private static float _openedAt;
         private static bool _held;
 
-        public static bool Open => _target != null;
+        public static bool Open => _target != null || _far != null;
 
         public static void Tick(Player p)
         {
@@ -69,19 +83,26 @@ namespace VillagePlebs
             GameObject hover = p.GetHoverObject();
             Humanoid looked = hover != null ? hover.GetComponentInParent<Humanoid>() : null;
             if (looked != null && Companion.Is(looked) && !looked.IsDead() && Companion.CanCommand(looked, p)) return looked;
-            return Companion.All().Where(c => !c.IsDead() && Companion.CanCommand(c, p))
-                .OrderBy(c => Vector3.Distance(c.transform.position, p.transform.position)).FirstOrDefault();
+            // The one you last chose on the wheel, if it is still here.
+            Humanoid last = Companion.LastChosen == 0L ? null : Companion.All().FirstOrDefault(c => !c.IsDead() && Companion.IdOf(c) == Companion.LastChosen && Companion.IsMine(c, p));
+            if (last != null) return last;
+            // The nearest you can give orders to, else (all of them away sailing) the nearest of yours, to see what it is doing.
+            var mine = Companion.All().Where(c => !c.IsDead() && Companion.IsMine(c, p)).OrderBy(c => Vector3.Distance(c.transform.position, p.transform.position)).ToList();
+            return mine.FirstOrDefault(c => Companion.CanCommand(c, p)) ?? mine.FirstOrDefault();
         }
 
         private static void Pop(Humanoid c)
         {
             if (_canvas == null) Build();
             _target = c;
+            _far = null;
+            Companion.LastChosen = Companion.IdOf(c);
             _openedAt = Time.unscaledTime;
             _held = true;
             _hover = null;
             foreach (Slice s in Slices) s.Grow = 0f;
             _name.text = Companion.NameOf(c);
+            BuildStrip(Player.m_localPlayer);
             _canvas.SetActive(true);
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
@@ -89,47 +110,89 @@ namespace VillagePlebs
 
         public static void Close()
         {
+            bool was = Open;
             _target = null;
+            _far = null;
             _hover = null;
             if (_canvas != null) _canvas.SetActive(false);
+            if (!was) return;
+            // The click (or key) that chose or closed it is still down: the game must not take it as an attack once the wheel is gone.
+            _swallow = true;
+            _closedAt = Time.unscaledTime;
+            ZInput.ResetButtonStatus("Attack");
+            ZInput.ResetButtonStatus("SecondaryAttack");
+            ZInput.ResetButtonStatus("Block");
+        }
+
+        private static bool _swallow;
+        private static float _closedAt;
+
+        // Just closed, with the mouse button that did it not let go yet (or a moment after): the game still treats the wheel as open.
+        public static bool Swallowing
+        {
+            get
+            {
+                if (!_swallow) return false;
+                bool held = Input.GetMouseButton(0) || Input.GetMouseButton(1);
+                if (!held && Time.unscaledTime - _closedAt > 0.15f) _swallow = false;
+                return _swallow;
+            }
         }
 
         private static void Update(Player p)
         {
-            if (p == null || _target == null || _target.IsDead() || _canvas == null || VillagePlebsPlugin.MenuOpen || VillagePlebsPlugin.TypingOrBusy()) { Close(); return; }
+            bool gone = _far != null ? ZDOMan.instance == null || ZDOMan.instance.GetZDO(_far.m_uid) == null : _target == null || _target.IsDead();
+            if (p == null || gone || _canvas == null || VillagePlebsPlugin.MenuOpen || VillagePlebsPlugin.TypingOrBusy()) { Close(); return; }
             float t = Mathf.Clamp01((Time.unscaledTime - _openedAt) / OpenTime);
             _root.localScale = Vector3.one * WheelScale * Mathf.LerpUnclamped(0.75f, 1f, EaseOutBack(t));
             _fade.alpha = t;
             if (Input.GetKeyDown(KeyCode.Escape) || Input.GetMouseButtonDown(1)) { Close(); return; }
 
-            _hover = Hovered();
+            _chipHover = ChipAt(MouseLocal());
+            _hover = _chipHover != null ? null : Hovered();
             if (_held && !MainConfig.wheelKey.Value.IsPressed())
             {
                 _held = false;
-                if (Time.unscaledTime - _openedAt > HoldToPick) { if (_hover != null) Pick(p, _hover); else Close(); return; }
+                if (_chipHover != null) Switch(p, _chipHover);
+                else if (Time.unscaledTime - _openedAt > HoldToPick) { if (_hover != null) Pick(p, _hover); else Close(); return; }
             }
             else if (!_held && MainConfig.wheelKey.Value.IsDown()) { Close(); return; }
+            if (Input.GetMouseButtonDown(0) && _chipHover != null) { Switch(p, _chipHover); return; }
             if (Input.GetMouseButtonDown(0) && _hover != null) { Pick(p, _hover); return; }
             Paint();
+            PaintStrip();
         }
 
         private static Slice Hovered()
         {
-            float scale = (_canvasComp != null ? _canvasComp.scaleFactor : 1f) * Mathf.Max(0.01f, _root.localScale.x);
-            Vector2 m = ((Vector2)Input.mousePosition - new Vector2(Screen.width, Screen.height) * 0.5f) / scale;
+            Vector2 m = MouseLocal();
             float d = m.magnitude;
             if (d < InnerHole * 0.85f) return null;
             bool inner = d < (InnerR + OuterHole) * 0.5f;
             float a = Mathf.Repeat(Mathf.Atan2(m.x, m.y) * Mathf.Rad2Deg, 360f);
-            return Slices.Where(s => s.Inner == inner).OrderBy(s => Mathf.Abs(Mathf.DeltaAngle(a, s.Start + s.Size * 0.5f))).FirstOrDefault();
+            Slice near = Slices.Where(s => s.Inner == inner).OrderBy(s => Mathf.Abs(Mathf.DeltaAngle(a, s.Start + s.Size * 0.5f))).FirstOrDefault();
+            return near != null && Dim(near) ? null : near;
         }
+
+        // Dimmed: an order a far-away companion cannot take.
+        private static bool Dim(Slice s) => _far != null && s.FarDo == null || s.Enabled != null && !s.Enabled();
+
+        private static bool IsActive(Slice s) => _far != null ? s.FarActive != null && s.FarActive(_far) : s.Active != null && s.Active(_target);
 
         private static void Pick(Player p, Slice s)
         {
+            if (_far != null)
+            {
+                ZDO far = _far;
+                Close();
+                if (s.FarDo != null) s.FarDo(p, far);
+                return;
+            }
             Humanoid c = _target;
             Close();
             if (c == null) return;
-            if (!Companion.CanCommand(c, p)) { VillagePlebsPlugin.Tell(P("villagepleb_menu_owner_orders")); return; }
+            // Sail works on one already under way too: it opens the chart to change its course.
+            if (!Companion.CanCommand(c, p) && !(s.WhileSailing && Companion.IsMine(c, p))) { VillagePlebsPlugin.Tell(Sailing.Away(c) ? P("villagepleb_sail_busy", Companion.NameOf(c)) : P("villagepleb_menu_owner_orders")); return; }
             s.Do(p, c);
         }
 
@@ -139,11 +202,12 @@ namespace VillagePlebs
             float dt = Time.unscaledDeltaTime;
             foreach (Slice s in Slices)
             {
-                bool active = s.Active != null && s.Active(_target);
+                bool active = IsActive(s), dim = Dim(s);
                 s.Grow = Mathf.MoveTowards(s.Grow, s == h ? 1f : 0f, dt * 9f);
                 float e = s.Grow * s.Grow * (3f - 2f * s.Grow);
                 s.Body.localScale = Vector3.one * Mathf.Lerp(1f, s.Inner ? InnerGrow : OuterGrow, e);
-                s.Fill.color = Color.Lerp(active ? Current : Base, Lit, e);
+                s.Fill.color = dim ? Faded : Color.Lerp(active ? Current : Base, Lit, e);
+                if (s.Look != null) s.Look.color = dim ? new Color(0.95f, 0.92f, 0.85f, 0.2f) : new Color(0.95f, 0.92f, 0.85f, 0.95f);
                 // The wedge grows from the middle of the wheel, so its icon and dot move out with it by the same amount.
                 float swell = Mathf.Lerp(1f, s.Inner ? InnerGrow : OuterGrow, e);
                 var dir = new Vector2(Mathf.Sin((s.Start + s.Size * 0.5f) * Mathf.Deg2Rad), Mathf.Cos((s.Start + s.Size * 0.5f) * Mathf.Deg2Rad));
@@ -155,12 +219,12 @@ namespace VillagePlebs
             }
             _box.gameObject.SetActive(h != null);
             if (h == null) return;
-            bool current = h.Active != null && h.Active(_target), about = h.About != null;
+            bool current = IsActive(h), about = h.About != null;
             _title.text = Show(h.Label);
             _sub.text = Show(h.Group) + (current ? "  ·  " + Show(P("villagepleb_wheel_current")) : "");
             _sub.color = current ? Good : Ink;
             _about.text = about ? Show(h.About) : "";
-            // The box sits on a line above the wheel and grows upwards to fit what it says.
+            // The box hangs from a line below the wheel and grows downwards to fit what it says.
             float aboutH = about ? Mathf.Ceil(_about.GetPreferredValues(_about.text, BoxWidth - BoxPad * 3f, 0f).y) : 0f;
             float height = BoxPad + 28f + 20f + (about ? 6f + aboutH : 0f) + BoxPad, top = height * 0.5f - BoxPad;
             _box.sizeDelta = new Vector2(BoxWidth, height);
@@ -181,13 +245,14 @@ namespace VillagePlebs
         private static IEnumerable<Slice> Orders()
         {
             const string g = "villagepleb_menu_tab_orders";
-            yield return new Slice { Group = P(g), Label = P("villagepleb_menu_come_with_me"), Icon = "follow", Active = c => Companion.OrderOf(c) == Order.Follow,
+            yield return new Slice { Group = P(g), Label = P("villagepleb_menu_come_with_me"), Icon = "follow", Active = c => !Sailing.Away(c) && Companion.OrderOf(c) == Order.Follow,
                                      Do = (p, c) => Say(c, Home.Follow(c), "villagepleb_home_say_behind_you") };
-            yield return new Slice { Group = P(g), Label = P("villagepleb_menu_go_home"), Icon = "gohome", Active = c => Companion.OrderOf(c) == Order.Gather,
-                                     Do = (p, c) => Say(c, Home.GoHome(c), "villagepleb_home_say_heading_home") };
-            yield return new Slice { Group = P(g), Label = P("villagepleb_menu_stay_here"), Icon = "stay", Active = c => Companion.OrderOf(c) == Order.Stay,
+            yield return new Slice { Group = P(g), Label = P("villagepleb_menu_go_home"), Icon = "gohome", Active = c => !Sailing.Away(c) && Companion.OrderOf(c) == Order.Gather, WhileSailing = true,
+                                     Do = (p, c) => Say(c, Home.GoHome(c), "villagepleb_home_say_heading_home"),
+                                     FarActive = z => !Sailing.Away(z) && Remote.OrderOf(z) == Order.Gather, FarDo = FarHome };
+            yield return new Slice { Group = P(g), Label = P("villagepleb_menu_stay_here"), Icon = "stay", Active = c => !Sailing.Away(c) && Companion.OrderOf(c) == Order.Stay,
                                      Do = (p, c) => Say(c, Companion.Write(c, z => z.Set(Keys.Order, (int)Order.Stay)), null) };
-            yield return new Slice { Group = P(g), Label = P("villagepleb_menu_guard_spot"), Icon = "guard", Active = c => Companion.OrderOf(c) == Order.Guard,
+            yield return new Slice { Group = P(g), Label = P("villagepleb_menu_guard_spot"), Icon = "guard", Active = c => !Sailing.Away(c) && Companion.OrderOf(c) == Order.Guard,
                                      Do = (p, c) => Say(c, Companion.Write(c, z => { z.Set(Keys.Order, (int)Order.Guard); z.Set(Keys.Post, c.transform.position); }), null) };
             yield return new Slice { Group = P(g), Label = P("villagepleb_menu_come_here"), Icon = "comehere",
                                      Do = (p, c) =>
@@ -195,12 +260,38 @@ namespace VillagePlebs
                                          if (!Say(c, Home.Follow(c), "villagepleb_home_say_behind_you")) return;
                                          if (Vector3.Distance(p.transform.position, c.transform.position) > 15f && c.GetComponent<ZNetView>().IsOwner()) Brain.TeleportBehind(c, p);
                                      } };
+            yield return new Slice { Group = P(g), Label = P("villagepleb_sail_order"), Icon = "sailing", Active = Sailing.AtHelm, WhileSailing = true,
+                                     Do = (p, c) => { string why = Sailing.Offer(p, c); if (!string.IsNullOrEmpty(why)) VillagePlebsPlugin.Tell(why); },
+                                     FarActive = Sailing.Away,
+                                     FarDo = (p, z) =>
+                                     {
+                                         string why = Sailing.Away(z) ? SeaMap.OpenCourse(p, z) : P("villagepleb_wheel_far_no_ship", z.GetString(Keys.Name, ""));
+                                         if (!string.IsNullOrEmpty(why)) VillagePlebsPlugin.Tell(why);
+                                     } };
+        }
+
+        // Go home for one far away: by sea if it is away with a ship, otherwise its order changes and it heads home once it is loaded again.
+        private static void FarHome(Player p, ZDO z)
+        {
+            string name = z.GetString(Keys.Name, "");
+            if (z.GetLong(Keys.Master, 0L) != p.GetPlayerID()) { VillagePlebsPlugin.Tell(P("villagepleb_menu_owner_orders")); return; }
+            if (Sailing.Away(z))
+            {
+                string why = SeaMap.OpenCourse(p, z);
+                if (why != null) VillagePlebsPlugin.Tell(why);
+                else SeaMap.HeadHome();
+                return;
+            }
+            if (Remote.Home(z) == null) { VillagePlebsPlugin.Tell(P("villagepleb_sail_no_home", name)); return; }
+            if (!z.IsOwner()) z.SetOwner(ZDOMan.GetSessionID());
+            z.Set(Keys.Order, (int)Order.Gather);
+            VillagePlebsPlugin.Tell(P("villagepleb_wheel_far_home", name));
         }
 
         private static readonly Dictionary<Errand, string> ErrandIcons = new Dictionary<Errand, string>
         {
             [Errand.PutAway] = "putaway", [Errand.Restock] = "restock", [Errand.BetterGear] = "bettergear", [Errand.RepairGear] = "repairgear", [Errand.RepairBase] = "repairbase",
-            [Errand.Fires] = "fires", [Errand.Cook] = "cook", [Errand.Plant] = "plant", [Errand.Harvest] = "harvest", [Errand.Fish] = "fishing", [Errand.Smelt] = "smelting",
+            [Errand.Fires] = "fires", [Errand.Cook] = "cook", [Errand.Plant] = "plant", [Errand.Harvest] = "harvest", [Errand.Fish] = "fishing", [Errand.Smelt] = "smelting", [Errand.Shop] = "shopping",
         };
 
         private static IEnumerable<Slice> ErrandSlices() =>
@@ -211,6 +302,7 @@ namespace VillagePlebs
                 {
                     Group = P("villagepleb_menu_errands"), Label = e.Label, Icon = ErrandIcons.TryGetValue(what, out string icon) ? icon : "putaway",
                     Active = what == Errand.Plant || what == Errand.Harvest || what == Errand.Fish || what == Errand.Smelt ? c => Brain.Get(c)?.Farm == what : (Func<Humanoid, bool>)null,
+                    Enabled = what == Errand.Shop ? Shopping.AnyTrader : (Func<bool>)null,
                     Do = (p, c) =>
                     {
                         BrainState st = Brain.Claim(c, out string why);
@@ -233,6 +325,119 @@ namespace VillagePlebs
                     Active = c => Companion.Chosen(c) == pick,
                     Do = (p, c) => Say(c, Companion.Write(c, z => z.Set(Keys.Style, (int)pick)), null),
                 };
+            }
+        }
+
+        // ---- your companions, above the hover box: click one to give the wheel's orders to it instead ----
+
+        private static Vector2 MouseLocal()
+        {
+            float scale = (_canvasComp != null ? _canvasComp.scaleFactor : 1f) * Mathf.Max(0.01f, _root.localScale.x);
+            return ((Vector2)Input.mousePosition - new Vector2(Screen.width, Screen.height) * 0.5f) / scale;
+        }
+
+        private static void BuildStrip(Player p)
+        {
+            foreach (Chip old in Chips) if (old.Body != null) Object.Destroy(old.Body.gameObject);
+            Chips.Clear();
+            _chipHover = null;
+            if (_strip == null) _strip = Rect("Plebs", _root, Vector2.zero);
+            if (p == null) return;
+            // All of yours, in your plebs' order: those near enough to be loaded to choose from, the rest greyed (far away, or sailing).
+            var loaded = Companion.All().Where(c => !c.IsDead() && Companion.IsMine(c, p)).ToList();
+            var all = Profile.Here(p).Where(x => !x.Dead)
+                .Select(x => (x.Id, x.Name, Who: loaded.FirstOrDefault(c => Companion.IdOf(c) == x.Id))).ToList();
+            foreach (Humanoid c in loaded) if (all.All(x => x.Who != c)) all.Add((Companion.IdOf(c), Companion.NameOf(c), c));
+            if (all.Count == 0 || loaded.Count == 0) { _strip.gameObject.SetActive(false); return; }
+            _strip.gameObject.SetActive(true);
+            float width = all.Count * ChipW + (all.Count - 1) * ChipGap;
+            for (int i = 0; i < all.Count; i++)
+            {
+                ZDO far = all[i].Who == null ? Remote.Find(all[i].Id) : null;
+                var chip = new Chip { Who = all[i].Who, Id = all[i].Id, FarSailing = Sailing.Away(far) };
+                chip.Body = Rect("Pleb", _strip, new Vector2(ChipW, ChipH));
+                chip.Body.anchoredPosition = new Vector2(-width * 0.5f + ChipW * 0.5f + i * (ChipW + ChipGap), ChipH * 0.5f);
+                chip.Back = chip.Body.gameObject.AddComponent<Image>();
+                chip.Back.color = Base;
+                chip.Back.raycastTarget = false;
+                RectTransform frame = Rect("Frame", chip.Body, new Vector2(Face + 8f, Face + 8f));
+                frame.anchoredPosition = new Vector2(0f, ChipH * 0.5f - 10f - Face * 0.5f);
+                chip.Frame = frame.gameObject.AddComponent<Image>();
+                chip.Frame.color = Good;
+                chip.Frame.raycastTarget = false;
+                chip.Frame.enabled = false;
+                RectTransform face = Rect("Face", chip.Body, new Vector2(Face, Face));
+                face.anchoredPosition = frame.anchoredPosition;
+                chip.Face = face.gameObject.AddComponent<RawImage>();
+                chip.Face.raycastTarget = false;
+                string name = all[i].Who != null ? Companion.NameOf(all[i].Who) : all[i].Name;
+                chip.Initial = Text(face, 40f, Ink, new Vector2(Face, Face), Vector2.zero);
+                chip.Initial.text = name.Length > 0 ? name.Substring(0, 1).ToUpperInvariant() : "?";
+                chip.Name = Text(chip.Body, 18f, Bright, new Vector2(ChipW - 8f, 24f), new Vector2(0f, -ChipH * 0.5f + 32f));
+                chip.Name.text = name;
+                chip.Name.overflowMode = TextOverflowModes.Ellipsis;
+                chip.Note = Text(chip.Body, 13f, Ink, new Vector2(ChipW - 8f, 18f), new Vector2(0f, -ChipH * 0.5f + 12f));
+                Chips.Add(chip);
+            }
+        }
+
+        private static Chip ChipAt(Vector2 m)
+        {
+            if (_strip == null || !_strip.gameObject.activeSelf) return null;
+            foreach (Chip c in Chips)
+            {
+                Vector2 at = _strip.anchoredPosition + c.Body.anchoredPosition;
+                if (Mathf.Abs(m.x - at.x) <= ChipW * 0.5f && Mathf.Abs(m.y - at.y) <= ChipH * 0.5f) return c;
+            }
+            return null;
+        }
+
+        private static void Switch(Player p, Chip chip)
+        {
+            Humanoid c = chip.Who;
+            // One too far away to be loaded but away sailing: the chart opens to send it somewhere new, or home.
+            if (c == null)
+            {
+                ZDO body = Remote.Find(chip.Id);
+                if (body == null || body == _far) return;
+                _far = body;
+                _farId = chip.Id;
+                Companion.LastChosen = chip.Id;
+                _name.text = body.GetString(Keys.Name, "");
+                _held = false;
+                return;
+            }
+            if (c.IsDead() || (c == _target && _far == null)) return;
+            _far = null;
+            // One away sailing can be chosen too, to see what it is doing; it just takes no orders until it gets there.
+            if (!Companion.IsMine(c, p)) { VillagePlebsPlugin.Tell(P("villagepleb_menu_owner_orders")); return; }
+            _target = c;
+            Companion.LastChosen = Companion.IdOf(c);
+            _name.text = Companion.NameOf(c);
+            _held = false;
+        }
+
+        // Sits just above the wheel, each companion's face and name; the one the wheel is for is lit.
+        private static void PaintStrip()
+        {
+            if (_strip == null || !_strip.gameObject.activeSelf) return;
+            float top = OuterR + 62f;
+            _strip.anchoredPosition = new Vector2(0f, top);
+            foreach (Chip c in Chips)
+            {
+                bool gone = c.Who == null || c.Who.IsDead(), away = gone ? c.FarSailing : Sailing.Away(c.Who), shop = !gone && Shopping.Away(c.Who), chosen = _far != null ? c.Id == _farId : !gone && c.Who == _target;
+                Texture tex = Portraits.Get(c.Id);
+                if (c.Face.texture != tex) c.Face.texture = tex;
+                c.Initial.enabled = tex == null;
+                c.Back.color = chosen ? Current : c == _chipHover ? Lit : Base;
+                // The one the wheel is giving orders to has a green border round its face.
+                c.Frame.enabled = chosen;
+                float fade = gone || away ? 0.45f : 1f;
+                c.Face.color = tex != null ? new Color(1f, 1f, 1f, fade) : new Color(0.1f, 0.08f, 0.06f, fade);
+                c.Name.alpha = fade;
+                c.Note.text = shop ? Show(P("villagepleb_menu_out_shopping")) : away ? Show(P(!gone && Sailing.Docked(c.Who) ? "villagepleb_sail_status_docked" : "villagepleb_sail_status_away"))
+                            : gone ? Show(P("villagepleb_wheel_far")) : chosen ? Show(P("villagepleb_wheel_current")) : "";
+                c.Note.color = chosen ? Good : Ink;
             }
         }
 
@@ -280,11 +485,17 @@ namespace VillagePlebs
             for (int i = 0; i < styles.Count; i++) { styles[i].Start = -step * 0.5f + i * step + Gap * 0.5f; styles[i].Size = step - Gap; }
             Slices.AddRange(styles);
             foreach (Slice s in Slices) Wedge(s);
+            // The green dots go on top of every wedge and icon, so none is hidden under a neighbour.
+            foreach (Slice s in Slices) s.Dot.SetAsLastSibling();
 
+            RectTransform nameBack = Rect("NameBack", _root, new Vector2(InnerHole * 1.8f, 40f));
+            Image nameBand = nameBack.gameObject.AddComponent<Image>();
+            nameBand.color = Backing;
+            nameBand.raycastTarget = false;
             _name = Text(_root, 26f, Bright, new Vector2(InnerHole * 1.8f, 60f), Vector2.zero);
             _box = Rect("Hover", _root, new Vector2(BoxWidth, 56f));
-            _box.pivot = new Vector2(0.5f, 0f);
-            _box.anchoredPosition = new Vector2(0f, OuterR + 62f);
+            _box.pivot = new Vector2(0.5f, 1f);
+            _box.anchoredPosition = new Vector2(0f, -(OuterR + 62f));
             Image back = _box.gameObject.AddComponent<Image>();
             back.color = Base;
             back.raycastTarget = false;
@@ -312,12 +523,12 @@ namespace VillagePlebs
             s.Fill.raycastTarget = false;
             float size = s.Inner ? InnerIcon : OuterIcon;
             s.Glyph = Rect("Icon", _root, new Vector2(size, size));
-            Image icon = s.Glyph.gameObject.AddComponent<Image>();
-            icon.sprite = Icon(s.Icon);
+            Image icon = s.Look = s.Glyph.gameObject.AddComponent<Image>();
+            icon.sprite = Icon(s.Icon) ?? Icon("restock");
             icon.color = new Color(0.95f, 0.92f, 0.85f, 0.95f);
             icon.raycastTarget = false;
             icon.preserveAspect = true;
-            s.Dot = Rect("Dot", _root, new Vector2(11f, 11f));
+            s.Dot = Rect("Dot", _root, new Vector2(16f, 16f));
             Image dot = s.Dot.gameObject.AddComponent<Image>();
             dot.sprite = _dot;
             dot.color = Good;
@@ -325,12 +536,22 @@ namespace VillagePlebs
             s.Dot.gameObject.SetActive(false);
         }
 
+        private static readonly Color Backing = new Color(0.06f, 0.05f, 0.04f, 0.55f);
+
+        // A group's name round the outside, on a faint dark band so it reads over a bright world.
         private static void Heading(string text, float angle)
         {
             float a = angle * Mathf.Deg2Rad;
-            TMP_Text t = Text(_root, 22f, Ink, new Vector2(220f, 30f), new Vector2(Mathf.Sin(a), Mathf.Cos(a)) * (OuterR + 30f));
+            Vector2 at = new Vector2(Mathf.Sin(a), Mathf.Cos(a)) * (OuterR + 30f);
+            RectTransform back = Rect("HeadingBack", _root, new Vector2(220f, 32f));
+            back.anchoredPosition = at;
+            Image band = back.gameObject.AddComponent<Image>();
+            band.color = Backing;
+            band.raycastTarget = false;
+            TMP_Text t = Text(_root, 22f, Ink, new Vector2(220f, 30f), at);
             t.text = Show(text);
             t.fontStyle = FontStyles.Bold;
+            back.sizeDelta = new Vector2(Mathf.Min(300f, t.GetPreferredValues(t.text).x + 28f), 32f);
         }
 
         private static RectTransform Rect(string name, Transform parent, Vector2 size)
@@ -380,7 +601,8 @@ namespace VillagePlebs
             return Sprite.Create(tex, new Rect(0f, 0f, n, n), new Vector2(0.5f, 0.5f), 100f);
         }
 
-        private static Sprite Icon(string name)
+        // One of the icons built into the mod (Assets/Wheel), loaded once.
+        internal static Sprite Icon(string name)
         {
             if (Icons.TryGetValue(name, out Sprite cached)) return cached;
             Sprite sprite = null;
@@ -412,7 +634,7 @@ namespace VillagePlebs
     [HarmonyPatch(typeof(Hud), nameof(Hud.InRadial))]
     internal static class Hud_InRadial_Wheel
     {
-        private static void Postfix(ref bool __result) { if (Wheel.Open) __result = true; }
+        private static void Postfix(ref bool __result) { if (Wheel.Open || Wheel.Swallowing) __result = true; }
     }
 
     [HarmonyPatch(typeof(Hud), "UpdateCrosshair")]

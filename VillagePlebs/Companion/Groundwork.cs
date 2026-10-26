@@ -44,8 +44,23 @@ namespace VillagePlebs
             return des != null && des.m_destructibleType != DestructibleType.Tree && des.m_damages.m_pickaxe != HitData.DamageModifier.Immune;
         }
 
-        // A rock or ore deposit standing on worked ground, which it leaves alone.
-        public static bool OnWorkedGround(GameObject go) => Mined(go) && Worked(go.transform.position, 2f);
+        // A rock or ore deposit standing on worked ground, or wood sunk into it (raised over with the hoe), which it leaves alone.
+        public static bool OnWorkedGround(GameObject go) => Worked(go.transform.position, 2f) && (Mined(go) || Buried(go));
+
+        // Half or more of it below the ground: a swing at it only hits the earth.
+        private static bool Buried(GameObject go)
+        {
+            if (ZoneSystem.instance == null) return false;
+            Bounds b = default;
+            bool any = false;
+            foreach (Collider c in go.GetComponentsInChildren<Collider>())
+            {
+                if (c == null || c.isTrigger) continue;
+                if (!any) { b = c.bounds; any = true; } else b.Encapsulate(c.bounds);
+            }
+            if (!any) return false;
+            return ZoneSystem.instance.GetGroundHeight(b.center) > b.center.y;
+        }
     }
 
     // A companion's pickaxe never digs the ground at all, so worked ground only ever means a player's work.

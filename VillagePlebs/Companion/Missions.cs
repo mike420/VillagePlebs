@@ -88,6 +88,7 @@ namespace VillagePlebs
             if (cur != null && cur.Key != key)
             {
                 if (Achieved(me, cur)) Finish(st, list, cur);
+                else if (st.NoSmelter.Contains(cur.Key)) Drop(st, list, cur, P("villagepleb_missions_no_smelter"), false);
                 else if (Ready(me, cur))
                 {
                     if (st.MissionReadySince == 0f) st.MissionReadySince = Time.time;
@@ -158,10 +159,11 @@ namespace VillagePlebs
             Save(st.Body, list);
         }
 
-        private static void Drop(BrainState st, List<Mission> list, Mission m, string why)
+        // Put off for an hour, unless it is only waiting for a smelter: then it is taken up again as soon as there is one.
+        private static void Drop(BrainState st, List<Mission> list, Mission m, string why, bool block = true)
         {
             m.Status = "dropped"; m.Why = why;
-            st.DroppedUntil[m.Key] = Time.time + 3600f;
+            if (block) st.DroppedUntil[m.Key] = Time.time + 3600f;
             Journal.Add(st.Body, P("villagepleb_missions_gave_up_journal", m.What, why));
             Talk.Mention(st.Body, P("villagepleb_missions_gave_up_say", m.What, why), "missiondrop:" + m.Key, 30f);
             st.MissionSince = 0f;

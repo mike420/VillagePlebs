@@ -436,6 +436,8 @@ namespace VillagePlebs
             if (master != null && master.IsOnGround()) Brain.TeleportBehind(me, master, "villagepleb_brain_stepped_off_boat");
         }
 
+        public static void Leave(BrainState st) { if (!ReferenceEquals(st.Riding, null)) Off(st, null); }
+
         public static void Forget()
         {
             foreach (var kv in Taken) if (kv.Value != null) { Rigidbody b = kv.Value.GetComponent<Rigidbody>(); if (b != null) { b.isKinematic = false; b.detectCollisions = true; } }

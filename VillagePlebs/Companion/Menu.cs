@@ -65,6 +65,7 @@ namespace VillagePlebs
             if (InventoryGui.IsVisible()) InventoryGui.instance.Hide();
             if (!MenuOpen) _openedAt = Time.unscaledTime;
             _shown = companion;
+            if (companion != null && Companion.IsMine(companion, player)) Companion.LastChosen = Companion.IdOf(companion);
             _hirePrice = companion == null ? hirePrice : -1;
             _hireCoin = hireCoin;
             _nameField = companion != null ? Companion.NameOf(companion) : _hirePrice >= 0 ? Trading.FreeName(player)
@@ -129,9 +130,12 @@ namespace VillagePlebs
         private bool Mine => _shown != null && Companion.IsMine(_shown, Player.m_localPlayer);
         private bool Commandable => _shown != null && Companion.CanCommand(_shown, Player.m_localPlayer);
 
+        private string NoOrders => _shown != null && Sailing.Away(_shown) ? T("villagepleb_sail_busy", Companion.NameOf(_shown))
+            : _shown != null && Shopping.Away(_shown) ? T("villagepleb_shop_busy", Companion.NameOf(_shown)) : T("villagepleb_menu_owner_orders");
+
         private void Change(Action<ZDO> change)
         {
-            if (!Commandable) { _note = T("villagepleb_menu_owner_orders"); return; }
+            if (!Commandable) { _note = NoOrders; return; }
             if (!Companion.Write(_shown, change)) _note = T("villagepleb_menu_busy");
         }
 
@@ -231,6 +235,7 @@ namespace VillagePlebs
             BrainState st = Here(c) ? Brain.Get(c) : null;
             float done = -1f;
             string text = st == null ? T("villagepleb_menu_shows_elsewhere") : T("villagepleb_menu_job", Words.Show(Work.JobText(st, out done)));
+            text = $"<b>{Companion.NameOf(c)}</b>  ·  {text}";
             if (text != _jobWaiting) { _jobWaiting = text; _jobSince = Time.unscaledTime; }
             if (_jobShown == null || text != _jobShown && Time.unscaledTime - _jobSince >= 1f) { _jobShown = text; Set(_jobText, text); }
             bool measured = done >= 0f && text == _jobShown;
@@ -580,8 +585,11 @@ namespace VillagePlebs
                 Humanoid there = prof.Id == id ? c : Companion.All().FirstOrDefault(h => Companion.IdOf(h) == prof.Id);
                 string shownName = there != null ? Companion.NameOf(there) : prof.Name;
                 bool chosen = prof.Id == id;
+                // Away by ship (sailing, or waiting aboard somewhere): says so where its Rename button would be.
+                ZDO rec = there != null ? Companion.Zdo(there) : Remote.Find(prof.Id);
+                bool sailing = Sailing.Away(rec), shopping = Shopping.Away(rec);
                 float px = Pad + i * cw, mid = px + cw / 2f;
-                _sig.Append("|p").Append(prof.Id).Append(shownName).Append(there != null);
+                _sig.Append("|p").Append(prof.Id).Append(shownName).Append(there != null).Append(sailing).Append(shopping);
                 if (chosen && _renaming)
                 {
                     if (_make) _field = GameUi.TextField(_window, new Vector2(px + 4f, -12f), new Vector2(cw - 8f, 34f), _nameField, 24, v => _nameField = v, _ => SaveName(), 18f);
@@ -598,14 +606,25 @@ namespace VillagePlebs
                         t.overflowMode = TextOverflowModes.Ellipsis;
                     }
                     Humanoid target = there;
-                    Btn(Loc("$hud_rename"), mid - 55f, 136f, 110f, 24f, () =>
+                    if (sailing || shopping)
+                    {
+                        if (_make) GameUi.Label(_window, T(sailing ? "villagepleb_menu_away_sailing" : "villagepleb_menu_out_shopping"), new Vector2(mid - 60f, -136f), new Vector2(120f, 24f), 15f, GameUi.Gold, null, TextAlignmentOptions.Center);
+                    }
+                    else Btn(Loc("$hud_rename"), mid - 55f, 136f, 110f, 24f, () =>
                     {
                         if (target == _shown) { _renaming = true; _focusField = true; _nameField = Companion.NameOf(_shown); return; }
                         _pending = () => { OpenMenuFor(pl, target); _renaming = true; _focusField = true; _nameField = Companion.NameOf(target); };
                     }, enabled: target != null, size: 13f);
                 }
                 if (!_make) continue;
-                if (chosen) GameUi.HeaderBox(_window, new Vector2(mid - 45f, -44f), new Vector2(90f, 90f), false);
+                // The one shown has a green border round its portrait, as on the command wheel.
+                if (chosen)
+                {
+                    RectTransform ring = GameUi.Rect(_window, "Chosen", new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(mid - 44f, -45f), new Vector2(88f, 88f));
+                    Image border = ring.gameObject.AddComponent<Image>();
+                    border.color = GameUi.Good;
+                    border.raycastTarget = false;
+                }
                 RawImage face = GameUi.Picture(_window, new Vector2(mid - 39f, -50f), new Vector2(78f, 78f), Portraits.Get(prof.Id));
                 TMP_Text initial = GameUi.Label(face.transform.parent, shownName.Length > 0 ? shownName.Substring(0, 1).ToUpperInvariant() : "?", Vector2.zero, new Vector2(78f, 78f), 40f,
                     GameUi.Dim, GameUi.Norse, TextAlignmentOptions.Center);
@@ -738,21 +757,31 @@ namespace VillagePlebs
             Order order = Companion.OrderOf(c);
             float half = (_width - 8f) / 2f;
             Btn(T("villagepleb_menu_come_with_me"), _left, _y, half, 42f, () => _pending = () => GiveOrder(h => Home.Follow(h)), order == Order.Follow, size: 19f);
-            Btn(T("villagepleb_menu_go_home"), _left + half + 8f, _y, half, 42f, () => _pending = () => GiveOrder(h => Home.GoHome(h)), order == Order.Gather, size: 19f);
+            Btn(T("villagepleb_menu_go_home"), _left + half + 8f, _y, half, 42f, () => _pending = () => GiveOrder(h => Home.GoHome(h), true), order == Order.Gather, size: 19f);
             _y += 48f;
-            if (_make) GameUi.Label(_in, T("villagepleb_menu_more"), new Vector2(_left, -_y - 6f), new Vector2(76f, 24f), 16f, GameUi.Dim);
-            float third = (_width - 82f - 12f) / 3f, bx = _left + 82f;
+            float third = (_width - 12f) / 3f, bx = _left;
             Btn(T("villagepleb_menu_stay_here"), bx, _y, third, 32f, () => _pending = () => Change(z => z.Set(Keys.Order, (int)VillagePlebs.Order.Stay)), order == Order.Stay, size: 16f);
             Btn(T("villagepleb_menu_guard_spot"), bx + third + 6f, _y, third, 32f,
                 () => _pending = () => Change(z => { z.Set(Keys.Order, (int)VillagePlebs.Order.Guard); z.Set(Keys.Post, c.transform.position); }), order == Order.Guard, size: 16f);
             Btn(T("villagepleb_menu_come_here"), bx + (third + 6f) * 2f, _y, third, 32f, () => _pending = ComeHere, size: 16f);
             _y += 38f;
+            Btn(T(Sailing.Away(c) ? "villagepleb_sail_change" : "villagepleb_sail_order"), bx, _y, _width, 32f, () => _pending = () =>
+            {
+                Player p = Player.m_localPlayer;
+                Humanoid h = _shown;
+                if (!Mine) { _note = NoOrders; return; }
+                CloseMenu();
+                string why = Sailing.Offer(p, h);
+                if (!string.IsNullOrEmpty(why)) Tell(why);
+            }, size: 16f);
+            _y += 38f;
             Note(T("villagepleb_menu_hold_key", MainConfig.menuKey.Value), GameUi.Dim);
         }
 
-        private void GiveOrder(Func<Humanoid, bool> order)
+        // whileAway: an order it takes even away by ship (Go home: it sails home).
+        private void GiveOrder(Func<Humanoid, bool> order, bool whileAway = false)
         {
-            if (!Commandable) { _note = T("villagepleb_menu_owner_orders"); return; }
+            if (!Commandable && !(whileAway && Mine && Sailing.Away(_shown))) { _note = NoOrders; return; }
             if (!order(_shown)) _note = T("villagepleb_menu_busy");
         }
 
@@ -875,6 +904,7 @@ namespace VillagePlebs
         {
             Order order = Companion.OrderOf(c);
             BeginCard(T("villagepleb_menu_what_it_does"));
+            if (Sailing.Away(c)) Note(T("villagepleb_sail_busy_menu", Companion.NameOf(c)), GameUi.Warn);
             OrderButtons(c);
             Note(order switch
             {
@@ -895,7 +925,10 @@ namespace VillagePlebs
                 for (int k = 0; k < Errands.All.Length; k++)
                 {
                     Errand pick = Errands.All[k].What;
-                    Btn(Errands.All[k].Label, _left + (k % 3) * (bw + 6f), _y, bw, 32f, () => _pending = () => { BrainState bs = Brain.Claim(_shown, out string why); _note = bs != null ? Errands.Run(bs, pick) ?? "" : Words.Show(why); }, size: 16f);
+                    // Go shopping only once a trader has been found.
+                    bool can = pick != Errand.Shop || Shopping.AnyTrader();
+                    _sig.Append(can);
+                    Btn(Errands.All[k].Label, _left + (k % 3) * (bw + 6f), _y, bw, 32f, () => _pending = () => { BrainState bs = Brain.Claim(_shown, out string why); _note = bs != null ? Errands.Run(bs, pick) ?? "" : Words.Show(why); }, enabled: can, size: 16f);
                     if (k % 3 == 2 || k == Errands.All.Length - 1) _y += 38f;
                 }
                 EndCard();
@@ -1148,7 +1181,7 @@ namespace VillagePlebs
             Note(jobs == Job.None
                 ? (auto == Job.None && goal == null ? T("villagepleb_menu_jobs_auto_nothing") : T("villagepleb_menu_jobs_auto", JobNames(auto | Goals.JobsFor(goal, out _))))
                 : T("villagepleb_menu_jobs_chosen"), GameUi.Text);
-            foreach (Job job in new[] { Job.Wood, Job.Stone, Job.Ore, Job.Forage, Job.Hunt, Job.Cook, Job.Loot })
+            foreach (Job job in new[] { Job.Wood, Job.Stone, Job.Ore, Job.Forage, Job.Hunt, Job.Cook, Job.Plant, Job.Harvest, Job.Loot })
             {
                 bool on = (jobs & job) != 0;
                 string tool = Work.ToolFor(c, job);
@@ -1160,6 +1193,8 @@ namespace VillagePlebs
                     Job.Forage => T("villagepleb_menu_job_forage"),
                     Job.Hunt => T("villagepleb_menu_job_hunt"),
                     Job.Cook => T("villagepleb_menu_job_cook"),
+                    Job.Plant => T("villagepleb_menu_job_plant"),
+                    Job.Harvest => T("villagepleb_menu_job_harvest"),
                     _ => T("villagepleb_menu_job_loot"),
                 };
                 Job pick = job;

@@ -67,6 +67,8 @@ namespace VillagePlebs
             VillagePlebs.Shared.ServerCheck.Stop();
             Activity.Flush(true);
             Home.Stop();
+            Docks.Stop();
+            Shopping.Forget();
             Portraits.Stop();
             ReleaseForReload();
             EpicMmo.Forget();
@@ -103,7 +105,9 @@ namespace VillagePlebs
             Player player = Player.m_localPlayer;
             Net.Update(player);
             Passing.Tick();
-            if (player == null) { if (MenuOpen) CloseMenu(); Wheel.Close(); return; }
+            Sailing.Update(player, Time.deltaTime);
+            Shopping.Update();
+            if (player == null) { if (MenuOpen) CloseMenu(); Wheel.Close(); if (SeaMap.IsOpen) SeaMap.Close(); return; }
             Companion.KeepOwnership(player);
             Home.Tick(player);
             UpdateMenu(player);
@@ -127,13 +131,13 @@ namespace VillagePlebs
                 if (!_keyHeld && Time.time - _keyDownAt > 0.45f) { _keyHeld = true; Home.ToggleAll(player); }
                 return;
             }
-            if (!_keyHeld) OpenMenuFor(player, Companion.MineNear(player, float.MaxValue));
+            if (!_keyHeld) OpenMenuFor(player, Companion.LastOrNearest(player));
             _keyDownAt = -1f;
         }
 
         internal static bool TypingOrBusy() =>
             (Chat.instance != null && Chat.instance.HasFocus()) || Console.IsVisible() || TextInput.IsVisible() || global::Menu.IsVisible() ||
-            InventoryGui.IsVisible() || Minimap.IsOpen() || StoreGui.IsVisible() || Hud.IsPieceSelectionVisible();
+            InventoryGui.IsVisible() || Minimap.IsOpen() || StoreGui.IsVisible() || Hud.IsPieceSelectionVisible() || SeaMap.IsOpen || ShopPanel.IsOpen;
 
         internal void Note(string text) => Logger.LogInfo(text);
         internal void Warn(string text) => Logger.LogWarning(text);

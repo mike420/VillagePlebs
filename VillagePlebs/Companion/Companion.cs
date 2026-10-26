@@ -69,12 +69,22 @@ namespace VillagePlebs
             return null;
         }
 
+        // The companion last chosen on the command wheel or in the menu: both open on it next time while it is still near.
+        public static long LastChosen;
+
+        public static Humanoid LastOrNearest(Player p)
+        {
+            Humanoid last = LastChosen == 0L ? null : All().FirstOrDefault(c => !c.IsDead() && IdOf(c) == LastChosen && IsMine(c, p));
+            return last ?? MineNear(p, float.MaxValue);
+        }
+
         public static Humanoid MineNear(Player p, float range) =>
             All().Where(c => IsMine(c, p) && Vector3.Distance(c.transform.position, p.transform.position) < range)
                  .OrderBy(c => Vector3.Distance(c.transform.position, p.transform.position)).FirstOrDefault();
 
         // Only its own master gives it orders.
-        public static bool CanCommand(Component c, Player p) => IsMine(c, p);
+        // Yours, and not away by ship (it takes no orders until it is sent somewhere new or home).
+        public static bool CanCommand(Component c, Player p) => IsMine(c, p) && !Sailing.Away(c) && !Shopping.Away(c);
 
         public static bool Write(Humanoid c, System.Action<ZDO> change)
         {

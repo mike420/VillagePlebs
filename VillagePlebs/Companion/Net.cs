@@ -12,7 +12,7 @@ namespace VillagePlebs
     internal static class Net
     {
         private const string RpcStats = "VillagePlebs_Stats", RpcFallen = "VillagePlebs_Fallen", RpcCleared = "VillagePlebs_GearTaken", RpcSays = "VillagePlebs_Says";
-        private const string RpcWhereIs = "VillagePlebs_WhereIs", RpcWhereIsAnswer = "VillagePlebs_WhereIsAnswer";
+        private const string RpcWhereIs = "VillagePlebs_WhereIs", RpcWhereIsAnswer = "VillagePlebs_WhereIsAnswer", RpcFetch = "VillagePlebs_Fetch";
         public const string CrateKey = "vp_fallen";
         private const string MarkerKey = "villagepleb_net_marker";
 
@@ -25,6 +25,9 @@ namespace VillagePlebs
         private static ZRoutedRpc _registeredOn;
         private static float _nextSend, _nextMarkerCheck;
         private static int _peers, _registerAfterFrame;
+
+        // This game's handlers are in place, so answers to what it asks are not lost.
+        public static bool Ready => ZRoutedRpc.instance != null && _registeredOn == ZRoutedRpc.instance;
 
         public static void Start()
         {
@@ -58,7 +61,9 @@ namespace VillagePlebs
                 rpc.Register<string>(RpcSays, OnSays);
                 rpc.Register<string>(RpcWhereIs, OnWhereIs);
                 rpc.Register<string>(RpcWhereIsAnswer, OnWhereIsAnswer);
+                rpc.Register<string>(RpcFetch, OnFetch);
                 Book.Register(rpc);
+                Docks.Register(rpc);
             }
             Book.Tick();
             if (me == null) return;
@@ -73,7 +78,7 @@ namespace VillagePlebs
                 if (peers > 1)
                     foreach (Humanoid c in Companion.All())
                     {
-                        if (!c.GetComponent<ZNetView>().IsOwner()) continue;
+                        if (!c.GetComponent<ZNetView>().IsOwner() || Shopping.Away(c)) continue;
                         string line = StatsLine(c), gist = Gist(line);
                         long id = Companion.IdOf(c);
                         if (LastSent.TryGetValue(id, out var last) && last.Key == gist && Time.time - last.Value < 3f) continue;
@@ -122,7 +127,7 @@ namespace VillagePlebs
         {
             if (ZRoutedRpc.instance == null) return;
             var table = AccessTools.Field(typeof(ZRoutedRpc), "m_functions").GetValue(ZRoutedRpc.instance) as IDictionary;
-            foreach (string name in new[] { RpcStats, RpcFallen, RpcCleared, RpcSays, RpcWhereIs, RpcWhereIsAnswer }.Concat(Book.RpcNames)) table?.Remove(name.GetStableHashCode());
+            foreach (string name in new[] { RpcStats, RpcFallen, RpcCleared, RpcSays, RpcWhereIs, RpcWhereIsAnswer, RpcFetch }.Concat(Book.RpcNames).Concat(Docks.RpcNames)) table?.Remove(name.GetStableHashCode());
         }
 
         public static void AskWhere(long id)
@@ -141,6 +146,33 @@ namespace VillagePlebs
             Vector3? tomb = up ? null : VillagePlebs.Remote.FindTomb(id);
             ZRoutedRpc.instance.InvokeRoutedRPC(sender, RpcWhereIsAnswer, id.ToString(CultureInfo.InvariantCulture) + "|" + (up ? "1" : "0")
                 + (tomb != null ? $"|{F(tomb.Value.x)}|{F(tomb.Value.y)}|{F(tomb.Value.z)}" : ""));
+        }
+
+        // After a relog your game knows nothing of what is far away: it asks the host to send it your companions that are not near you
+        // (and the ships of any away sailing), so they show on the map and their voyages carry on from your game.
+        public static void AskFor(IEnumerable<long> ids)
+        {
+            if (ZRoutedRpc.instance == null || ZNet.instance == null || ZNet.instance.IsServer()) return;
+            string payload = string.Join(",", ids.Select(i => i.ToString(CultureInfo.InvariantCulture)));
+            if (payload.Length == 0) return;
+            try { ZRoutedRpc.instance.InvokeRoutedRPC(RpcFetch, payload); }
+            catch (Exception e) { VillagePlebsPlugin.Instance?.Warn($"Could not ask the host about a voyage: {e.Message}"); }
+        }
+
+        private static void OnFetch(long sender, string payload)
+        {
+            if (ZNet.instance == null || !ZNet.instance.IsServer() || ZDOMan.instance == null) return;
+            VillagePlebs.Remote.Rescan();
+            foreach (string part in (payload ?? "").Split(','))
+            {
+                if (!long.TryParse(part, NumberStyles.Integer, CultureInfo.InvariantCulture, out long id)) continue;
+                ZDO body = VillagePlebs.Remote.Find(id);
+                if (body == null) continue;
+                ZDOMan.instance.ForceSendZDO(sender, body.m_uid);
+                if (!Sailing.Away(body)) continue;
+                ZDO hull = Sailing.HullOf(body);
+                if (hull != null) ZDOMan.instance.ForceSendZDO(sender, hull.m_uid);
+            }
         }
 
         private static void OnWhereIsAnswer(long sender, string payload)
@@ -195,6 +227,26 @@ namespace VillagePlebs
             Remote[id] = new Seen { Line = line, At = Time.time, Master = f[2] };
         }
 
+        private static List<ZDO> _far = new List<ZDO>();
+        private static float _nextFar;
+
+        // Your companions this game has a record of but not loaded, looked up once a second.
+        private static List<ZDO> FarMine()
+        {
+            if (Time.time < _nextFar) return _far;
+            _nextFar = Time.time + 1f;
+            _far = new List<ZDO>();
+            Player me = Player.m_localPlayer;
+            if (me == null || ZNetScene.instance == null) return _far;
+            foreach (Profile prof in Profile.Here(me))
+            {
+                if (prof.Dead) continue;
+                ZDO z = VillagePlebs.Remote.Find(prof.Id);
+                if (z != null && ZNetScene.instance.FindInstance(z) == null && z.GetLong(Keys.Id, 0L) != 0L) _far.Add(z);
+            }
+            return _far;
+        }
+
         private static List<string> CompanionLines()
         {
             var lines = new List<string>();
@@ -205,15 +257,27 @@ namespace VillagePlebs
                 var have = new HashSet<long>();
                 foreach (Humanoid c in Companion.All())
                 {
-                    if (c.IsDead() || !online.Contains(Companion.Zdo(c).GetString(Keys.MasterName, ""))) continue;
+                    // Out shopping: off the map too until it is back.
+                    if (c.IsDead() || Shopping.Away(c) || !online.Contains(Companion.Zdo(c).GetString(Keys.MasterName, ""))) continue;
                     long cid = Companion.IdOf(c);
                     bool runHere = c.GetComponent<ZNetView>().IsOwner();
                     if (!runHere && Remote.TryGetValue(cid, out Seen s) && Time.time - s.At < 6f) continue;
                     lines.Add(StatsLine(c));
                     have.Add(cid);
                 }
-                foreach (var kv in Remote.Where(kv => Time.time - kv.Value.At < 8f && !have.Contains(kv.Key) && online.Contains(kv.Value.Master)))
+                foreach (var kv in Remote.Where(kv => Time.time - kv.Value.At < 8f && !have.Contains(kv.Key) && online.Contains(kv.Value.Master) && !Shopping.Away(VillagePlebs.Remote.Find(kv.Key))))
+                {
                     lines.Add(kv.Value.Line);
+                    have.Add(kv.Key);
+                }
+                // Your own that are too far away to be loaded: where the world last had them.
+                foreach (ZDO z in FarMine())
+                {
+                    long cid = z.GetLong(Keys.Id, 0L);
+                    if (have.Contains(cid) || Shopping.Away(z)) continue;
+                    Vector3 p = z.GetPosition();
+                    lines.Add(string.Join("|", cid.ToString(CultureInfo.InvariantCulture), Clean(z.GetString(Keys.Name, "")), Clean(z.GetString(Keys.MasterName, "")), F(p.x), F(p.y), F(p.z)));
+                }
                 RecentlyFallen.RemoveAll(f => Time.time - f.At > 600f || (Time.time - f.At > 10f && lines.Any(l => l.Split('|')[2] == f.Master)));
             }
             catch (Exception) { lines.Clear(); }

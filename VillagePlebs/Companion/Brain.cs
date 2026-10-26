@@ -71,6 +71,7 @@ namespace VillagePlebs
         public Dictionary<string, int> StockCaps;
         public float MissionSince, MissionBest, MissionAskSince, MissionReadySince;
         public readonly Dictionary<string, float> DroppedUntil = new Dictionary<string, float>();
+        public readonly HashSet<string> NoSmelter = new HashSet<string>();
         public List<Goal> Candidates = new List<Goal>();
         public float WokeAt = -999f;
         public Work.Task Task;
@@ -78,6 +79,8 @@ namespace VillagePlebs
         public float NextRepairLook, RepairSince;
         public bool RepairAll, RollCredited;
         public Ship Riding;
+        public Ship Helm;
+        public float HelmSince, NextHelmLook;
         public Chair Seat;
         public Vector3 DeckSpot;
         public float RideLastSeen;
@@ -156,10 +159,17 @@ namespace VillagePlebs
         public readonly Dictionary<int, float> Skipped = new Dictionary<int, float>();
         public readonly Dictionary<string, int> Gathered = new Dictionary<string, int>();
         public float NextEnemyScan, NextGear, NextAsk, LastAsk, HealthAtAsk = 1f;
-        public float NextPlant, NextToolLook, NextMissionCheck, GoingHomeUntil;
+        public float NextPlant, NextToolLook, NextMissionCheck, GoingHomeUntil, HomeBest = float.MaxValue, HomeBestAt;
+        public float PerchedSince = -1f, NextPerchLook, NextFullPath, WedgedSince = -1f;
+        public Vector3 WedgedAt;
+        public bool NoFullPath;
+        public Vector3 FullPathTo;
+        public Vector3? PerchDown;
         public Work.Task Then;
         public Job Ticked;
         public Errand? Farm;
+        public bool FarmQuiet;
+        public float NextFarmJob;
         public int FarmTrips;
         public float NextStuckCheck, StuckDistance = float.MaxValue;
         public Vector3 StuckFrom;
@@ -198,15 +208,37 @@ namespace VillagePlebs
         private static readonly AccessTools.FieldRef<Character, bool> Blocking = AccessTools.FieldRefAccess<Character, bool>("m_blocking");
         private static readonly AccessTools.FieldRef<Humanoid, float> DrawTime = AccessTools.FieldRefAccess<Humanoid, float>("m_attackDrawTime");
 
+        // Whether the game's way-finding reaches the point itself, not just the nearest it can get to it (outside the wall of the house
+        // it is in, say: it would walk there and stand, often up on whatever is against the wall).
+        private static bool FullPath(BaseAI ai, Vector3 from, Vector3 to)
+        {
+            Pathfinding pf = Pathfinding.instance;
+            if (pf == null) return true;
+            if (!pf.FindValidPoint(out Vector3 goal, to, 2.5f, ai.m_pathAgentType)) return false;
+            return pf.HavePath(from, goal, ai.m_pathAgentType);
+        }
+
         private static bool MoveTo(BaseAI ai, float dt, Vector3 point, float dist, bool run)
         {
             Character c = ai.GetComponent<Character>();
             bool canRun = run && Stamina.CanRun(c);
-            bool result = MoveToRaw(ai, dt, point, dist, canRun);
             Vector3 pos = c.transform.position;
-            if (Utils.DistanceXZ(point, pos) <= Mathf.Max(dist, 0.75f) || c.GetMoveDir().sqrMagnitude > 0.01f) return result;
             Humanoid h = c as Humanoid;
             BrainState st = h != null ? Get(h) : null;
+            // No whole way there: a way through a door (open or shut) comes first, before the game's way to the nearest it can get.
+            bool partial = false;
+            if (st != null && Utils.DistanceXZ(point, pos) > 3f)
+            {
+                if (Time.time >= st.NextFullPath || Vector3.Distance(st.FullPathTo, point) > 2f)
+                {
+                    st.NextFullPath = Time.time + 2f;
+                    st.FullPathTo = point;
+                    st.NoFullPath = !FullPath(ai, pos, point);
+                }
+                partial = st.NoFullPath && (st.Door != null && Time.time < st.Door.Until && Vector3.Distance(st.Door.Target, point) < 4f || (st.Door = PlanDoor(ai, pos, point)) != null);
+            }
+            bool result = partial ? false : MoveToRaw(ai, dt, point, dist, canRun);
+            if (!partial && (Utils.DistanceXZ(point, pos) <= Mathf.Max(dist, 0.75f) || c.GetMoveDir().sqrMagnitude > 0.01f)) return result;
             if (st != null)
             {
                 DoorPlan plan = st.Door != null && Time.time < st.Door.Until && Vector3.Distance(st.Door.Target, point) < 4f ? st.Door : st.Door = PlanDoor(ai, pos, point);
@@ -426,6 +458,59 @@ namespace VillagePlebs
             Food.Tick(me, st);
             EpicMmo.Tick(me);
             Activity.Tick(st);
+            if (Shopping.Tick(st)) return true;
+            if (Sailing.Tick(st)) return true;
+            // Up on a workbench, chest, table or the like (it found no other way towards somewhere): it climbs down before anything else.
+            if (Time.time >= st.NextPerchLook)
+            {
+                st.NextPerchLook = Time.time + 0.5f;
+                // Not when it means to be there: sat on a chair, or asleep in its bed.
+                bool meant = st.Sitting || st.Asleep || !ReferenceEquals(st.SitChair, null) || !ReferenceEquals(st.IdleChair, null);
+                st.PerchDown = st.Riding == null && !me.IsAttached() && !meant ? Steer.Perched(me) : null;
+                if (st.PerchDown == null) st.PerchedSince = -1f;
+                else if (st.PerchedSince < 0f) st.PerchedSince = Time.time;
+            }
+            if (st.PerchDown is Vector3 down && st.PerchedSince >= 0f && Time.time - st.PerchedSince > 2f)
+            {
+                if (Time.time - st.PerchedSince > 6f)
+                {
+                    // Could not walk off it: it hops down.
+                    me.transform.position = down;
+                    if (me.GetComponent<Rigidbody>() is Rigidbody rb) { rb.position = down; rb.linearVelocity = Vector3.zero; }
+                    st.PerchedSince = -1f;
+                    st.PerchDown = null;
+                    Activity.Log(me, $"hopped down off the furniture to {down:F0}");
+                }
+                else
+                {
+                    MoveTo(ai, dt, down, 0.3f, false);
+                    SetStatus(st, P("villagepleb_brain_status_climbing_down"));
+                    return true;
+                }
+            }
+            // Wedged (it means to move but has not shifted for a while, caught in furniture or a corner): it hops to the nearest free spot.
+            if (me.GetMoveDir().sqrMagnitude > 0.01f && st.Riding == null && !me.IsAttached() && !me.InAttack())
+            {
+                if (st.WedgedSince < 0f || Vector3.Distance(me.transform.position, st.WedgedAt) > 0.3f) { st.WedgedSince = Time.time; st.WedgedAt = me.transform.position; }
+                else if (Time.time - st.WedgedSince > 6f)
+                {
+                    st.WedgedSince = -1f;
+                    if (Steer.FreeSpot(me) is Vector3 free)
+                    {
+                        me.transform.position = free;
+                        if (me.GetComponent<Rigidbody>() is Rigidbody rb) { rb.position = free; rb.linearVelocity = Vector3.zero; }
+                        Activity.Log(me, $"was wedged at {st.WedgedAt:F0}: moved to {free:F0}");
+                    }
+                }
+            }
+            else st.WedgedSince = -1f;
+            // In the water near the shore: it swims ashore before anything else.
+            if (st.Riding == null && Steer.ShoreFor(me) is Vector3 shore)
+            {
+                MoveTo(ai, dt, shore, 1f, true);
+                SetStatus(st, P("villagepleb_brain_status_swimming_ashore"));
+                return true;
+            }
             Following.Tick(st, master);
             Banter.Tick(st, master);
             Idle.Tick(st, master);
@@ -524,6 +609,8 @@ namespace VillagePlebs
                         && Work.Help(st, master, dt, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run), () => st.Ai.StopMoving(), p => LookAt(st.Ai, p), st.Doing == Doing.Mining ? Job.Stone | Job.Ore : Job.Wood))
                         break;
                     if (d > 60f && !master.IsAttached() && master.IsOnGround() && st.Area == null) { TeleportBehind(me, master); break; }
+                    // You crossed water it won't swim: once you are ashore it comes over to you.
+                    if (d > 12f && Steer.WetFor(me) > 4f && !master.IsAttached() && master.IsOnGround() && !master.InWater() && st.Area == null) { TeleportBehind(me, master, "villagepleb_brain_hopped_over_to"); break; }
                     if (Time.time < st.SideStepUntil) { MoveTo(st.Ai, dt, st.SideStepTo, 0.4f, false); break; }
                     if (d < 8f && st.Cart == null && Idle.WithYou(st, master, d, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run), p => LookAt(st.Ai, p))) break;
                     if (d > 3.5f)
@@ -573,6 +660,7 @@ namespace VillagePlebs
 
         internal static void TeleportBehind(Humanoid me, Player master, string how = "villagepleb_brain_caught_up_with")
         {
+            if (Sailing.AtHelm(me) || Shopping.Away(me)) return;
             Vector3 pos = FreeSpotNear(master, me);
             me.transform.position = pos;
             Rigidbody body = me.GetComponent<Rigidbody>();

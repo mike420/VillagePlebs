@@ -17,6 +17,7 @@ namespace VillagePlebs
         public readonly List<KeyValuePair<Recipe, CraftingStation>> Steps = new List<KeyValuePair<Recipe, CraftingStation>>();
         public readonly HashSet<string> Smelt = new HashSet<string>();
         public int Cost;
+        public bool NoSmelter;
 
         public bool Wants(string prefab) => prefab != null && Raw.ContainsKey(prefab);
 
@@ -33,6 +34,7 @@ namespace VillagePlebs
         private static Dictionary<string, ItemDrop> _smeltedFrom;
         private static HashSet<string> _crops;
         private static Dictionary<string, float> _unfindable;
+        private static List<Smelter> _smelters;
 
         private static readonly HashSet<string> Prey = new HashSet<string> { "Deer", "Boar", "Neck", "Hare" };
 
@@ -137,6 +139,7 @@ namespace VillagePlebs
             Learn();
             if (_sources == null || ObjectDB.instance == null) return null;
             _unfindable = st?.Unfindable;
+            _smelters = Smelting.Near(center, radius).ToList();
             List<CraftingStation> stations = Upgrades.StationsNear(center, radius + 10f);
             List<Container> chests = Home.Chests(me);
             var goals = new List<Goal>();
@@ -160,7 +163,10 @@ namespace VillagePlebs
                 var g = new Goal { Recipe = r, Station = at, What = P("villagepleb_goals_make_what", Low(r.m_item.m_itemData.m_shared.m_name)) };
                 if (Build(me, chests, stations, g, r, 1)) goals.Add(g);
             }
-            var ranked = goals.Where(g => st == null || !Missions.Blocked(st, Missions.KeyOf(g)))
+            _smelters = null;
+            // Bars (or anything else a smelter makes) it has not got and no smelter near home makes: that waits until one is built.
+            if (st != null) { st.NoSmelter.Clear(); foreach (Goal wait in goals.Where(x => x.NoSmelter)) st.NoSmelter.Add(Missions.KeyOf(wait)); }
+            var ranked = goals.Where(g => !g.NoSmelter && (st == null || !Missions.Blocked(st, Missions.KeyOf(g))))
                               .OrderBy(g => g.Ask.Count > 0 ? 1 : 0).ThenBy(g => g.Ask.Count).ThenBy(g => g.Cost).ToList();
             if (st != null)
             {
@@ -202,6 +208,9 @@ namespace VillagePlebs
             string prefab = item.gameObject.name;
             if (depth > 0) need -= Have(me, chests, item);
             if (need <= 0) return;
+            // Metal (or anything made from what a smelter makes) it has not got: only with a smelter near home that makes it, however
+            // else it might turn up.
+            if (_smelters != null && NeedsSmelter(me, chests, item, depth)) { g.NoSmelter = true; return; }
             g.Cost += need;
             if (CanGather(me, prefab))
             {
@@ -211,6 +220,7 @@ namespace VillagePlebs
             }
             if (depth < 3 && _smeltedFrom.TryGetValue(prefab, out ItemDrop ore))
             {
+                if (_smelters != null && !_smelters.Any(s => Smelting.Makes(s, prefab))) { g.NoSmelter = true; return; }
                 g.Smelt.Add(item.m_itemData.m_shared.m_name);
                 Expand(me, chests, stations, g, ore, need, depth + 1);
                 return;
@@ -226,6 +236,16 @@ namespace VillagePlebs
             }
             g.Ask.Add(P("villagepleb_goals_amount", need, Low(item.m_itemData.m_shared.m_name)));
             g.Cost += 100;
+        }
+
+        // Whether this, or what it is made from (and not already to hand), comes out of a smelter with none near home making it.
+        private static bool NeedsSmelter(Humanoid me, List<Container> chests, ItemDrop item, int depth)
+        {
+            string prefab = item.gameObject.name;
+            if (_smeltedFrom.ContainsKey(prefab)) return !_smelters.Any(s => Smelting.Makes(s, prefab));
+            if (depth >= 3) return false;
+            Recipe r = ObjectDB.instance.GetRecipe(item.m_itemData);
+            return r != null && Upgrades.Needs(r).Any(q => q.m_resItem != null && Have(me, chests, q.m_resItem) < q.GetAmount(1) && NeedsSmelter(me, chests, q.m_resItem, depth + 1));
         }
 
         public static KeyValuePair<Recipe, CraftingStation>? StepReady(Humanoid me, Goal g)

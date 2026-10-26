@@ -150,16 +150,22 @@ namespace VillagePlebs
 
         public static bool Follow(Humanoid c, bool manual = true)
         {
+            if (Sailing.Away(c) || Shopping.Away(c)) return false;
             bool ok = Companion.Write(c, z => z.Set(Keys.Order, (int)Order.Follow));
             if (!ok) return false;
             BrainState st = Brain.Get(c);
             st.GoingHomeUntil = 0f;
+            // Called to you: whatever errand it was on is over.
+            if (manual && Work.OnOrder(st)) Work.StopJob(st);
             if (manual) { st.ManualOrderAt = Time.time; st.Outing = false; st.Remember(P("villagepleb_home_remember_called")); Errands.ForTheRoad(st); }
             return true;
         }
 
         public static bool GoHome(Humanoid c, bool quiet = false, bool manual = true)
         {
+            // Away by ship, Go home sends it home by sea.
+            if (Shopping.Away(c)) return false;
+            if (Sailing.Away(c)) return manual && Sailing.HomeBySea(c);
             string setUp = Companion.Zdo(c)?.GetBool(Keys.HasBed, false) == true && Chests(c).Count > 0 ? null : SetUp(c);
             bool ok = Companion.Write(c, z =>
             {
@@ -179,7 +185,7 @@ namespace VillagePlebs
 
         public static void ToggleAll(Player p)
         {
-            var near = Companion.All().Where(c => Companion.IsMine(c, p) && !c.IsDead() && Vector3.Distance(c.transform.position, p.transform.position) < 100f).ToList();
+            var near = Companion.All().Where(c => Companion.CanCommand(c, p) && !c.IsDead() && Vector3.Distance(c.transform.position, p.transform.position) < 100f).ToList();
             if (near.Count == 0) { VillagePlebsPlugin.Tell(T("villagepleb_home_none_near", MainConfig.menuKey.Value)); return; }
             bool home = near.Any(c => Companion.OrderOf(c) == Order.Follow);
             foreach (Humanoid c in near)
