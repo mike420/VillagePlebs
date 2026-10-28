@@ -89,7 +89,6 @@ namespace VillagePlebs
             Banter.Forget();
             Marks.Forget();
             Words.Forget();
-            BagPanel.Destroy();
             Container_Load_Companion.Forget();
             _harmony?.UnpatchSelf();
             Prefab.Unregister();

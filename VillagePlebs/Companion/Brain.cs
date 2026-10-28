@@ -504,13 +504,6 @@ namespace VillagePlebs
                 }
             }
             else st.WedgedSince = -1f;
-            // In the water near the shore: it swims ashore before anything else.
-            if (st.Riding == null && Steer.ShoreFor(me) is Vector3 shore)
-            {
-                MoveTo(ai, dt, shore, 1f, true);
-                SetStatus(st, P("villagepleb_brain_status_swimming_ashore"));
-                return true;
-            }
             Following.Tick(st, master);
             Banter.Tick(st, master);
             Idle.Tick(st, master);
@@ -518,7 +511,7 @@ namespace VillagePlebs
             if (Ride.Tick(st, master)) return true;
             Loot.PassBy(st);
             if (Time.time >= st.NextMissionCheck) { st.NextMissionCheck = Time.time + 1f; Missions.CheckDone(st); }
-            if (Time.time >= st.NextGear) { st.NextGear = Time.time + 0.5f; Companion.Maintain(me, st.Current.Ranged, st.InCombat ? null : st.WorkTool, st.InCombat ? st.Current.Target : null); }
+            if (Time.time >= st.NextGear) { st.NextGear = Time.time + 0.5f; Companion.Maintain(me, st.Current.Ranged, st.InCombat ? null : st.WorkTool, st.InCombat ? st.Current.Target : null, st.InCombat || st.Enemies.Count > 0); }
             if (gear != null && Containers.InUse(gear)) { ai.StopMoving(); Blocking(me) = false; SetStatus(st, P("villagepleb_brain_status_gear_open")); return true; }
             if (!st.Asleep && Carts.Tick(st, (p, dd, run) => MoveTo(ai, dt, p, dd, run), () => ai.StopMoving())) return true;
 
@@ -609,8 +602,6 @@ namespace VillagePlebs
                         && Work.Help(st, master, dt, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run), () => st.Ai.StopMoving(), p => LookAt(st.Ai, p), st.Doing == Doing.Mining ? Job.Stone | Job.Ore : Job.Wood))
                         break;
                     if (d > 60f && !master.IsAttached() && master.IsOnGround() && st.Area == null) { TeleportBehind(me, master); break; }
-                    // You crossed water it won't swim: once you are ashore it comes over to you.
-                    if (d > 12f && Steer.WetFor(me) > 4f && !master.IsAttached() && master.IsOnGround() && !master.InWater() && st.Area == null) { TeleportBehind(me, master, "villagepleb_brain_hopped_over_to"); break; }
                     if (Time.time < st.SideStepUntil) { MoveTo(st.Ai, dt, st.SideStepTo, 0.4f, false); break; }
                     if (d < 8f && st.Cart == null && Idle.WithYou(st, master, d, (p, dd, run) => MoveTo(st.Ai, dt, p, dd, run), p => LookAt(st.Ai, p))) break;
                     if (d > 3.5f)

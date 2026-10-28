@@ -269,13 +269,13 @@ namespace VillagePlebs
             foreach (var kv in st.LootDrops)
             {
                 ItemDrop d = kv.Key;
-                if (Time.time - kv.Value < 0.6f || !inv.CanAddItem(d.m_itemData) || Steer.InDeepWater(d.transform.position)) continue;
+                if (Time.time - kv.Value < 0.6f || !inv.CanAddItem(d.m_itemData)) continue;
                 float dist = Vector3.Distance(d.transform.position, me.transform.position);
                 if (dist < 40f && dist < best) { best = dist; next = d; }
             }
             foreach (ItemDrop d in Drops())
             {
-                if (d == null || !inv.CanAddItem(d.m_itemData) || !Wants(me, d) || Steer.InDeepWater(d.transform.position)) continue;
+                if (d == null || !inv.CanAddItem(d.m_itemData) || !Wants(me, d)) continue;
                 foreach (Spot s in st.LootSpots)
                 {
                     float fromSpot = Vector3.Distance(d.transform.position, s.Pos);

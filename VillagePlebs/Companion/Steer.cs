@@ -8,7 +8,7 @@ namespace VillagePlebs
     internal static class Steer
     {
         private class Hazard { public Collider Col; public Vector3 Center; public float Radius; }
-        private class State { public float NextScan, NextJump, NextMoveCheck, Side, SideUntil, PressedSince = -1f, WetSince = -1f, NextShore, StrandedSince = -1f, SwimUntil; public bool AvoidWater; public Vector3? Shore; public Vector3 LastPos; public readonly List<Hazard> Near = new List<Hazard>(); }
+        private class State { public float NextScan, NextJump, NextMoveCheck, Side, SideUntil, PressedSince = -1f; public Vector3 LastPos; public readonly List<Hazard> Near = new List<Hazard>(); }
 
         private static readonly Dictionary<Humanoid, State> States = Cleanup.Track(new Dictionary<Humanoid, State>());
         private static readonly AccessTools.FieldRef<Aoe, Character> Owner = AccessTools.FieldRefAccess<Aoe, Character>("m_owner");
@@ -18,31 +18,6 @@ namespace VillagePlebs
         public static void Forget() => States.Clear();
 
         public static int HazardsNear(Humanoid h) => h != null && States.TryGetValue(h, out State s) ? s.Near.Count : 0;
-
-        // In the water (knocked in, or a ship gone from under it) with dry land near: the nearest of it, to swim to. Looked for once a second.
-        public static Vector3? ShoreFor(Humanoid me)
-        {
-            if (me == null || !me.IsSwimming() || ZoneSystem.instance == null) return null;
-            State s = Of(me);
-            if (Time.time < s.NextShore) return s.Shore;
-            s.NextShore = Time.time + 1f;
-            s.Shore = null;
-            Vector3 pos = me.transform.position;
-            float dry = ZoneSystem.instance.m_waterLevel + 0.3f;
-            for (float r = 4f; r <= 40f && s.Shore == null; r += 4f)
-            {
-                float best = float.MaxValue;
-                for (int k = 0; k < 16; k++)
-                {
-                    float a = k * Mathf.PI / 8f;
-                    Vector3 p = pos + new Vector3(Mathf.Sin(a), 0f, Mathf.Cos(a)) * r;
-                    if (!ZoneSystem.instance.GetSolidHeight(p, out float h) || h < dry || !Climbable(pos, p, h) || !Land(pos, p, dry)) continue;
-                    float d = Vector3.Distance(new Vector3(p.x, h, p.z), pos);
-                    if (d < best) { best = d; s.Shore = new Vector3(p.x, h, p.z); }
-                }
-            }
-            return s.Shore;
-        }
 
         // Standing on top of a piece of furniture (a workbench or its extensions, a chest, bed, chair, table, stove, fire, smelter):
         // the nearest free ground below it to step down to, or null if it is not up on one.
@@ -82,37 +57,13 @@ namespace VillagePlebs
                 {
                     Vector3 p = pos + Quaternion.Euler(0f, k * 30f, 0f) * Vector3.forward * r;
                     if (!Physics.Raycast(new Vector3(p.x, pos.y + 2.5f, p.z), Vector3.down, out RaycastHit hit, 6f, Solid, QueryTriggerInteraction.Ignore)) continue;
-                    if (Furniture(hit.collider) || Mathf.Abs(hit.point.y - pos.y) > 2.5f || Deep(hit.point)) continue;
+                    if (Furniture(hit.collider) || Mathf.Abs(hit.point.y - pos.y) > 2.5f) continue;
                     Vector3 feet = hit.point + Vector3.up * 0.05f;
                     if (Physics.CheckCapsule(feet + Vector3.up * 0.45f, feet + Vector3.up * 1.6f, 0.38f, Solid, QueryTriggerInteraction.Ignore)) continue;
                     return feet;
                 }
             return null;
         }
-
-        // Real land, not a rock in the water: the ground stays dry a few steps on past where it would climb out.
-        private static bool Land(Vector3 from, Vector3 p, float dry)
-        {
-            Vector3 on = Vector3.ProjectOnPlane(p - from, Vector3.up).normalized;
-            foreach (float d in new[] { 3f, 6f })
-                if (!ZoneSystem.instance.GetSolidHeight(p + on * d, out float h) || h < dry) return false;
-            return true;
-        }
-
-        // Dry ground it can climb out onto: not a slope steeper than it can walk, and not a step up from the water (or from the ground
-        // just before it) higher than it can climb.
-        private static bool Climbable(Vector3 from, Vector3 p, float h)
-        {
-            if (Physics.Raycast(new Vector3(p.x, h + 5f, p.z), Vector3.down, out RaycastHit hit, 10f, Solid, QueryTriggerInteraction.Ignore)
-                && Vector3.Angle(hit.normal, Vector3.up) > 45f) return false;
-            Vector3 back = p - Vector3.ProjectOnPlane(p - from, Vector3.up).normalized * 2f;
-            float water = ZoneSystem.instance.m_waterLevel;
-            float below = ZoneSystem.instance.GetSolidHeight(back, out float hb) ? Mathf.Max(hb, water) : water;
-            return h - below <= 1.6f;
-        }
-
-        // How long it has been wanting to go on into deep water (and not going), 0 if it is not.
-        public static float WetFor(Humanoid h) => h != null && States.TryGetValue(h, out State s) && s.WetSince >= 0f ? Time.time - s.WetSince : 0f;
 
         private static State Of(Humanoid h)
         {
@@ -125,14 +76,11 @@ namespace VillagePlebs
         {
             if (me == null || me.IsDead() || st.Riding != null || me.IsSwimming()) return;
             State s = Of(me);
-            // It keeps out of deep water: it only goes to sea on a ship (riding along with you, or at the helm), and when you swim across
-            // it waits on the bank and comes over once you are ashore. Stranded (on a rock with deep water all round) it may swim for a bit.
-            s.AvoidWater = Time.time >= s.SwimUntil;
             Vector3 pos = me.transform.position;
             if (Time.time >= s.NextScan) { s.NextScan = Time.time + 0.3f; Scan(me, s, pos); }
             Vector3 dir = me.GetMoveDir();
             dir.y = 0f;
-            if (dir.sqrMagnitude < 0.01f) { s.PressedSince = -1f; s.LastPos = pos; s.WetSince = -1f; return; }
+            if (dir.sqrMagnitude < 0.01f) { s.PressedSince = -1f; s.LastPos = pos; return; }
             if (Time.time >= s.NextMoveCheck)
             {
                 s.NextMoveCheck = Time.time + 0.25f;
@@ -141,8 +89,6 @@ namespace VillagePlebs
                 s.PressedSince = !still ? -1f : s.PressedSince < 0f ? Time.time : s.PressedSince;
             }
             dir.Normalize();
-            bool wet = Deep(pos + dir * 1.5f);
-            s.WetSince = !wet ? -1f : s.WetSince < 0f ? Time.time : s.WetSince;
 
             Hazard inside = s.Near.FirstOrDefault(h => Hurts(h, pos, 0.3f));
             if (inside != null)
@@ -155,16 +101,6 @@ namespace VillagePlebs
 
             if (Clear(s, pos, dir)) { Jump(me, s, pos, dir); return; }
 
-            if (s.AvoidWater && Deep(pos + dir * 1.5f) && !Deep(pos + dir * 3.2f) && !Deep(pos + dir * 3.8f) && !Drop(pos, pos + dir * 3.5f)
-                && !s.Near.Any(h => Hurts(h, pos + dir * 3.5f, 0.4f)) && me.IsOnGround() && Time.time >= s.NextJump)
-            {
-                s.NextJump = Time.time + 1.5f;
-                me.SetMoveDir(dir);
-                me.SetRun(Stamina.CanRun(me));
-                me.Jump(false);
-                return;
-            }
-
             float first = Time.time < s.SideUntil ? s.Side : 1f;
             foreach (float a in Angles)
                 foreach (float sign in new[] { first, -first })
@@ -173,17 +109,9 @@ namespace VillagePlebs
                     if (!Clear(s, pos, d)) continue;
                     s.Side = sign;
                     s.SideUntil = Time.time + 1.5f;
-                    s.StrandedSince = -1f;
                     Go(me, st, d);
                     return;
                 }
-            // Every way out is deep water (stood on a rock in a lake, say): after a few seconds it swims for it, and once in the water
-            // it makes for the nearest real shore.
-            if (s.AvoidWater && Enumerable.Range(0, 8).Count(k => Deep(pos + Quaternion.Euler(0f, k * 45f, 0f) * Vector3.forward * 2f)) >= 5)
-            {
-                if (s.StrandedSince < 0f) s.StrandedSince = Time.time;
-                else if (Time.time - s.StrandedSince > 3f) { s.StrandedSince = -1f; s.SwimUntil = Time.time + 20f; Go(me, st, dir); return; }
-            }
             me.SetMoveDir(Vector3.zero);
             if (!st.InCombat) Brain.Status(st, Words.P("villagepleb_steer_status_safe_way"));
         }
@@ -201,17 +129,15 @@ namespace VillagePlebs
                 Vector3 p = pos + dir * d;
                 foreach (Hazard h in s.Near) if (Hurts(h, p, 0.5f)) return false;
             }
-            return !Drop(pos, pos + dir * 1.2f) && !(s.AvoidWater && Deep(pos + dir * 1.5f));
+            return !Drop(pos, pos + dir * 1.2f);
         }
 
-        // Over water too deep to wade (what it keeps out of): loot floating there is left be.
-        public static bool InDeepWater(Vector3 at) => Deep(at);
-
-        private static bool Deep(Vector3 at)
+        // Ground more than 0.2 m under water (a wet shore or a puddle doesn't count).
+        public static bool Underwater(Vector3 at)
         {
             if (at.y > 3000f) return false;
             if (ZoneSystem.instance == null || !ZoneSystem.instance.GetSolidHeight(at, out float ground)) return false;
-            return ground < ZoneSystem.instance.m_waterLevel - 1f;
+            return ground < ZoneSystem.instance.m_waterLevel - 0.2f;
         }
 
         private static bool Drop(Vector3 from, Vector3 to)

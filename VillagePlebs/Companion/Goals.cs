@@ -147,7 +147,7 @@ namespace VillagePlebs
             foreach (ItemDrop.ItemData item in me.GetInventory().GetAllItems().Where(i => Upgrades.Upgradable(i)))
             {
                 Recipe r = ObjectDB.instance.GetRecipe(item);
-                if (r == null || r.m_craftingStation == null) continue;
+                if (r == null || r.m_craftingStation == null || Upgrades.SkipItem(item, item.m_dropPrefab != null ? item.m_dropPrefab.name : null)) continue;
                 int next = item.m_quality + 1;
                 CraftingStation at = stations.FirstOrDefault(s => s.m_name == r.m_craftingStation.m_name && s.GetLevel() >= r.GetRequiredStationLevel(next));
                 if (at == null) continue;
@@ -156,7 +156,7 @@ namespace VillagePlebs
             }
             foreach (Recipe r in ObjectDB.instance.m_recipes)
             {
-                if (r == null || !r.m_enabled || r.m_item == null || !Upgrades.WorthMaking(me, r.m_item.m_itemData)) continue;
+                if (r == null || !r.m_enabled || r.m_item == null || !Upgrades.Allowed(me, r) || !Upgrades.WorthMaking(me, r.m_item.m_itemData)) continue;
                 if (r.m_item.m_itemData.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Ammo) continue;
                 CraftingStation at = r.m_craftingStation == null ? null : stations.FirstOrDefault(s => s.m_name == r.m_craftingStation.m_name && s.GetLevel() >= Mathf.Max(1, r.m_minStationLevel));
                 if (at == null && r.m_craftingStation != null) continue;

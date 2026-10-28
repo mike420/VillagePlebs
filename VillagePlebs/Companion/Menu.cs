@@ -795,7 +795,7 @@ namespace VillagePlebs
             BeginCard(T("villagepleb_menu_fighting_card"));
             string Block()
             {
-                ItemDrop.ItemData sh = Companion.Shield(c), me = Companion.BestMelee(c);
+                ItemDrop.ItemData sh = Companion.Shield(c) ?? Companion.BestShield(c), me = Companion.BestMelee(c);
                 float skill = Skill.Get(c, Skills.SkillType.Blocking) / 100f;
                 return sh != null ? $"{sh.GetBlockPower(skill):0}" : me != null ? $"{me.GetBlockPower(skill):0}" : "-";
             }
@@ -805,7 +805,7 @@ namespace VillagePlebs
                   (T("villagepleb_menu_fights"), null, () => Here(c) ? Brain.Get(c).Fights.ToString() : "-"));
             LiveText(() =>
             {
-                ItemDrop.ItemData melee = Companion.BestMelee(c), bow = Companion.BestRanged(c), shield = Companion.Shield(c);
+                ItemDrop.ItemData melee = Companion.BestMelee(c), bow = Companion.BestRanged(c), shield = Companion.Shield(c) ?? Companion.BestShield(c);
                 var lines = new List<string>
                 {
                     melee != null ? T("villagepleb_menu_damage_hit", Loc(melee.m_shared.m_name), Damage(c, melee), Words.Mid(Loc("$skill_" + melee.m_shared.m_skillType.ToString().ToLower())))
@@ -1264,13 +1264,14 @@ namespace VillagePlebs
             LiveHeading(() => T("villagepleb_menu_its_bag", Gear.BagCount(c.GetInventory()), c.GetInventory().GetWidth() * Gear.BagRows, Carry.Weight(c).ToString("0"), Carry.Max(c).ToString("0")));
             LiveText(() => Carry.Over(c) ? T("villagepleb_menu_too_heavy") : "", GameUi.Warn);
             int width = its.GetWidth(), height = Mathf.Min(Gear.BagRows, its.GetHeight());
-            _sig.Append("|bag").Append(width).Append('x').Append(height);
-            for (int y = 0; y < height; y++)
-                for (int x = 0; x < width; x++)
+            // Its bag cells in order, as many to a row as fit across the card (as the gear above): each still the same cell of its bag.
+            int bagAcross = Mathf.Max(1, Mathf.FloorToInt((_width + space - 64f) / space)), cells = width * height;
+            _sig.Append("|bag").Append(width).Append('x').Append(height).Append('/').Append(bagAcross);
+            for (int i = 0; i < cells; i++)
                 {
                     if (!_make) continue;
-                    var pos = new Vector2(_left + x * space, -_y - y * space);
-                    int cx = x, cy = y;
+                    var pos = new Vector2(_left + (i % bagAcross) * space, -_y - (i / bagAcross) * space);
+                    int cx = i % width, cy = i / width;
                     InventoryElement e = GameUi.Slot(_in, pos, mine ? () =>
                     {
                         _pending = () => { ItemDrop.ItemData now = _shown != null ? _shown.GetInventory().GetItemAt(cx, cy) : null; if (now != null && !Companion.Take(_shown, Player.m_localPlayer, now, out string why) && why != null) _note = Words.Show(why); };
@@ -1280,7 +1281,7 @@ namespace VillagePlebs
                     Show();
                     _live.Add(Show);
                 }
-            _y += height * space + 4f;
+            _y += Mathf.CeilToInt(cells / (float)bagAcross) * space + 4f;
             Note(T("villagepleb_menu_bag_about"), GameUi.Dim);
             EndCard();
 

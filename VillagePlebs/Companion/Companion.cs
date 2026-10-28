@@ -359,7 +359,8 @@ namespace VillagePlebs
             h.GetInventory().GetAllItems().Where(i => i.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Consumable && i.m_shared.m_consumeStatusEffect is SE_Stats se
                 && (se.m_healthOverTime > 0f || se.m_healthUpFront > 0f) && i.m_shared.m_food <= 0f).ToList();
 
-        public static void Maintain(Humanoid h, bool wantRanged, ItemDrop.ItemData tool = null, Character against = null)
+        // fighting: its shield only comes out in a fight; the rest of the time it stays in its shield slot, out of sight.
+        public static void Maintain(Humanoid h, bool wantRanged, ItemDrop.ItemData tool = null, Character against = null, bool fighting = false)
         {
             if (h.InAttack()) return;
             Inventory inv = h.GetInventory();
@@ -386,11 +387,12 @@ namespace VillagePlebs
                 ItemDrop.ItemData ammo = inv.GetAmmoItem(weapon.m_shared.m_ammoType);
                 if (ammo != null && ammo.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Ammo) Equip(h, ammo);
             }
-            if (weapon == null || weapon.m_shared.m_itemType == ItemDrop.ItemData.ItemType.OneHandedWeapon)
+            if (fighting && (weapon == null || weapon.m_shared.m_itemType == ItemDrop.ItemData.ItemType.OneHandedWeapon))
             {
-                ItemDrop.ItemData shield = items.Where(i => i.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Shield).OrderByDescending(i => i.m_shared.m_blockPower).FirstOrDefault();
+                ItemDrop.ItemData shield = BestShield(h);
                 if (shield != null) Equip(h, shield);
             }
+            else if (!fighting && Shield(h) is ItemDrop.ItemData away) h.UnequipItem(away, false);
         }
 
         private static void Equip(Humanoid h, ItemDrop.ItemData item)
@@ -398,6 +400,10 @@ namespace VillagePlebs
             if (!h.IsItemEquiped(item)) h.EquipItem(item, false);
             item.m_equipped = false;
         }
+
+        // The shield it takes up in a fight: the best it carries.
+        public static ItemDrop.ItemData BestShield(Humanoid h) =>
+            h.GetInventory().GetAllItems().Where(i => i.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Shield).OrderByDescending(i => i.m_shared.m_blockPower).FirstOrDefault();
 
         public static ItemDrop.ItemData Shield(Humanoid h) { ItemDrop.ItemData l = Left(h); return l != null && l.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Shield ? l : null; }
 

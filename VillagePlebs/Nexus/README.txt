@@ -38,7 +38,7 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [*][b]Sailing:[/b] stand by a free ship and choose Sail a ship (on the wheel or in its menu: Orders). It takes the helm and a chart opens: click where it should go, and it plots a course round the coasts. Once it sets sail it takes no other orders and does no missions (the wind is always behind it, its ship takes no damage except from the Ashlands sea unless you turn Ships Take Damage on, and it keeps going even when you are far away). Arriving somewhere it stays aboard until you send it on: Sail a ship again sends it somewhere new or home, and Go home sails it home. Once home it steps ashore and carries on with its orders and missions. Aboard with it, you can take the helm yourself: it hands it over and rides along with you. [b]Docks:[/b] the chart lists the world's docks, shared by every player (the host keeps them in [b]BepInEx/VillagePlebs/Docks[/b]; on a dedicated server without the mod each player keeps their own instead). Click one to send the ship there, where it takes a free berth clear of the ships already in; name a clicked spot to add one, and the end of any voyage away from home is kept as a dock too. You can ride along. The sea chart is worked out from the world seed the first time (a few seconds) and kept in [b]BepInEx/VillagePlebs/Sea[/b].
 [*][b]Go shopping:[/b] the Go shopping errand (once you have found Haldor, Hildir or the Bog Witch) lists what the traders you have found sell. Tick what you want and press Buy now: it pays from the coins in its bag, is gone for 15 minutes, and comes back with the goods (what does not fit in its bag is set down at its feet).
 [*][b]Needs like a player:[/b] food, stamina, skills that rise, carry weight, weather and rest.
-[*][b]Gear slots of its own[/b] (swords, knives, polearms, spears, a spare weapon, shield, bow and arrows, axe, pickaxe, hammer, cultivator, fishing rod and bait, armour, belt and food), and its bag shows below your inventory: drag items between you, or give and take from its menu. It puts its tools away when it is done with them.
+[*][b]Gear slots of its own[/b] (swords, knives, polearms, spears, a spare weapon, shield, bow and arrows, axe, pickaxe, hammer, cultivator, fishing rod and bait, armour, belt and food): give and take its gear and bag from its menu (Inventory). It puts its tools away when it is done with them.
 [*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status (and journal), stats, missions, orders, home, inventory, looks and your plebs.
 [*][b]EpicMMO System:[/b] it earns experience and levels from what it kills and gathers.
 [*][b]StarLevelSystem:[/b] it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.
@@ -78,6 +78,11 @@ Settings are in [b]BepInEx/config/MagicMike.VillagePlebs.cfg[/b]. Change them in
 [b]EpicMMO[/b]
 [list]
 [*][b]Companion Exp[/b] (default 1)
+[/list]
+
+[b]Missions[/b]
+[list]
+[*][b]Skip Items[/b] (default $item_axe_early)
 [/list]
 
 [b]Sailing[/b]

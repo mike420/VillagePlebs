@@ -100,7 +100,6 @@ namespace VillagePlebs
         {
             if (!Physics.Raycast(to + Vector3.up * 1.5f, Vector3.down, out RaycastHit hit, 3.5f, Ground)) return false;
             if (Mathf.Abs(hit.point.y - me.transform.position.y) > 1f) return false;
-            if (ZoneSystem.instance != null && hit.point.y < ZoneSystem.instance.m_waterLevel - 0.5f) return false;
             if (Physics.CheckCapsule(me.transform.position + Vector3.up * 0.8f, to + Vector3.up * 0.8f, 0.3f, LayerMask.GetMask("Default", "static_solid", "piece"))) return false;
             return Steer.Safe(hit.point, me);
         }

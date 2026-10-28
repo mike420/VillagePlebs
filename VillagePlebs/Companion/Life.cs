@@ -186,11 +186,11 @@ namespace VillagePlebs
             return Of(h).TryGetValue(type, out Level l) ? l.Value : MainConfig.startingSkill.Value;
         }
 
-        public static IEnumerable<Skills.SkillType> Types()
-        {
-            Def(Skills.SkillType.Swords);
-            return _defs.Keys.Where(t => t != Skills.SkillType.None && t != Skills.SkillType.All);
-        }
+        // Every skill the game itself has (as in your own skills list), and only those: none a mod adds to the player.
+        private static readonly Skills.SkillType[] Vanilla = ((Skills.SkillType[])Enum.GetValues(typeof(Skills.SkillType)))
+            .Where(t => t != Skills.SkillType.None && t != Skills.SkillType.All).ToArray();
+
+        public static IEnumerable<Skills.SkillType> Types() => Vanilla;
 
         public static float Progress(Humanoid c, Skills.SkillType type)
         {

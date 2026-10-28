@@ -1236,7 +1236,7 @@ namespace VillagePlebs
                 }
             }
 
-            ItemDrop loot = ItemDrops().Where(d => d != null && Vector3.Distance(d.transform.position, center) < radius && !Skipped(st, d) && !Steer.InDeepWater(d.transform.position)
+            ItemDrop loot = ItemDrops().Where(d => d != null && Vector3.Distance(d.transform.position, center) < radius && !Skipped(st, d)
                     && ((jobs & Job.Loot) != 0 || (st.Wanted.Contains(Utils.GetPrefabName(d.gameObject)) && Vector3.Distance(d.transform.position, st.WorkSpot) < 10f))
                     && inv.CanAddItem(d.m_itemData))
                 .OrderBy(d => Vector3.Distance(d.transform.position, me.transform.position)).FirstOrDefault();
@@ -1380,6 +1380,8 @@ namespace VillagePlebs
         {
             if (!ordered && Breaks(go) && InBase(go)) return null;
             if (Groundwork.OnWorkedGround(go)) return null;
+            // Trees and rocks standing in water are left be: it doesn't chop or mine from the water.
+            if (Breaks(go) && Steer.Underwater(go.transform.position)) return null;
             if (go.GetComponent<Piece>() != null || go.GetComponent<Character>() != null) return null;
             if ((jobs & Job.Wood) != 0 && axe != null)
             {
@@ -2026,7 +2028,7 @@ namespace VillagePlebs
             foreach (ItemDrop.ItemData item in me.GetInventory().GetAllItems().Where(Upgradable).OrderByDescending(i => me.IsItemEquiped(i)))
             {
                 Recipe recipe = ObjectDB.instance?.GetRecipe(item);
-                if (recipe == null || recipe.m_craftingStation == null) continue;
+                if (recipe == null || recipe.m_craftingStation == null || SkipItem(item, item.m_dropPrefab != null ? item.m_dropPrefab.name : null)) continue;
                 int next = item.m_quality + 1;
                 CraftingStation station = stations.FirstOrDefault(s => s.m_name == recipe.m_craftingStation.m_name && s.GetLevel() >= recipe.GetRequiredStationLevel(next));
                 if (station == null) continue;
@@ -2043,7 +2045,7 @@ namespace VillagePlebs
             List<CraftingStation> stations = StationsNear(center, radius + 10f);
             foreach (Recipe r in ObjectDB.instance.m_recipes)
             {
-                if (r == null || !r.m_enabled || r.m_item == null) continue;
+                if (r == null || !r.m_enabled || r.m_item == null || !Allowed(me, r)) continue;
                 if (!WorthMaking(me, r.m_item.m_itemData)) continue;
                 CraftingStation station = r.m_craftingStation == null ? null : stations.FirstOrDefault(s => s.m_name == r.m_craftingStation.m_name && s.GetLevel() >= Mathf.Max(1, r.m_minStationLevel));
                 if (station == null && r.m_craftingStation != null) continue;
@@ -2052,6 +2054,33 @@ namespace VillagePlebs
                     return new KeyValuePair<Recipe, CraftingStation>(r, station);
             }
             return null;
+        }
+
+        private static string _skipText;
+        private static HashSet<string> _skip = new HashSet<string>();
+
+        // On the Skip Items list (by the game's name for it, its prefab name or the name you see).
+        public static bool SkipItem(ItemDrop.ItemData i, string prefab)
+        {
+            string text = MainConfig.skipItems?.Value ?? "";
+            if (text != _skipText)
+            {
+                _skipText = text;
+                _skip = new HashSet<string>(text.Split(',').Select(x => x.Trim().ToLowerInvariant()).Where(x => x.Length > 0));
+            }
+            if (_skip.Count == 0 || i == null) return false;
+            string token = i.m_shared.m_name ?? "";
+            return _skip.Contains(token.ToLowerInvariant()) || prefab != null && _skip.Contains(prefab.ToLowerInvariant())
+                || Localization.instance != null && _skip.Contains(Localization.instance.Localize(token).ToLowerInvariant());
+        }
+
+        // A recipe it may follow: one its player has learned (so never a hidden or unused item, and never ahead of what you can make
+        // yourself), and not on the Skip Items list.
+        public static bool Allowed(Humanoid me, Recipe r)
+        {
+            if (r?.m_item == null || SkipItem(r.m_item.m_itemData, r.m_item.gameObject.name)) return false;
+            Player p = Companion.Master(me);
+            return p == null || p.IsRecipeKnown(r.m_item.m_itemData.m_shared.m_name);
         }
 
         public static bool WorthMaking(Humanoid me, ItemDrop.ItemData made)

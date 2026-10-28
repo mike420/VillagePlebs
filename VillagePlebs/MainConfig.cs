@@ -14,7 +14,6 @@ namespace VillagePlebs
         public static ConfigEntry<KeyboardShortcut> commandKey;
         public static ConfigEntry<KeyboardShortcut> assignKey;
         public static ConfigEntry<KeyboardShortcut> wheelKey;
-        public static ConfigEntry<string> bagPanelSpot;
         public static ConfigEntry<int> maxCompanions;
         public static ConfigEntry<int> maxBought;
         public static ConfigEntry<int> companionPrice;
@@ -29,6 +28,7 @@ namespace VillagePlebs
         public static ConfigEntry<float> startingSkill;
         public static ConfigEntry<float> mmoExp;
         public static ConfigEntry<bool> shipDamage;
+        public static ConfigEntry<string> skipItems;
 
         public static void InitConfigs(ConfigFile config)
         {
@@ -36,7 +36,6 @@ namespace VillagePlebs
             commandKey = config.BindConfigInOrder("General", "Command Key", defaultValue: new KeyboardShortcut(KeyCode.H), "Point at something and press it: an enemy (they attack it), a tree, rock or plant (it works it), your chest (it puts its things in), a cart (it pulls it), its tombstone, a free bed (its bed), the ground (it waits there), or the sky (it comes back).", synced: false, sectionOrder: true, settingOrder: true);
             assignKey = config.BindConfigInOrder("General", "Assign Key", defaultValue: new KeyboardShortcut(KeyCode.Y), "While choosing a companion's bed and chests (its menu: Home): look at a bed or a chest and press it to give it to the companion, again to take it back.", synced: false, sectionOrder: true, settingOrder: true);
             wheelKey = config.BindConfigInOrder("General", "Wheel Key", defaultValue: new KeyboardShortcut(KeyCode.F, KeyCode.LeftShift), "Opens the command wheel for the companion you look at (or your nearest): its orders and errands round the outside, how it fights inside. Hold it and let go over a choice, or tap it and click; Esc or right-click closes it.", synced: false, sectionOrder: true, settingOrder: true);
-            bagPanelSpot = config.BindConfigInOrder("General", "Bag Panel Position", defaultValue: "", "Where the companion bag panel was last dragged to: its top-left corner, as fractions of the screen across and up. Empty: placed by the inventory. Right-click the panel to clear it.", sectionOrder: true, settingOrder: true, configAttributes: new ConfigurationManagerAttributes { Browsable = false });
             maxCompanions = config.BindConfigInOrder("Companion", "Max Companions", defaultValue: 1, "How many companions each player can have for free (summoned from the menu). More are bought from traders: Max Bought Companions. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<int>(1, 10));
             maxBought = config.BindConfigInOrder("Companion", "Max Bought Companions", defaultValue: 2, "How many more companions each player can buy from any trader (Haldor, Hildir, the Bog Witch) on top of their free ones (Max Companions). Buying one lets you name them; the coins are taken when they join you. 0: none for sale. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<int>(0, 6));
             companionPrice = config.BindConfigInOrder("Companion", "Companion Price", defaultValue: 500, "What a trader asks for a companion, in coins. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<int>(0, 10000));
@@ -51,6 +50,7 @@ namespace VillagePlebs
             startingSkill = config.BindConfigInOrder("Companion", "Starting Skill", defaultValue: 0f, "The skill level a new companion starts at (a new player: 0). Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<float>(0f, 100f));
             mmoExp = config.BindConfigInOrder("EpicMMO", "Companion Exp", defaultValue: 1f, "With EpicMMO System installed: the experience a companion earns from its kills and its work (chopping, mining, picking), as a multiple of what a player gets for them (EpicMMO's RateExp counts too). 0: companions don't level up, and their levels give nothing. Their kills count for their player as a tame's do (EpicMMO's \"Tames give XP on Mob kill\"). Synced from the server.", synced: true, sectionOrder: true, settingOrder: true, acceptableValues: new AcceptableValueRange<float>(0f, 10f));
 
+            skipItems = config.BindConfigInOrder("Missions", "Skip Items", defaultValue: "$item_axe_early", "Items companions never make, upgrade or work towards as a mission, separated by commas: the game's name for them ($item_axe_early), their prefab name (AxeFlint) or the name you see (Flint axe). Synced from the server.", synced: true, sectionOrder: true, settingOrder: true);
             shipDamage = config.BindConfigInOrder("Sailing", "Ships Take Damage", defaultValue: false, "Whether a ship a companion has the helm of (sailing, about to, or waiting aboard) can be damaged: by rocks, the sea, capsizing and anything that hits it. Off: it takes none. The Ashlands sea burns it either way. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true);
 
             CarryOverOldSections(config);
