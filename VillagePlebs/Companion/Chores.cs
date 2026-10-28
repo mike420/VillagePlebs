@@ -182,7 +182,7 @@ namespace VillagePlebs
                 if (f.Length != 3 || !float.TryParse(f[0], NumberStyles.Float, CultureInfo.InvariantCulture, out float x) || !float.TryParse(f[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float y)
                     || !float.TryParse(f[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float z)) continue;
                 var spot = new Vector3(x, y, z);
-                Container chest = UnityEngine.Object.FindObjectsByType<Container>(FindObjectsSortMode.None).FirstOrDefault(c => Vector3.Distance(c.transform.position, spot) < 1f && !Containers.InUse(c));
+                Container chest = Loaded.All<Container>().FirstOrDefault(c => Vector3.Distance(c.transform.position, spot) < 1f && !Containers.InUse(c));
                 if (chest == null || Vector3.Distance(chest.transform.position, me.transform.position) > 60f) continue;
                 if (!Containers.Take(chest)) continue;
                 int n = item.m_stack;

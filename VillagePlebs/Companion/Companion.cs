@@ -35,7 +35,15 @@ namespace VillagePlebs
 
         public static ZDO Zdo(Component c) { ZNetView v = c != null ? c.GetComponent<ZNetView>() : null; return v != null && v.IsValid() ? v.GetZDO() : null; }
 
-        public static IEnumerable<Humanoid> All() => Character.GetAllCharacters().OfType<Humanoid>().Where(Is);
+        // Every companion loaded, gathered once a frame however many times it is asked for (a fresh list each time, so one being
+        // walked through is never changed under it).
+        private static List<Humanoid> _all = new List<Humanoid>();
+        private static int _allFrame = -1;
+        public static IEnumerable<Humanoid> All()
+        {
+            if (_allFrame != Time.frameCount) { _allFrame = Time.frameCount; _all = Character.GetAllCharacters().OfType<Humanoid>().Where(Is).ToList(); }
+            return _all.Where(c => c != null);
+        }
 
         public static long IdOf(Component c)
         {
@@ -198,6 +206,15 @@ namespace VillagePlebs
         public static void SaveBag(Humanoid c)
         {
             if (c != null && c.GetComponent<ZNetView>() is ZNetView v && v.IsValid() && v.IsOwner()) c.GetInventory().m_onChanged?.Invoke();
+        }
+
+        // The regular save: only when its bag is not already in the world as it is, since every save goes out to every player.
+        public static void SaveBagIfChanged(Humanoid c)
+        {
+            if (c == null || !(c.GetComponent<ZNetView>() is ZNetView v) || !v.IsValid() || !v.IsOwner()) return;
+            var pkg = new ZPackage();
+            c.GetInventory().Save(pkg);
+            if (pkg.GetBase64() != v.GetZDO().GetString(ZDOVars.s_items, "")) c.GetInventory().m_onChanged?.Invoke();
         }
 
         public const string KeptKey = "vp_kept";

@@ -423,7 +423,7 @@ namespace VillagePlebs
             Work.RestoreArea(st);
             if (h.GetComponent<Rigidbody>() is Rigidbody body && body.isKinematic && h.GetComponentInParent<Ship>() == null && !h.IsAttached())
             { body.isKinematic = false; body.detectCollisions = true; }
-            st.Cart = UnityEngine.Object.FindObjectsByType<Vagon>(FindObjectsSortMode.None).FirstOrDefault(cart => cart != null && cart.IsAttached(h));
+            st.Cart = Loaded.All<Vagon>().FirstOrDefault(cart => cart != null && cart.IsAttached(h));
             if (Companion.Zdo(h) is ZDO z && z.GetBool(ZDOVars.s_dodgeinv, false)) z.Set(ZDOVars.s_dodgeinv, false);
             if (h.GetComponent<Container>() is Container gear) Container_Load_Companion.Fresh(gear);
             return st;
@@ -507,7 +507,7 @@ namespace VillagePlebs
             Following.Tick(st, master);
             Banter.Tick(st, master);
             Idle.Tick(st, master);
-            if (Time.time >= st.NextBagSave) { st.NextBagSave = Time.time + 30f; Companion.SaveBag(me); }
+            if (Time.time >= st.NextBagSave) { st.NextBagSave = Time.time + 30f; Companion.SaveBagIfChanged(me); }
             if (Ride.Tick(st, master)) return true;
             Loot.PassBy(st);
             if (Time.time >= st.NextMissionCheck) { st.NextMissionCheck = Time.time + 1f; Missions.CheckDone(st); }

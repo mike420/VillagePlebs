@@ -9,7 +9,7 @@ namespace VillagePlebs
     internal static class Smelting
     {
         public static IEnumerable<Smelter> Near(Vector3 center, float radius) =>
-            Object.FindObjectsByType<Smelter>(FindObjectsSortMode.None)
+            Loaded.All<Smelter>()
                 .Where(s => s != null && Companion.Zdo(s) != null && Flat(s.transform.position, center) < radius + 20f);
 
         private static float Fuel(Smelter s) => Companion.Zdo(s)?.GetFloat(ZDOVars.s_fuel, 0f) ?? 0f;

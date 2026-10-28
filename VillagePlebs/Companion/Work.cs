@@ -119,7 +119,7 @@ namespace VillagePlebs
         public static bool Stows(Component c) => Companion.Zdo(c)?.GetBool(StowKey, true) ?? true;
 
         internal static IEnumerable<Container> YourChests(Humanoid me, Vector3 center, float radius) =>
-            UnityEngine.Object.FindObjectsByType<Container>(FindObjectsSortMode.None)
+            Loaded.All<Container>()
                 .Where(c => c != null && c.GetInventory() != null && Home.IsChest(c) && Home.IdOn(c) == 0L && !Containers.InUse(c) && Vector3.Distance(c.transform.position, center) < radius
                             && (!c.m_checkGuardStone || PrivateArea.CheckAccess(c.transform.position, 0f, false)))
                 .OrderBy(c => Vector3.Distance(c.transform.position, me.transform.position));
@@ -241,7 +241,7 @@ namespace VillagePlebs
                 var seen = new HashSet<GameObject>();
                 Task best = null;
                 float bestD = float.MaxValue;
-                foreach (Collider col in Physics.OverlapSphere(master.transform.position, 15f, ~0, QueryTriggerInteraction.Collide))
+                foreach (Collider col in Scan(master.transform.position, 15f))
                 {
                     GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;
                     if (!seen.Add(go)) continue;
@@ -1248,7 +1248,7 @@ namespace VillagePlebs
             Task best = null;
             float bestScore = float.MaxValue;
             float reach = (jobs & (Job.Wood | Job.Stone | Job.Ore)) != 0 ? radius + OutsideReach : radius;
-            foreach (Collider col in Physics.OverlapSphere(center, reach, ~0, QueryTriggerInteraction.Collide))
+            foreach (Collider col in Scan(center, reach))
             {
                 GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;
                 if (!seen.Add(go)) continue;
@@ -1378,11 +1378,12 @@ namespace VillagePlebs
 
         internal static Task Consider(BrainState st, GameObject go, Job jobs, ItemDrop.ItemData axe, ItemDrop.ItemData pick, bool ordered = false)
         {
+            // Building pieces and creatures first: the scans pass over every wall and floor of a base, and this turns them away cheaply.
+            if (go.GetComponent<Piece>() != null || go.GetComponent<Character>() != null) return null;
             if (!ordered && Breaks(go) && InBase(go)) return null;
             if (Groundwork.OnWorkedGround(go)) return null;
             // Trees and rocks standing in water are left be: it doesn't chop or mine from the water.
             if (Breaks(go) && Steer.Underwater(go.transform.position)) return null;
-            if (go.GetComponent<Piece>() != null || go.GetComponent<Character>() != null) return null;
             if ((jobs & Job.Wood) != 0 && axe != null)
             {
                 TreeLog log = go.GetComponent<TreeLog>();
@@ -1435,7 +1436,7 @@ namespace VillagePlebs
             var seen = new HashSet<GameObject>();
             Task best = null;
             float bestDist = float.MaxValue;
-            foreach (Collider col in Physics.OverlapSphere(center, 170f, ~0, QueryTriggerInteraction.Collide))
+            foreach (Collider col in Scan(center, 170f))
             {
                 GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;
                 if (!seen.Add(go)) continue;
@@ -1541,6 +1542,20 @@ namespace VillagePlebs
 
         private static IEnumerable<ItemDrop> ItemDrops() => GameFields.ItemDrops() ?? new List<ItemDrop>();
 
+        // Every layer a tree, log, rock, bush or pickable has a solid collider on (as the game's own prefabs have them). Terrain,
+        // creatures, water, ships and every trigger volume are left out of the looking.
+        private static readonly int WorkLayers = LayerMask.GetMask("Default", "Default_small", "static_solid", "piece", "piece_nonsolid", "item");
+        private static Collider[] _hits = new Collider[1024];
+
+        // What the work scans look through, in one buffer kept between them (grown when it fills, so nothing is cut off). It holds
+        // until the next scan, so nothing is scanned for while going through one.
+        private static ArraySegment<Collider> Scan(Vector3 at, float radius)
+        {
+            int n;
+            while ((n = Physics.OverlapSphereNonAlloc(at, radius, _hits, WorkLayers, QueryTriggerInteraction.Ignore)) == _hits.Length) _hits = new Collider[_hits.Length * 2];
+            return new ArraySegment<Collider>(_hits, 0, n);
+        }
+
         internal static bool Edible(Component c)
         {
             ItemDrop.ItemData item = (c as Pickable)?.m_itemPrefab?.GetComponent<ItemDrop>()?.m_itemData;
@@ -1578,7 +1593,7 @@ namespace VillagePlebs
         }
 
         internal static Container YourFood(Humanoid me, Vector3 center, float radius, Func<Container, bool> allowed = null) =>
-            UnityEngine.Object.FindObjectsByType<Container>(FindObjectsSortMode.None)
+            Loaded.All<Container>()
                 .Where(c => c != null && c.GetInventory() != null && Home.IsChest(c) && Home.IdOn(c) == 0L && !Containers.InUse(c) && Vector3.Distance(c.transform.position, center) < radius && (allowed == null || allowed(c))
                             && c.GetInventory().GetAllItems().Any(Food.IsFood) && (!c.m_checkGuardStone || PrivateArea.CheckAccess(c.transform.position, 0f, false)))
                 .OrderBy(c => Vector3.Distance(c.transform.position, me.transform.position)).Take(6).FirstOrDefault(c => Brain.CanReach(me, c.transform.position));

@@ -88,6 +88,7 @@ namespace VillagePlebs
             Defense.Forget();
             Banter.Forget();
             Marks.Forget();
+            Loaded.Forget();
             Words.Forget();
             Container_Load_Companion.Forget();
             _harmony?.UnpatchSelf();

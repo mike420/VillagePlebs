@@ -51,7 +51,7 @@ namespace VillagePlebs
             left = true;
             long id = Companion.IdOf(c);
             Vector3 near = fellAt != Vector3.zero ? fellAt : c.transform.position;
-            TombStone tomb = UnityEngine.Object.FindObjectsByType<TombStone>(FindObjectsSortMode.None)
+            TombStone tomb = Loaded.All<TombStone>()
                 .Where(t => (Companion.Zdo(t)?.GetLong(OfKey, 0L) ?? 0L) == id && (t.GetComponent<Container>()?.GetInventory()?.GetAllItems().Any(Gear.InSlot) ?? false))
                 .OrderBy(t => Vector3.Distance(t.transform.position, near)).FirstOrDefault();
             Container grave = tomb != null ? tomb.GetComponent<Container>() : null;
@@ -87,7 +87,7 @@ namespace VillagePlebs
         {
             long id = Companion.IdOf(me), master = Companion.MasterId(me);
             string name = Companion.NameOf(me);
-            return UnityEngine.Object.FindObjectsByType<TombStone>(FindObjectsSortMode.None).Where(t => IsMine(t, me, id, master, name));
+            return Loaded.All<TombStone>().Where(t => IsMine(t, me, id, master, name));
         }
 
         private static TombStone Find(Humanoid me)
@@ -300,8 +300,8 @@ namespace VillagePlebs
     {
         public static Fireplace Low(Humanoid me, Vector3 center, float radius)
         {
-            List<CookingStation> stoves = UnityEngine.Object.FindObjectsByType<CookingStation>(FindObjectsSortMode.None).Where(s => Vector3.Distance(s.transform.position, center) < radius).ToList();
-            return UnityEngine.Object.FindObjectsByType<Fireplace>(FindObjectsSortMode.None)
+            List<CookingStation> stoves = Loaded.All<CookingStation>().Where(s => Vector3.Distance(s.transform.position, center) < radius).ToList();
+            return Loaded.All<Fireplace>()
                 .Where(f => f != null && !f.m_infiniteFuel && f.m_canRefill && f.m_fuelItem != null && Vector3.Distance(f.transform.position, center) < radius
                             && (Vector3.Distance(f.transform.position, center) < 10f || stoves.Any(s => Vector3.Distance(s.transform.position, f.transform.position) < 3f))
                             && Fuel(f) < f.m_maxFuel * 0.4f && Spare(me, f.m_fuelItem) > 0)
@@ -381,7 +381,7 @@ namespace VillagePlebs
 
         public static int CookAll(Humanoid me, Vector3 center, float radius)
         {
-            CookingStation stove = UnityEngine.Object.FindObjectsByType<CookingStation>(FindObjectsSortMode.None)
+            CookingStation stove = Loaded.All<CookingStation>()
                 .Where(s => Vector3.Distance(s.transform.position, center) < radius + 10f && Usable(s)).OrderBy(s => Vector3.Distance(s.transform.position, center)).FirstOrDefault();
             if (stove == null) return 0;
             int done = 0;
@@ -404,7 +404,7 @@ namespace VillagePlebs
         }
 
         public static IEnumerable<string> Describe(Humanoid me, Vector3 center, float radius) =>
-            UnityEngine.Object.FindObjectsByType<CookingStation>(FindObjectsSortMode.None).Where(s => Vector3.Distance(s.transform.position, center) < radius + 60f)
+            Loaded.All<CookingStation>().Where(s => Vector3.Distance(s.transform.position, center) < radius + 60f)
                 .OrderBy(s => Vector3.Distance(s.transform.position, center))
                 .Select(s => $"{Localization.instance.Localize(s.m_name)} at {s.transform.position:F0}: {Vector3.Distance(s.transform.position, center):0} m from home, {Vector3.Distance(s.transform.position, me.transform.position):0} m from it, " +
                              $"fire {(!s.m_requireFire ? "not needed" : (bool)FireLit.Invoke(s, null) ? "lit" : "OUT")}, free spot {((int)FreeSlot.Invoke(s, null) >= 0 ? "yes" : "no")}, " +
@@ -412,7 +412,7 @@ namespace VillagePlebs
 
         private static string FireUnder(CookingStation s)
         {
-            Fireplace f = UnityEngine.Object.FindObjectsByType<Fireplace>(FindObjectsSortMode.None).OrderBy(x => Vector3.Distance(x.transform.position, s.transform.position)).FirstOrDefault();
+            Fireplace f = Loaded.All<Fireplace>().OrderBy(x => Vector3.Distance(x.transform.position, s.transform.position)).FirstOrDefault();
             if (f == null) return "no fireplace";
             float fuel = Companion.Zdo(f)?.GetFloat(ZDOVars.s_fuel, 0f) ?? 0f;
             return $"nearest fire {Utils.GetPrefabName(f.gameObject)} {Vector3.Distance(f.transform.position, s.transform.position):0.0} m off (flat {Vector2.Distance(new Vector2(f.transform.position.x, f.transform.position.z), new Vector2(s.transform.position.x, s.transform.position.z)):0.0}), fuel {fuel:0.#}/{f.m_maxFuel:0}, burning {f.IsBurning()}";
@@ -452,9 +452,9 @@ namespace VillagePlebs
         {
             var raw = food.ToList();
             if (raw.Count == 0) return (null, null);
-            var fires = UnityEngine.Object.FindObjectsByType<Fireplace>(FindObjectsSortMode.None)
+            var fires = Loaded.All<Fireplace>()
                 .Where(f => f != null && !f.m_infiniteFuel && f.m_canRefill && f.m_fuelItem != null && !f.IsBurning() && Fires.HasFuel(me, f.m_fuelItem)).ToList();
-            foreach (CookingStation s in UnityEngine.Object.FindObjectsByType<CookingStation>(FindObjectsSortMode.None)
+            foreach (CookingStation s in Loaded.All<CookingStation>()
                          .Where(s => (s.m_requireFire || s.m_useFuel) && Vector3.Distance(s.transform.position, center) < radius + 10f && !Usable(s) && raw.Any(i => Raw(s, i)) && (int)FreeSlot.Invoke(s, null) >= 0)
                          .OrderBy(s => Vector3.Distance(s.transform.position, center)))
             {
@@ -476,7 +476,7 @@ namespace VillagePlebs
         {
             var raw = me.GetInventory().GetAllItems();
             if (raw.Count == 0) return null;
-            return UnityEngine.Object.FindObjectsByType<CookingStation>(FindObjectsSortMode.None)
+            return Loaded.All<CookingStation>()
                 .Where(s => Vector3.Distance(s.transform.position, center) < radius + 10f && Usable(s) && raw.Any(i => Raw(s, i)) && (int)FreeSlot.Invoke(s, null) >= 0)
                 .OrderBy(s => Vector3.Distance(s.transform.position, center)).FirstOrDefault();
         }
