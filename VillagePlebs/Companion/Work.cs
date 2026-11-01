@@ -1380,7 +1380,9 @@ namespace VillagePlebs
         {
             // Building pieces and creatures first: the scans pass over every wall and floor of a base, and this turns them away cheaply.
             if (go.GetComponent<Piece>() != null || go.GetComponent<Character>() != null) return null;
-            if (!ordered && Breaks(go) && InBase(go)) return null;
+            // Fallen logs are left out of the base check: there are none but felled trees', and a log is judged by its middle,
+            // half its length from the stump, so one that fell toward a base was left lying there for good.
+            if (!ordered && Breaks(go) && go.GetComponent<TreeLog>() == null && InBase(go)) return null;
             if (Groundwork.OnWorkedGround(go)) return null;
             // Trees and rocks standing in water are left be: it doesn't chop or mine from the water.
             if (Breaks(go) && Steer.Underwater(go.transform.position)) return null;
