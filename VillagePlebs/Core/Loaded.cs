@@ -9,7 +9,7 @@ namespace VillagePlebs
     // companion, instead of each of them searching the whole scene each time it looks. On a busy server that search is the dear part.
     internal static class Loaded
     {
-        private class Found { public Object[] Items; public float At; }
+        private class Found { public Object[] Items; public ZNetView[] Views; public float At; }
 
         private const float Fresh = 1f;
         private static readonly Dictionary<Type, Found> Cache = new Dictionary<Type, Found>();
@@ -20,15 +20,19 @@ namespace VillagePlebs
             if (f.Items == null || Time.time - f.At >= Fresh || Time.time < f.At)
             {
                 f.Items = Object.FindObjectsByType<T>(FindObjectsSortMode.None);
+                f.Views = new ZNetView[f.Items.Length];
+                for (int i = 0; i < f.Items.Length; i++) f.Views[i] = f.Items[i] is Component c ? c.GetComponentInParent<ZNetView>() : null;
                 f.At = Time.time;
             }
-            return Live<T>(f.Items);
+            return Live<T>(f.Items, f.Views);
         }
 
-        // Anything destroyed since the search is left out.
-        private static IEnumerable<T> Live<T>(Object[] items) where T : Object
+        // Anything destroyed since the search is left out, and anything not in the world: the see-through piece you are placing
+        // is a real fire (or chest, or bed) with no world object behind it, and asking it whether it burns threw every time.
+        private static IEnumerable<T> Live<T>(Object[] items, ZNetView[] views) where T : Object
         {
-            foreach (Object o in items) if (o != null) yield return (T)o;
+            for (int i = 0; i < items.Length; i++)
+                if (items[i] != null && views[i] != null && views[i].IsValid()) yield return (T)items[i];
         }
 
         public static void Forget() => Cache.Clear();
