@@ -54,6 +54,9 @@ namespace VillagePlebs
             shipDamage = config.BindConfigInOrder("Sailing", "Ships Take Damage", defaultValue: false, "Whether a ship a companion has the helm of (sailing, about to, or waiting aboard) can be damaged: by rocks, the sea, capsizing and anything that hits it. Off: it takes none. The Ashlands sea burns it either way. Synced from the server.", synced: true, sectionOrder: true, settingOrder: true);
 
             CarryOverOldSections(config);
+
+            // Decimal settings rounded (and kept in range) whichever editor sets them
+            MagicMike.ModSettings.ConfigRounding.RoundAll(config);
         }
 
         private static readonly Dictionary<string, string[]> OldSections = new Dictionary<string, string[]>
