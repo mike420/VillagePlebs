@@ -611,6 +611,7 @@ namespace VillagePlebs
                 if (t.Kind == Kind.Mend)
                     foreach (Collider col in Physics.OverlapSphere(t.Target.transform.position, 6f, LayerMask.GetMask("piece", "piece_nonsolid")))
                         if (col.GetComponentInParent<WearNTear>() is WearNTear near && near != t.Target) st.Skipped[near.gameObject.GetInstanceID()] = Time.time + 600f;
+                Activity.Log(me, $"{(stuck ? "stood still 8 s" : tooLong ? "ran out of time" : "got no nearer in 20 s")} on its way, {dist:0} m off, moving by {(string.IsNullOrEmpty(st.MoveMode) ? "nothing" : st.MoveMode)}");
                 if (t.Kind == Kind.Plant) { Farming.Bad(st, t.Pos); st.Task = null; return; }
                 Skip(st, t.Target, P("villagepleb_work_skip_cant_reach"));
                 return;

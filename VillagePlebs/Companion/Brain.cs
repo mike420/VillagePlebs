@@ -170,6 +170,11 @@ namespace VillagePlebs
         public Vector3 MoveGoal, LastWedge;
         public Component WedgeTarget;
         public ItemDrop LootTarget;
+        // A point on the way to somewhere far it has no whole way to, walked to first; and how it last moved, for the log.
+        public Vector3 Stone, StoneFor;
+        public float StoneUntil;
+        public bool HasStone;
+        public string MoveMode = "";
         public readonly HashSet<ItemDrop> LootSkip = new HashSet<ItemDrop>();
         public int Wedges;
         // Its own way-finding found no way within the near box for this place: it looks further round next time.
@@ -254,9 +259,10 @@ namespace VillagePlebs
                 partial = st.NoFullPath && (st.Door != null && Time.time < st.Door.Until && Vector3.Distance(st.Door.Target, point) < 4f || (st.Door = PlanDoor(ai, pos, point)) != null);
             }
             bool result = partial ? false : MoveToRaw(ai, dt, point, dist, canRun);
-            if (!partial && (Utils.DistanceXZ(point, pos) <= Mathf.Max(dist, 0.75f) || c.GetMoveDir().sqrMagnitude > 0.01f)) return result;
+            if (!partial && (Utils.DistanceXZ(point, pos) <= Mathf.Max(dist, 0.75f) || c.GetMoveDir().sqrMagnitude > 0.01f)) { if (st != null) st.MoveMode = "the game's way"; return result; }
             if (st != null)
             {
+                st.MoveMode = "a door";
                 DoorPlan plan = st.Door != null && Time.time < st.Door.Until && Vector3.Distance(st.Door.Target, point) < 4f ? st.Door : st.Door = PlanDoor(ai, pos, point);
                 if (plan != null)
                 {
@@ -278,8 +284,13 @@ namespace VillagePlebs
                     return false;
                 }
             }
-            if (st != null && Wayfinding.Follow(st, h, point, canRun)) return false;
-            if (h != null && Steer.HazardsNear(h) > 0 && !ClearLine(h, pos, point)) return result;
+            if (st != null && Wayfinding.Follow(st, h, point, canRun)) { st.MoveMode = "its own way"; return false; }
+            // Far off with no whole way there (the game maps its ways only round where a walk starts and ends, its own way-finding
+            // goes no further than 90 m): it walks to a point on the way first. Trees on the hill past a base were given up on one
+            // after another, it standing at the gate.
+            if (st != null && Utils.DistanceXZ(point, pos) > 30f && StepToward(st, ai, dt, pos, point, canRun)) return false;
+            if (h != null && Steer.HazardsNear(h) > 0 && !ClearLine(h, pos, point)) { if (st != null) st.MoveMode = "none: held back by a hazard near it"; return result; }
+            if (st != null) st.MoveMode = "a straight line";
             Vector3 to = point;
             Vector3 dir = to - pos;
             dir.y = 0f;
@@ -288,6 +299,53 @@ namespace VillagePlebs
             c.SetMoveDir(dir);
             c.SetRun(canRun);
             c.SetLookDir(dir, 0f);
+            return false;
+        }
+
+        private static readonly float[] StoneAngles = { 0f, 25f, -25f, 50f, -50f, 80f, -80f };
+        private static readonly float[] StoneSteps = { 30f, 20f, 12f };
+
+        // Walks to a point 12 to 30 m on the way (the straightest it has a way to that brings it nearer), kept until it gets there,
+        // 15 s go by, or it is headed somewhere else.
+        private static bool StepToward(BrainState st, BaseAI ai, float dt, Vector3 pos, Vector3 point, bool run)
+        {
+            Humanoid h = st.Body;
+            bool same = Utils.DistanceXZ(st.StoneFor, point) < 4f;
+            if (!st.HasStone && same && Time.time < st.StoneUntil) return false;
+            bool keep = st.HasStone && Time.time < st.StoneUntil && same && Utils.DistanceXZ(st.Stone, pos) > 2f;
+            if (!keep)
+            {
+                st.HasStone = false;
+                Pathfinding pf = Pathfinding.instance;
+                Vector3 dir = point - pos; dir.y = 0f; dir.Normalize();
+                float now = Utils.DistanceXZ(point, pos);
+                Vector3? walkable = null;
+                foreach (float step in StoneSteps)
+                {
+                    foreach (float angle in StoneAngles)
+                    {
+                        Vector3 p = pos + Quaternion.Euler(0f, angle, 0f) * dir * step;
+                        if (Utils.DistanceXZ(p, point) > now - step * 0.4f) continue;
+                        if (pf != null && pf.FindValidPoint(out Vector3 q, p, 4f, ai.m_pathAgentType) && pf.HavePath(pos, q, ai.m_pathAgentType)) { walkable = q; break; }
+                    }
+                    if (walkable != null) break;
+                }
+                // None the game has a way to: a point on solid ground straight on, for its own way-finding to work out.
+                if (walkable == null && ZoneSystem.instance != null)
+                {
+                    Vector3 p = pos + dir * 20f;
+                    if (ZoneSystem.instance.GetSolidHeight(p, out float y) && Mathf.Abs(y - pos.y) < 12f && !Steer.Underwater(new Vector3(p.x, y, p.z))) walkable = new Vector3(p.x, y, p.z);
+                }
+                if (walkable == null) { st.StoneFor = point; st.StoneUntil = Time.time + 2f; return false; }
+                st.Stone = walkable.Value; st.StoneFor = point; st.StoneUntil = Time.time + 15f; st.HasStone = true;
+                Activity.Log(h, $"no whole way to {point:F0}: heads for {st.Stone:F0} on the way");
+            }
+            st.MoveMode = "a point on the way";
+            MoveToRaw(ai, dt, st.Stone, 1f, run);
+            if (h.GetMoveDir().sqrMagnitude > 0.01f) return true;
+            if (Wayfinding.Follow(st, h, st.Stone, run)) return true;
+            st.HasStone = false;
+            st.StoneUntil = Time.time + 2f;
             return false;
         }
 
