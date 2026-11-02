@@ -159,7 +159,7 @@ namespace VillagePlebs
             if (BodyReplacerLook.HasTattoos) BuildTattoos(einherjar);
         }
 
-        // A tick under the iris size: the eyes drawn with BodyReplacer's plain default texture
+        // A tick under the iris size: the eyes drawn with BodyReplacer's default texture, its iris coloured by the eye sliders above
         private void BuildHideIris(Transform section)
         {
             const float tick = 22f;

@@ -170,7 +170,7 @@ namespace VillagePlebs
 
         public static string ShownCustomHair(int model, string look, string hair) => _shownCustomHair != null ? _shownCustomHair(model, look ?? "", hair ?? "") : hair ?? "";
 
-        // Hide Iris: the eyes drawn with BodyReplacer's plain default eye texture (BodyReplacer versions with the toggle)
+        // Hide Iris: the eyes drawn with BodyReplacer's default eye texture, its iris coloured by the eye glow sliders (BodyReplacer versions with the toggle)
         public static bool HasHideIris { get { Find(); return _applyHideIris != null; } }
 
         public static void ApplyHideIris(GameObject character, bool hide) { if (HasHideIris) _applyHideIris(character, hide); }
