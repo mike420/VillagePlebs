@@ -891,7 +891,10 @@ namespace VillagePlebs
         {
             Humanoid me = st.Body;
             float far = Flat(center, me.transform.position);
-            if (far < radius + 60f || Time.time < st.TripUntil || OnOrder(st)) { st.TripStart = 0f; return false; }
+            // Out at a tree, rock or log it may work (one at the edge of its reach, or a log lying a log's length past its stump):
+            // it is working, not lost, so it isn't called home off it.
+            bool working = st.Task != null && st.Task.Kind == Kind.Hit && st.Task.Target != null && far < radius + OutsideReach + LogReach + 20f && WithinReach(st.Task.Target, center, radius);
+            if (far < radius + 60f || working || Time.time < st.TripUntil || OnOrder(st)) { st.TripStart = 0f; return false; }
             if (st.TripStart == 0f) { st.TripStart = Time.time; st.Task = null; st.Remember(P("villagepleb_work_set_off_home")); }
             moveTo(center, 2f, true);
             Brain.Status(st, P("villagepleb_work_status_heading_home"));
@@ -1247,7 +1250,7 @@ namespace VillagePlebs
             bool goalSeen = false;
             Task best = null;
             float bestScore = float.MaxValue;
-            float reach = (jobs & (Job.Wood | Job.Stone | Job.Ore)) != 0 ? radius + OutsideReach : radius;
+            float reach = (jobs & Job.Wood) != 0 ? radius + OutsideReach + LogReach : (jobs & (Job.Stone | Job.Ore)) != 0 ? radius + OutsideReach : radius;
             foreach (Collider col in Scan(center, reach))
             {
                 GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;
@@ -1255,6 +1258,7 @@ namespace VillagePlebs
                 Task t = Consider(st, go, jobs, axe, pick);
                 if (t == null || Skipped(st, t.Target) || ClaimedByOther(st, t.Target)) continue;
                 if (t.Kind != Kind.Hit && Flat(t.Target.transform.position, center) > radius) continue;
+                if (t.Kind == Kind.Hit && !WithinReach(t.Target, center, radius)) continue;
                 t.ForGoal = goal != null && Drops(t.Target).Any(goal.Wants);
                 if (t.ForGoal) goalSeen = true;
                 float score = Vector3.Distance(t.Target.transform.position, me.transform.position) + Priority(t) - (t.ForGoal ? 60f : 0f) - (t.Edible && st.Hungry ? 200f : 0f);
@@ -1328,6 +1332,15 @@ namespace VillagePlebs
 
         // How far past its home radius it goes for wood and stone, since it never takes them from inside a base.
         public const float OutsideReach = 50f;
+
+        // How much further a fallen log may lie (by its nearest end): a felled tree's log, and the half logs it breaks into, can
+        // lie a log's length past the stump, and it finishes them rather than leaving them there.
+        private const float LogReach = 20f;
+
+        // A tree or rock within reach by where it stands (not by any collider of it that strays into the scan), a log by its
+        // nearest end.
+        private static bool WithinReach(Component c, Vector3 center, float radius) =>
+            c is TreeLog ? Flat(Point(c, center), center) <= radius + OutsideReach + LogReach : Flat(c.transform.position, center) <= radius + OutsideReach;
 
         // A player base: the game's own (workbenches, fires) or within reach of anything a player built.
         internal static bool InBase(Vector3 at) => EffectArea.IsPointInsideArea(at, EffectArea.Type.PlayerBase) != null || NearBuildings(at);
