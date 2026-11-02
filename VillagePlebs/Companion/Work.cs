@@ -42,6 +42,8 @@ namespace VillagePlebs
             public float HealthAt = -1f;
             public float Started, LastClose, StillSince;
             public Vector3 StillAt;
+            // The nearest it has got so far and when, and when it first got within reach.
+            public float BestDist = float.MaxValue, BestAt, Arrived;
         }
 
         private static readonly string[] OreWords = { "Ore", "Scrap", "Flametal" };
@@ -597,7 +599,14 @@ namespace VillagePlebs
             // Stood still for a while without once getting within reach of it (a crop behind a post, say): it cannot get there.
             if (Flat(me.transform.position, t.StillAt) > 0.5f) { t.StillAt = me.transform.position; t.StillSince = Time.time; }
             bool stuck = t.Kind != Kind.Fish && Time.time - t.StillSince > 8f && Time.time - t.LastClose > 8f;
-            if (stuck || Time.time - t.Started > (t.Trip ? 240f : t.Ordered ? 180f : 60f) || (dist > 3f && Time.time - t.LastClose > (t.Trip || t.Ordered ? 120f : 20f)))
+            // Still closing in counts as getting somewhere: a tree out past home is a long walk for a new, slow companion, and it used to
+            // give up on each after 20 s still on its way, then try the next one out, further still.
+            if (dist < t.BestDist - 1f) { t.BestDist = dist; t.BestAt = Time.time; }
+            if (t.Arrived == 0f && t.LastClose > t.Started) t.Arrived = t.LastClose;
+            float gained = Mathf.Max(t.LastClose, t.BestAt), limit = t.Trip ? 240f : t.Ordered ? 180f : 60f;
+            // The time it has for the job counts from when it got there, not from setting off (with a bound on the walk as well).
+            bool tooLong = Time.time - (t.Arrived > 0f ? t.Arrived : t.Started) > limit || Time.time - t.Started > limit * 3f;
+            if (stuck || tooLong || (dist > 3f && Time.time - gained > (t.Trip || t.Ordered ? 120f : 20f)))
             {
                 if (t.Kind == Kind.Mend)
                     foreach (Collider col in Physics.OverlapSphere(t.Target.transform.position, 6f, LayerMask.GetMask("piece", "piece_nonsolid")))
