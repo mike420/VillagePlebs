@@ -169,6 +169,8 @@ namespace VillagePlebs
         // Where it last meant to walk to, and where and on what it was last wedged (it gives up on a job it keeps wedging on).
         public Vector3 MoveGoal, LastWedge;
         public Component WedgeTarget;
+        public ItemDrop LootTarget;
+        public readonly HashSet<ItemDrop> LootSkip = new HashSet<ItemDrop>();
         public int Wedges;
         // Its own way-finding found no way within the near box for this place: it looks further round next time.
         public bool PathWide;
@@ -515,7 +517,8 @@ namespace VillagePlebs
                 }
             }
             // Wedged (it means to move but has not shifted for a while, caught in furniture or a corner): it hops to the nearest free spot.
-            if (me.GetMoveDir().sqrMagnitude > 0.01f && st.Riding == null && !me.IsAttached() && !me.InAttack())
+            // Not in bed: it is held there, and a walk left over from before (to some loot) read as wedged every 6 s all night.
+            if (me.GetMoveDir().sqrMagnitude > 0.01f && st.Riding == null && !me.IsAttached() && !me.InAttack() && !st.Asleep)
             {
                 if (st.WedgedSince < 0f || Vector3.Distance(me.transform.position, st.WedgedAt) > 0.3f) { st.WedgedSince = Time.time; st.WedgedAt = me.transform.position; }
                 else if (Time.time - st.WedgedSince > 6f)
@@ -536,6 +539,14 @@ namespace VillagePlebs
                     else Activity.Log(me, $"was wedged at {st.WedgedAt:F0} {heading}: no free spot near");
                     // Wedged in the same place twice on the way to the same job: the way it takes runs into a wall, so it leaves the job.
                     if (st.Wedges >= 2) { st.Wedges = 0; st.WedgeTarget = null; Work.Wedged(st); }
+                    // On the way to loot, or to a spot by the fire or for a stroll, it doesn't go on walking at the same place.
+                    if (st.LootTarget != null && Vector3.Distance(st.MoveGoal, st.LootTarget.transform.position) < 1f)
+                    {
+                        st.LootSkip.Add(st.LootTarget);
+                        Activity.Log(me, $"gave up on the {Localization.instance.Localize(st.LootTarget.m_itemData.m_shared.m_name).ToLowerInvariant()} at {st.LootTarget.transform.position:F0}: could not get to it");
+                        st.LootTarget = null;
+                    }
+                    else if (st.Task == null) Idle.Wedged(st);
                 }
             }
             else st.WedgedSince = -1f;

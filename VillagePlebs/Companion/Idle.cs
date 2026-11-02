@@ -278,6 +278,24 @@ namespace VillagePlebs
 
         private static bool Evening() => EnvMan.instance != null && (EnvMan.IsNight() || EnvMan.instance.GetDayFraction() > 0.72f);
 
+        // Wedged on the way to its spot between jobs. Near a spot by the fire or out of the rain, it settles where it is (the spot
+        // by the fire was a step past a bench or the hearth, and it walked at it every 6 s for as long as it rested); otherwise it
+        // finds something else to do.
+        internal static void Wedged(BrainState st)
+        {
+            if (st.IdlePlan == IdlePlan.None || Vector3.Distance(st.MoveGoal, st.IdleAt) > 1f) return;
+            Vector3 here = st.Body.transform.position;
+            if ((st.IdlePlan == IdlePlan.Fire || st.IdlePlan == IdlePlan.Shelter) && Utils.DistanceXZ(here, st.IdleAt) < 3f)
+            {
+                Activity.Log(st.Body, $"could not get right to its spot at {st.IdleAt:F0}: stays at {here:F0}");
+                st.IdleAt = here;
+                return;
+            }
+            Activity.Log(st.Body, $"could not get to its spot at {st.IdleAt:F0} ({st.IdlePlan.ToString().ToLowerInvariant()}): does something else");
+            st.IdlePlan = IdlePlan.None;
+            st.IdleUntil = 0f;
+        }
+
         private static bool StillGood(BrainState st)
         {
             switch (st.IdlePlan)

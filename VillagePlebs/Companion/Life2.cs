@@ -263,19 +263,20 @@ namespace VillagePlebs
             st.LootDrops.RemoveAll(kv => kv.Key == null || Time.time - kv.Value > 180f);
             if (st.LootSpots.Count == 0 && st.LootDrops.Count == 0) return false;
             if (Work.BagFull(me)) return false;
+            if (st.LootSkip.Count > 50) st.LootSkip.RemoveWhere(d => d == null);
             Inventory inv = me.GetInventory();
             ItemDrop next = null;
             float best = float.MaxValue;
             foreach (var kv in st.LootDrops)
             {
                 ItemDrop d = kv.Key;
-                if (Time.time - kv.Value < 0.6f || !inv.CanAddItem(d.m_itemData)) continue;
+                if (Time.time - kv.Value < 0.6f || st.LootSkip.Contains(d) || !inv.CanAddItem(d.m_itemData)) continue;
                 float dist = Vector3.Distance(d.transform.position, me.transform.position);
                 if (dist < 40f && dist < best) { best = dist; next = d; }
             }
             foreach (ItemDrop d in Drops())
             {
-                if (d == null || !inv.CanAddItem(d.m_itemData) || !Wants(me, d)) continue;
+                if (d == null || st.LootSkip.Contains(d) || !inv.CanAddItem(d.m_itemData) || !Wants(me, d)) continue;
                 foreach (Spot s in st.LootSpots)
                 {
                     float fromSpot = Vector3.Distance(d.transform.position, s.Pos);
@@ -286,6 +287,7 @@ namespace VillagePlebs
             }
             if (next == null) { st.LootSpots.RemoveAll(s => Time.time - s.At > 20f); return false; }
             if (Carry.Weight(me) + next.m_itemData.GetWeight() > Carry.Max(me)) { st.LootDrops.RemoveAll(kv => kv.Key == next); return false; }
+            st.LootTarget = next;
             if (best > 1.2f) { moveTo(next.transform.position, 0.5f, best > 6f); Brain.Status(st, P("villagepleb_life2_status_loot")); return true; }
             if (!next.CanPickup(false)) { next.RequestOwn(); return true; }
             string token = next.m_itemData.m_shared.m_name;

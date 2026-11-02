@@ -61,6 +61,7 @@ namespace VillagePlebs
             me.transform.SetPositionAndRotation(spot.position, spot.rotation);
             Rigidbody body = me.GetComponent<Rigidbody>();
             if (body != null) { body.position = spot.position; body.rotation = spot.rotation; }
+            me.SetMoveDir(Vector3.zero);
             GameFields.Anim(me)?.SetBool("attach_bed", true);
             Brain.Status(st, P("villagepleb_chores_status_sleeping"));
         }
