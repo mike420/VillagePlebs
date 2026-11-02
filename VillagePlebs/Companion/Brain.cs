@@ -141,7 +141,7 @@ namespace VillagePlebs
         public readonly Dictionary<string, float> Unfindable = new Dictionary<string, float>();
         public Goal Goal;
         public string GoalSaid;
-        public float NextTripLook, TripUntil;
+        public float NextTripLook, TripUntil, NextNothingLog;
         public float NextFireLook, NextMendLook, NextMend;
         public float NextReadLook;
         public float ManualOrderAt = -999f, HomeSince;

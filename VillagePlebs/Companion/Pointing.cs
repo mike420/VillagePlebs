@@ -61,10 +61,10 @@ namespace VillagePlebs
             Destructible des = go.GetComponent<Destructible>();
             if (des != null)
             {
-                DropTable drops = go.GetComponent<DropOnDestroyed>()?.m_dropWhenDestroyed;
+                DropTable drops = Work.DropsOf(des, out int tier);
                 if (drops == null || drops.m_drops.Count == 0) return P("villagepleb_pointing_nothing_worth");
                 bool wood = des.m_destructibleType == DestructibleType.Tree || des.m_damages.m_chop != HitData.DamageModifier.Immune && des.m_damages.m_pickaxe == HitData.DamageModifier.Immune;
-                if (wood) treeTier = des.m_minToolTier; else rockTier = des.m_minToolTier;
+                if (wood) treeTier = tier; else rockTier = tier;
             }
             if (treeTier >= 0) return axe == null ? P("villagepleb_pointing_need_axe") : P("villagepleb_pointing_axe_too_weak");
             if (rockTier >= 0) return pick == null ? P("villagepleb_pointing_need_pickaxe") : P("villagepleb_pointing_pickaxe_too_weak");

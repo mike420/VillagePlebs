@@ -59,12 +59,13 @@ namespace VillagePlebs
                 TreeLog log = prefab.GetComponent<TreeLog>();
                 if (log != null) Add(log.m_dropWhenDestroyed, Job.Wood, log.m_minToolTier);
                 Destructible des = prefab.GetComponent<Destructible>();
-                DropTable drops = prefab.GetComponent<DropOnDestroyed>()?.m_dropWhenDestroyed;
+                int desTier = 0;
+                DropTable drops = des != null ? Work.DropsOf(des, out desTier) : null;
                 if (des != null && drops != null && prefab.GetComponent<Piece>() == null && prefab.GetComponent<Character>() == null)
                 {
                     bool wood = des.m_destructibleType == DestructibleType.Tree || des.m_damages.m_chop != HitData.DamageModifier.Immune && des.m_damages.m_pickaxe == HitData.DamageModifier.Immune;
-                    if (wood) Add(drops, Job.Wood, des.m_minToolTier);
-                    else if (des.m_damages.m_pickaxe != HitData.DamageModifier.Immune) Add(drops, Work.IsOre(drops) ? Job.Ore : Job.Stone, des.m_minToolTier);
+                    if (wood) Add(drops, Job.Wood, desTier);
+                    else if (des.m_damages.m_pickaxe != HitData.DamageModifier.Immune) Add(drops, Work.IsOre(drops) ? Job.Ore : Job.Stone, desTier);
                 }
                 MineRock rock = prefab.GetComponent<MineRock>();
                 if (rock != null) Add(rock.m_dropItems, Work.IsOre(rock.m_dropItems) ? Job.Ore : Job.Stone, rock.m_minToolTier);

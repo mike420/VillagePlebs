@@ -230,15 +230,18 @@ namespace VillagePlebs
                         Remove(rock.gameObject); mined++;
                         break;
                     case Destructible des:
-                        DropTable table = des.GetComponent<DropOnDestroyed>()?.m_dropWhenDestroyed;
+                        DropTable table = Work.DropsOf(des, out int desTier);
                         if (table == null || table.m_drops.Count == 0) break;
                         bool wood = des.m_destructibleType == DestructibleType.Tree;
                         ItemDrop.ItemData tool = wood ? axe : pick;
-                        if (tool == null || tool.m_shared.m_toolTier < des.m_minToolTier) break;
+                        if (tool == null || tool.m_shared.m_toolTier < desTier) break;
                         if ((jobs & (wood ? Job.Wood : Work.IsOre(table) ? Job.Ore : Job.Stone)) == 0) break;
-                        if (!Chop(me, tool, des.m_health, ref budget)) break;
+                        // A boulder that breaks into a mine rock (Rock_3 into Rock_3_frac) is mined as that rock: its pieces' health, a drop for each.
+                        MineRock5 frac = des.m_spawnWhenDestroyed != null ? des.m_spawnWhenDestroyed.GetComponent<MineRock5>() : null;
+                        int pieces = frac != null ? Mathf.Max(4, frac.GetComponentsInChildren<Collider>(true).Count(col => !col.isTrigger)) : 1;
+                        if (!Chop(me, tool, frac != null ? des.m_health + frac.m_health * pieces : des.m_health, ref budget)) break;
                         EpicMmo.Worked(me, des, EpicMmo.Work.Destructible);
-                        AddTable(got, table);
+                        for (int i = 0; i < pieces; i++) AddTable(got, table);
                         Remove(des.gameObject);
                         if (wood) felled++; else mined++;
                         break;

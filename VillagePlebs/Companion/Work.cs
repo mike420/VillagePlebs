@@ -1286,6 +1286,11 @@ namespace VillagePlebs
                 float score = Vector3.Distance(t.Target.transform.position, me.transform.position) + Priority(t) - (t.ForGoal ? 60f : 0f) - (t.Edible && st.Hungry ? 200f : 0f);
                 if (score < bestScore) { bestScore = score; best = t; }
             }
+            if (best == null && (jobs & (Job.Wood | Job.Stone | Job.Ore)) != 0 && Time.time >= st.NextNothingLog)
+            {
+                st.NextNothingLog = Time.time + 120f;
+                LogNothing(st, jobs, center, radius, reach, axe, pick);
+            }
             if (best == null)
             {
                 var missing = new List<string>();
@@ -1329,6 +1334,49 @@ namespace VillagePlebs
             return best;
         }
 
+        // Why a search for wood or stone found nothing: each tree, log and rock in the scan, and what turned it away, with the
+        // nearest of each kind, so a log shows which check keeps it from work it can see.
+        private static void LogNothing(BrainState st, Job jobs, Vector3 center, float radius, float reach, ItemDrop.ItemData axe, ItemDrop.ItemData pick)
+        {
+            Humanoid me = st.Body;
+            var seen = new HashSet<GameObject>();
+            var why = new Dictionary<string, KeyValuePair<int, string>>();
+            var nearest = new Dictionary<string, float>();
+            var bases = new Dictionary<string, int>();
+            int looked = 0;
+            foreach (Collider col in Scan(center, reach))
+            {
+                GameObject go = col.attachedRigidbody != null ? col.attachedRigidbody.gameObject : col.transform.root.gameObject;
+                if (!seen.Add(go) || !Breaks(go) || go.GetComponent<Piece>() != null || go.GetComponent<Character>() != null) continue;
+                looked++;
+                bool wood = go.GetComponent<TreeBase>() != null || go.GetComponent<TreeLog>() != null
+                            || go.GetComponent<Destructible>() is Destructible d && (d.m_destructibleType == DestructibleType.Tree || d.m_damages.m_chop != HitData.DamageModifier.Immune && d.m_damages.m_pickaxe == HitData.DamageModifier.Immune);
+                string reason;
+                Task t = Consider(st, go, jobs, axe, pick);
+                if (t != null)
+                    reason = Skipped(st, t.Target) ? "skipped" : ClaimedByOther(st, t.Target) ? "another's" : t.Kind == Kind.Hit && !WithinReach(t.Target, center, radius) ? "out of reach" : "taken (?)";
+                else if (go.GetComponent<TreeLog>() == null && InBase(go)) reason = "in a base";
+                else if (Groundwork.OnWorkedGround(go)) reason = "on worked ground";
+                else if (Steer.Underwater(go.transform.position)) reason = "in water";
+                else if ((jobs & (wood ? Job.Wood : Job.Stone | Job.Ore)) == 0) reason = wood ? "wood not its job" : "stone not its job";
+                else if ((wood ? axe : pick) == null) reason = wood ? "no axe" : "no pickaxe";
+                else reason = "tool too weak or nothing to drop";
+                float dist = Flat(go.transform.position, center);
+                why.TryGetValue(reason, out var had);
+                bool closer = !nearest.TryGetValue(reason, out float best) || dist < best;
+                if (closer) nearest[reason] = dist;
+                why[reason] = new KeyValuePair<int, string>(had.Key + 1, closer ? $"{Utils.GetPrefabName(go)} {dist:0} m" : had.Value);
+                if (reason == "in a base")
+                {
+                    string by = BaseWhy(go.transform.position);
+                    bases[by] = (bases.TryGetValue(by, out int n) ? n : 0) + 1;
+                }
+            }
+            string parts = why.Count == 0 ? "none at all" : string.Join(", ", why.OrderByDescending(kv => kv.Value.Key).Select(kv => $"{kv.Value.Key} {kv.Key} (nearest {kv.Value.Value})"));
+            Activity.Log(me, $"found no wood or stone to work ({jobs}, axe {axe?.m_shared.m_toolTier.ToString() ?? "none"}, pickaxe {pick?.m_shared.m_toolTier.ToString() ?? "none"}, within {radius:0} m, scanned {reach:0} m): {looked} trees, logs and rocks seen: {parts}"
+                + (bases.Count > 0 ? "; in a base by: " + string.Join(", ", bases.OrderByDescending(kv => kv.Value).Take(5).Select(kv => $"{kv.Value} {kv.Key}")) : ""));
+        }
+
         private static float Priority(Task t)
         {
             if (t.Target is TreeLog) return -15f;
@@ -1365,7 +1413,25 @@ namespace VillagePlebs
             c is TreeLog ? Flat(Point(c, center), center) <= radius + OutsideReach + LogReach : Flat(c.transform.position, center) <= radius + OutsideReach;
 
         // A player base: the game's own (workbenches, fires) or within reach of anything a player built.
-        internal static bool InBase(Vector3 at) => EffectArea.IsPointInsideArea(at, EffectArea.Type.PlayerBase) != null || NearBuildings(at);
+        internal static bool InBase(Vector3 at) => BaseArea(at) != null || NearBuildings(at);
+
+        // The furthest a base area counts from its middle. Vanilla's reach 20 m or so, but a mod can stretch one far wider
+        // (AzuWorkbenchTweaks and the like): a workbench's area reached 180 m in one game, which made the whole land "base" and
+        // left no tree or rock it would touch.
+        private const float BaseReach = 32f;
+        private static readonly Collider[] _areaHits = new Collider[64];
+
+        // The base area covering a spot, within BaseReach of its middle.
+        private static EffectArea BaseArea(Vector3 at)
+        {
+            int n = Physics.OverlapSphereNonAlloc(at, 0f, _areaHits, LayerMask.GetMask("character_trigger"), QueryTriggerInteraction.Collide);
+            for (int i = 0; i < n; i++)
+            {
+                EffectArea area = _areaHits[i].GetComponent<EffectArea>();
+                if (area != null && (area.m_type & EffectArea.Type.PlayerBase) != 0 && Flat(area.transform.position, at) <= BaseReach) return area;
+            }
+            return null;
+        }
 
         private static readonly Dictionary<int, KeyValuePair<bool, float>> BaseSeen = new Dictionary<int, KeyValuePair<bool, float>>();
 
@@ -1382,8 +1448,20 @@ namespace VillagePlebs
         internal static bool Breaks(GameObject go) =>
             go.GetComponent<TreeBase>() != null || go.GetComponent<TreeLog>() != null || go.GetComponent<MineRock>() != null || go.GetComponent<MineRock5>() != null || go.GetComponent<Destructible>() != null;
 
-        private static bool NearBuildings(Vector3 at) =>
-            Physics.OverlapSphere(at, 10f, LayerMask.GetMask("piece", "piece_nonsolid")).Any(col => col.GetComponentInParent<Piece>() is Piece p && p.IsPlacedByPlayer());
+        // A building of a player's within 10 m: its solid parts only, since a piece's trigger (a big area of effect) is no wall.
+        private static bool NearBuildings(Vector3 at) => Building(at) != null;
+
+        private static Collider Building(Vector3 at) =>
+            Physics.OverlapSphere(at, 10f, LayerMask.GetMask("piece", "piece_nonsolid"), QueryTriggerInteraction.Ignore).FirstOrDefault(col => col.GetComponentInParent<Piece>() is Piece p && p.IsPlacedByPlayer());
+
+        // What makes a spot count as in a base, for the log: the base area that covers it, or the building near it.
+        private static string BaseWhy(Vector3 at)
+        {
+            EffectArea area = BaseArea(at);
+            if (area != null) return $"base area of {Utils.GetPrefabName(area.transform.root.gameObject)}, {Flat(area.transform.position, at):0} m off";
+            Collider b = Building(at);
+            return b != null ? $"by {Utils.GetPrefabName(b.transform.root.gameObject)} ({b.name})" : "?";
+        }
 
         private static void BeginClear(BrainState st, Vector3 tree)
         {
@@ -1431,11 +1509,11 @@ namespace VillagePlebs
             Destructible des = go.GetComponent<Destructible>();
             if (des != null)
             {
-                DropTable drops = go.GetComponent<DropOnDestroyed>()?.m_dropWhenDestroyed;
+                DropTable drops = DropsOf(des, out int tier);
                 if (drops == null || drops.m_drops.Count == 0) return null;
                 bool wood = des.m_destructibleType == DestructibleType.Tree || des.m_damages.m_chop != HitData.DamageModifier.Immune && des.m_damages.m_pickaxe == HitData.DamageModifier.Immune;
-                if (wood && (jobs & Job.Wood) != 0 && axe != null && axe.m_shared.m_toolTier >= des.m_minToolTier) return Wood(st, des, drops);
-                if (!wood && pick != null && pick.m_shared.m_toolTier >= des.m_minToolTier && des.m_damages.m_pickaxe != HitData.DamageModifier.Immune)
+                if (wood && (jobs & Job.Wood) != 0 && axe != null && axe.m_shared.m_toolTier >= tier) return Wood(st, des, drops);
+                if (!wood && pick != null && pick.m_shared.m_toolTier >= tier && des.m_damages.m_pickaxe != HitData.DamageModifier.Immune)
                 {
                     Job job = IsOre(drops) ? Job.Ore : Job.Stone;
                     if ((jobs & job) != 0) return Rock(st, des, drops, job);
@@ -1562,8 +1640,23 @@ namespace VillagePlebs
             GameObject go = c.gameObject;
             if (go.GetComponent<Pickable>() is Pickable p) return p.m_itemPrefab != null ? new[] { p.m_itemPrefab.name } : new string[0];
             DropTable t = go.GetComponent<TreeBase>()?.m_dropWhenDestroyed ?? go.GetComponent<TreeLog>()?.m_dropWhenDestroyed ?? go.GetComponent<MineRock>()?.m_dropItems
-                          ?? go.GetComponent<MineRock5>()?.m_dropItems ?? go.GetComponent<DropOnDestroyed>()?.m_dropWhenDestroyed;
+                          ?? go.GetComponent<MineRock5>()?.m_dropItems ?? (go.GetComponent<Destructible>() is Destructible des ? DropsOf(des, out _) : null);
             return t?.m_drops?.Where(d => d.m_item != null).Select(d => d.m_item.name) ?? Enumerable.Empty<string>();
+        }
+
+        // What breaking a destructible gives, and the tool tier that takes: its own drops, else those of what it breaks into.
+        // A meadows boulder (Rock_3) drops nothing itself: it turns into Rock_3_frac, a mine rock that gives the stone, so it was
+        // taken for worthless and never mined, chosen or pointed at.
+        internal static DropTable DropsOf(Destructible des, out int tier)
+        {
+            tier = des.m_minToolTier;
+            DropTable own = des.GetComponent<DropOnDestroyed>()?.m_dropWhenDestroyed;
+            if (own != null && own.m_drops.Count > 0) return own;
+            GameObject into = des.m_spawnWhenDestroyed;
+            if (into == null) return own;
+            if (into.GetComponent<MineRock5>() is MineRock5 r5) { tier = Mathf.Max(tier, r5.m_minToolTier); return r5.m_dropItems; }
+            if (into.GetComponent<MineRock>() is MineRock r) { tier = Mathf.Max(tier, r.m_minToolTier); return r.m_dropItems; }
+            return into.GetComponent<DropOnDestroyed>()?.m_dropWhenDestroyed ?? own;
         }
 
         private static Task Wood(BrainState st, Component c, DropTable drops) { Want(st, drops); return New(Kind.Hit, c, Job.Wood); }
