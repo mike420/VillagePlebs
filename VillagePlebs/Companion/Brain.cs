@@ -174,6 +174,8 @@ namespace VillagePlebs
         // A point on the way to somewhere far it has no whole way to, walked to first; and how it last moved, for the log.
         public Vector3 Stone, StoneFor;
         public float StoneUntil;
+        public Vector3 HeadwayFor;
+        public float HeadwayBest, HeadwayAt, SkipGameUntil;
         public bool HasStone;
         public string MoveMode = "";
         public readonly HashSet<ItemDrop> LootSkip = new HashSet<ItemDrop>();
@@ -259,8 +261,10 @@ namespace VillagePlebs
                 }
                 partial = st.NoFullPath && (st.Door != null && Time.time < st.Door.Until && Vector3.Distance(st.Door.Target, point) < 4f || (st.Door = PlanDoor(ai, pos, point)) != null);
             }
+            bool noHeadway = st != null && Utils.DistanceXZ(point, pos) > 30f && NoHeadway(st, pos, point);
             bool result = partial ? false : MoveToRaw(ai, dt, point, dist, canRun);
-            if (!partial && (Utils.DistanceXZ(point, pos) <= Mathf.Max(dist, 0.75f) || c.GetMoveDir().sqrMagnitude > 0.01f)) { if (st != null) st.MoveMode = "the game's way"; return result; }
+            if (!partial && !noHeadway && (Utils.DistanceXZ(point, pos) <= Mathf.Max(dist, 0.75f) || c.GetMoveDir().sqrMagnitude > 0.01f)) { if (st != null) st.MoveMode = "the game's way"; return result; }
+            if (noHeadway && StepToward(st, ai, dt, pos, point, canRun)) return false;
             if (st != null)
             {
                 st.MoveMode = "a door";
@@ -301,6 +305,21 @@ namespace VillagePlebs
             c.SetRun(canRun);
             c.SetLookDir(dir, 0f);
             return false;
+        }
+
+        // On a long walk, 6 s without getting a metre nearer: the game's way goes nowhere (round the low ground under the hill the
+        // logs were on, till it gave up), so for 20 s it walks in steps instead, then gives the game's way another go.
+        private static bool NoHeadway(BrainState st, Vector3 pos, Vector3 point)
+        {
+            float d = Utils.DistanceXZ(point, pos);
+            if (Utils.DistanceXZ(st.HeadwayFor, point) > 4f) { st.HeadwayFor = point; st.HeadwayBest = d; st.HeadwayAt = Time.time; st.SkipGameUntil = 0f; }
+            if (d < st.HeadwayBest - 1f) { st.HeadwayBest = d; st.HeadwayAt = Time.time; }
+            if (Time.time < st.SkipGameUntil) return true;
+            if (Time.time - st.HeadwayAt < 6f) return false;
+            st.SkipGameUntil = Time.time + 20f;
+            st.HeadwayAt = Time.time;
+            Activity.Log(st.Body, $"got no nearer to {point:F0} in 6 s the game's way ({d:0} m off): walks there in steps");
+            return true;
         }
 
         private static readonly float[] StoneAngles = { 0f, 25f, -25f, 50f, -50f, 80f, -80f };
@@ -350,12 +369,15 @@ namespace VillagePlebs
             return false;
         }
 
+        // Nothing that hurts on the next 6 m of the straight way (further on, its steering goes round what it meets). It used to
+        // need the whole way clear and no more than 8 m long, so in a base, always with stakes or a fire within 7 m, it stood still.
         private static bool ClearLine(Humanoid h, Vector3 from, Vector3 to)
         {
             float len = Utils.DistanceXZ(from, to);
-            if (len > 8f) return false;
-            for (float t = 0.5f; t < len + 0.25f; t += 0.5f)
-                if (!Steer.Safe(Vector3.Lerp(from, to, Mathf.Min(1f, t / len)), h)) return false;
+            if (len < 0.01f) return true;
+            float check = Mathf.Min(len, 6f);
+            for (float t = 0.5f; t < check + 0.25f; t += 0.5f)
+                if (!Steer.Safe(Vector3.Lerp(from, to, Mathf.Min(check, t) / len), h)) return false;
             return true;
         }
 

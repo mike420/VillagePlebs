@@ -140,7 +140,7 @@ namespace VillagePlebs
                 bool hurts = false;
                 for (float r = 0.5f; r <= 2.01f && !hurts; r += 0.5f)
                     foreach (Hazard h in s.Near) if (Hurts(h, pos + d * r, 0.5f)) { hurts = true; break; }
-                if (hurts || !ZoneSystem.instance.GetSolidHeight(pos + d * 1.2f, out float ground)) continue;
+                if (hurts || !GroundAt(pos + d * 1.2f, pos.y, out float ground)) continue;
                 float drop = pos.y - ground;
                 if (drop < least) { least = drop; best = d; }
             }
@@ -187,9 +187,18 @@ namespace VillagePlebs
         private static bool Drop(Vector3 from, Vector3 to)
         {
             if (from.y > 3000f) return false;
-            if (ZoneSystem.instance == null || !ZoneSystem.instance.GetSolidHeight(to, out float ground)) return false;
-            if (ground < ZoneSystem.instance.m_waterLevel - 0.5f) return false;
+            if (!GroundAt(to, from.y, out float ground)) return false;
+            if (ZoneSystem.instance != null && ground < ZoneSystem.instance.m_waterLevel - 0.5f) return false;
             return from.y - ground > 3.5f;
+        }
+
+        // The ground at a spot, a bridge or floor counted: the game's own height (terrain and some pieces) missed the deck of a
+        // lowered drawbridge, so the ditch under it read as a drop and it would not step on, stuck at the gate by the stakes.
+        private static bool GroundAt(Vector3 at, float fromY, out float ground)
+        {
+            if (Physics.Raycast(new Vector3(at.x, fromY + 1f, at.z), Vector3.down, out RaycastHit hit, 12f, Solid, QueryTriggerInteraction.Ignore)) { ground = hit.point.y; return true; }
+            ground = 0f;
+            return ZoneSystem.instance != null && ZoneSystem.instance.GetSolidHeight(at, out ground);
         }
 
         private static bool Hurts(Hazard h, Vector3 feet, float margin)
