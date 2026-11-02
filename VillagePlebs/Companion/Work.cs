@@ -1744,10 +1744,31 @@ namespace VillagePlebs
         }
 
         // Coins stay in its bag: they are its shopping money.
-        public static bool Keeps(Humanoid h, ItemDrop.ItemData i) => Gear.InSlot(i) || h.IsItemEquiped(i) || Companion.Useful(h, i) || IsTool(i) || IsCookable(i) || Mending.IsHammer(i)
+        public static bool Keeps(Humanoid h, ItemDrop.ItemData i) => (Gear.InSlot(i) || h.IsItemEquiped(i) || Companion.Useful(h, i) || IsTool(i) || IsCookable(i) || Mending.IsHammer(i)
                                                                     || i.m_shared.m_name == Shopping.Coins
                                                                     || Farming.IsCultivator(i) || Farming.IsSeed(h, i) || Fishing.IsRod(i) || Fishing.IsBait(i)
-                                                                    || Brain.Get(h) is BrainState b && b.Farm == Errand.Smelt && b.SmeltFeeds.Contains(i.m_shared.m_name);
+                                                                    || Brain.Get(h) is BrainState b && b.Farm == Errand.Smelt && b.SmeltFeeds.Contains(i.m_shared.m_name))
+                                                                    && !Spare(h, i);
+
+        // How much food, and raw food to cook, it keeps in its bag past its food slots: the rest it puts away like any stock. It used
+        // to keep every bit it came by, and with a mod that raises stack sizes its bag grew past a thousand pieces and thousands of kg.
+        private const int KeepFood = 20, KeepCook = 20;
+
+        private static bool FoodLike(ItemDrop.ItemData i, bool food) => food ? Food.IsFood(i) : IsCookable(i) && !Food.IsFood(i);
+
+        // A stack of food (or raw food) in its bag that runs past what it keeps, counting its bag's stacks in order.
+        private static bool Spare(Humanoid h, ItemDrop.ItemData i)
+        {
+            bool food = Food.IsFood(i);
+            if (!food && !IsCookable(i) || Gear.InSlot(i) || h.IsItemEquiped(i)) return false;
+            int keep = food ? KeepFood : KeepCook, before = 0;
+            foreach (ItemDrop.ItemData x in h.GetInventory().GetAllItems())
+            {
+                if (x == i) return before + i.m_stack > keep;
+                if (!Gear.InSlot(x) && !h.IsItemEquiped(x) && FoodLike(x, food)) before += x.m_stack;
+            }
+            return false;
+        }
 
         // The fishing errand, a fish at a time: a rod and bait (fetched from its own chest), then the nearest fish it has bait for
         // with a dry spot within a cast of it. Done when its bag is full, the bait runs out, or no fish near home will take it.
@@ -1969,7 +1990,18 @@ namespace VillagePlebs
             int put = 0, took = 0, tidied = 0;
             bool yours = Home.IdOn(chest) == 0L;
             bool stows = Stows(me);
-            foreach (ItemDrop.ItemData item in mine.GetAllItems().Where(i => !Keeps(me, i)).OrderBy(i => i.m_stack).ToList())
+            // Its spare food and raw food: what runs past what it keeps goes in, splitting a stack if need be (the kept part stays).
+            foreach (bool food in new[] { true, false })
+            {
+                int keep = food ? KeepFood : KeepCook, kept = 0;
+                foreach (ItemDrop.ItemData item in mine.GetAllItems().Where(x => !Gear.InSlot(x) && !me.IsItemEquiped(x) && FoodLike(x, food)).ToList())
+                {
+                    int over = Mathf.Max(0, kept + item.m_stack - keep);
+                    kept += item.m_stack - over;
+                    if (MovePart(mine, its, item, over) > 0) put++;
+                }
+            }
+            foreach (ItemDrop.ItemData item in mine.GetAllItems().Where(i => !Keeps(me, i) && !FoodLike(i, true) && !FoodLike(i, false)).OrderBy(i => i.m_stack).ToList())
             {
                 if (item.m_stack <= 0 || !mine.ContainsItem(item)) continue;
                 int n;

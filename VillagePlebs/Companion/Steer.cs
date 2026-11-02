@@ -8,12 +8,13 @@ namespace VillagePlebs
     internal static class Steer
     {
         private class Hazard { public Collider Col; public Vector3 Center; public float Radius; }
-        private class State { public float NextScan, NextJump, NextMoveCheck, Side, SideUntil, NextNote, PressedSince = -1f; public Vector3 LastPos; public readonly List<Hazard> Near = new List<Hazard>(); }
+        private class State { public float NextScan, NextJump, NextMoveCheck, Side, SideUntil, NextNote, PressedSince = -1f, BlockedSince = -1f; public Vector3 LastPos; public readonly List<Hazard> Near = new List<Hazard>(); }
 
         private static readonly Dictionary<Humanoid, State> States = Cleanup.Track(new Dictionary<Humanoid, State>());
         private static readonly AccessTools.FieldRef<Aoe, Character> Owner = AccessTools.FieldRefAccess<Aoe, Character>("m_owner");
         private static readonly int Solid = LayerMask.GetMask("Default", "static_solid", "Default_small", "piece", "terrain", "vehicle");
-        private static readonly float[] Angles = { 30f, 60f, 90f, 120f, 150f };
+        // Straight back last: the way it came is often the only way down off a rock it climbed.
+        private static readonly float[] Angles = { 30f, 60f, 90f, 120f, 150f, 180f };
 
         public static void Forget() => States.Clear();
 
@@ -80,7 +81,7 @@ namespace VillagePlebs
             if (Time.time >= s.NextScan) { s.NextScan = Time.time + 0.3f; Scan(me, s, pos); }
             Vector3 dir = me.GetMoveDir();
             dir.y = 0f;
-            if (dir.sqrMagnitude < 0.01f) { s.PressedSince = -1f; s.LastPos = pos; return; }
+            if (dir.sqrMagnitude < 0.01f) { s.PressedSince = -1f; s.LastPos = pos; s.BlockedSince = -1f; return; }
             if (Time.time >= s.NextMoveCheck)
             {
                 s.NextMoveCheck = Time.time + 0.25f;
@@ -99,7 +100,7 @@ namespace VillagePlebs
                 return;
             }
 
-            if (Clear(s, pos, dir)) { Jump(me, s, pos, dir); return; }
+            if (Clear(s, pos, dir)) { s.BlockedSince = -1f; Jump(me, s, pos, dir); return; }
 
             float first = Time.time < s.SideUntil ? s.Side : 1f;
             foreach (float a in Angles)
@@ -109,12 +110,41 @@ namespace VillagePlebs
                     if (!Clear(s, pos, d)) continue;
                     s.Side = sign;
                     s.SideUntil = Time.time + 1.5f;
+                    s.BlockedSince = -1f;
                     Go(me, st, d);
                     return;
                 }
+            if (s.BlockedSince < 0f) s.BlockedSince = Time.time;
+            // Nothing that hurts in the way, only drops every way round (up on a rock with steep sides, say): after a few seconds it
+            // takes the shortest way down rather than stand up there for good. A fall hurts a little; standing there does nothing.
+            if (Time.time - s.BlockedSince > 3f && ShortestDrop(s, pos, dir) is Vector3 down)
+            {
+                if (Time.time >= s.NextNote) { s.NextNote = Time.time + 10f; Activity.Log(me, $"only drops every way from {pos:F0}: takes the shortest way down"); }
+                Go(me, st, down);
+                return;
+            }
             me.SetMoveDir(Vector3.zero);
             if (!st.InCombat) Brain.Status(st, Words.P("villagepleb_steer_status_safe_way"));
             if (Time.time >= s.NextNote) { s.NextNote = Time.time + 10f; Activity.Log(me, $"no safe way on from {pos:F0} heading {dir:F1}: {Blockers(s, pos, dir)}"); }
+        }
+
+        // Of the ways round with nothing that hurts along them, the one with the least drop at its end; null if every way has a hurt.
+        private static Vector3? ShortestDrop(State s, Vector3 pos, Vector3 dir)
+        {
+            if (ZoneSystem.instance == null) return null;
+            Vector3? best = null;
+            float least = float.MaxValue;
+            for (int k = 0; k < 12; k++)
+            {
+                Vector3 d = Quaternion.Euler(0f, k * 30f, 0f) * dir;
+                bool hurts = false;
+                for (float r = 0.5f; r <= 2.01f && !hurts; r += 0.5f)
+                    foreach (Hazard h in s.Near) if (Hurts(h, pos + d * r, 0.5f)) { hurts = true; break; }
+                if (hurts || !ZoneSystem.instance.GetSolidHeight(pos + d * 1.2f, out float ground)) continue;
+                float drop = pos.y - ground;
+                if (drop < least) { least = drop; best = d; }
+            }
+            return best;
         }
 
         // What turns it back every way it could go: the hurting things near (by name and how far) and any drop straight ahead.

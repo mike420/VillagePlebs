@@ -168,6 +168,9 @@ namespace VillagePlebs
         public int Wedges;
         // Its own way-finding found no way within the near box for this place: it looks further round next time.
         public bool PathWide;
+        // Which companion this is (its id outlives the loaded body), and whether it was just picked up again after a reload.
+        public long Id;
+        public bool Reloaded;
         public bool NoFullPath;
         public Vector3 FullPathTo;
         public Vector3? PerchDown;
@@ -390,8 +393,19 @@ namespace VillagePlebs
             if (h == null) return null;
             if (!States.TryGetValue(h, out BrainState st))
             {
+                bool owner = h.GetComponent<ZNetView>() is ZNetView v && v.IsValid() && v.IsOwner();
+                long id = Companion.IdOf(h);
+                // The same companion, unloaded and loaded again a moment ago (it was out at the edge of what the game keeps loaded round
+                // you): it carries on with what it was doing, its trip and job and all, instead of starting over as if just met.
+                BrainState was = owner && id != 0L ? States.FirstOrDefault(kv => kv.Key == null && kv.Value.Id == id && kv.Value.RanFrame > 0 && Time.time - kv.Value.RanAt < 120f).Value : null;
                 foreach (Humanoid gone in States.Keys.Where(k => k == null).ToList()) States.Remove(gone);
-                States[h] = st = new BrainState { Body = h, Ai = h.GetComponent<MonsterAI>(), MadeAsOwner = h.GetComponent<ZNetView>() is ZNetView v && v.IsValid() && v.IsOwner() };
+                if (was != null)
+                {
+                    was.Body = h; was.Ai = h.GetComponent<MonsterAI>(); was.MadeAsOwner = true; was.Reloaded = true;
+                    States[h] = st = was;
+                    Activity.Log(h, "loaded again: carries on");
+                }
+                else States[h] = st = new BrainState { Body = h, Ai = h.GetComponent<MonsterAI>(), MadeAsOwner = owner, Id = id };
             }
             return st;
         }
@@ -418,7 +432,8 @@ namespace VillagePlebs
 
         private static BrainState TookOver(Humanoid h)
         {
-            bool fresh = States.TryGetValue(h, out BrainState had) && had.RanFrame == 0 && had.MadeAsOwner;
+            bool fresh = States.TryGetValue(h, out BrainState had) && (had.RanFrame == 0 && had.MadeAsOwner || had.Reloaded);
+            if (had != null) had.Reloaded = false;
             if (!fresh)
             {
                 Forget(h);
