@@ -43,6 +43,14 @@ namespace VillagePlebs
         private static IEnumerable<Container> YourChests(Humanoid me, Vector3 center, float radius, Func<Container, bool> allowed) =>
             Work.YourChests(me, center, radius).Where(c => (allowed == null || allowed(c)) && (!c.m_checkGuardStone || PrivateArea.CheckAccess(c.transform.position, 0f, false)));
 
+        public static bool Own(Humanoid me, Container c) => c != null && Companion.IdOf(me) != 0L && Home.IdOn(c) == Companion.IdOf(me);
+
+        // Chests it takes better gear from: its own always (what is in them is its own: a better shield it put away, or one you
+        // left there for it), and yours when it may use them.
+        private static IEnumerable<Container> Sources(Humanoid me, Vector3 center, float radius, Func<Container, bool> allowed, bool yours) =>
+            Home.Chests(me).Where(c => !Containers.InUse(c) && (allowed == null || allowed(c)))
+                .Concat(yours ? YourChests(me, center, radius, allowed) : Enumerable.Empty<Container>());
+
         private static Dictionary<ItemDrop.ItemData, Container> Best(Humanoid me, IEnumerable<Container> chests)
         {
             var all = chests.SelectMany(c => c.GetInventory().GetAllItems().Select(i => new KeyValuePair<ItemDrop.ItemData, Container>(i, c))).ToList();
@@ -57,27 +65,26 @@ namespace VillagePlebs
             return picks;
         }
 
-        private static List<ItemDrop.ItemData> Picks(Humanoid me, Container chest) =>
-            Best(me, Work.YourChests(me, chest.transform.position, 30f)).Where(kv => kv.Value == chest).Select(kv => kv.Key).ToList();
+        private static List<ItemDrop.ItemData> Picks(Humanoid me, Container chest, bool yours) =>
+            Best(me, Sources(me, chest.transform.position, 30f, null, yours)).Where(kv => kv.Value == chest).Select(kv => kv.Key).ToList();
 
-        public static Container Find(Humanoid me, Vector3 center, float radius, Func<Container, bool> allowed = null, bool force = false)
-        {
-            if (!force && !Allowed(me)) return null;
-            return Best(me, YourChests(me, center, radius, allowed)).Values.Distinct()
+        public static Container Find(Humanoid me, Vector3 center, float radius, Func<Container, bool> allowed = null, bool force = false) =>
+            Best(me, Sources(me, center, radius, allowed, force || Allowed(me))).Values.Distinct()
                 .OrderBy(c => Vector3.Distance(c.transform.position, me.transform.position)).Take(4).FirstOrDefault(c => Brain.CanReach(me, c.transform.position));
-        }
 
         public static string TakeFrom(BrainState st, Container chest, bool force = false)
         {
             Humanoid me = st.Body;
-            if (chest == null || !force && !Allowed(me) || Home.IdOn(chest) != 0L) return null;
+            if (chest == null) return null;
+            bool own = Own(me, chest), yours = force || Allowed(me);
+            if (!own && (Home.IdOn(chest) != 0L || !yours)) return null;
             if (!Containers.Take(chest)) return null;
             Inventory mine = me.GetInventory(), its = chest.GetInventory();
             var changes = new List<string>();
-            foreach (ItemDrop.ItemData pick in Picks(me, chest))
+            foreach (ItemDrop.ItemData pick in Picks(me, chest, yours))
             {
                 if (!its.ContainsItem(pick)) continue;
-                if (mine.GetEmptySlots() == 0) { Talk.Tell(me, P("villagepleb_armory_bag_full"), "armoryfull", 60f); break; }
+                if (mine.GetEmptySlots() == 0) { Talk.Tell(me, P(own ? "villagepleb_armory_bag_full_own" : "villagepleb_armory_bag_full"), "armoryfull", 60f); break; }
                 Gear.Slot slot = Gear.All.First(s => Gear.Fits(s, pick) && Kinds.Contains(s.Kind) && (s.Kind != GearKind.Spare || !Gear.IsTool(pick)));
                 ItemDrop.ItemData old = Gear.In(me, slot);
                 pick.m_equipped = false;
@@ -100,9 +107,9 @@ namespace VillagePlebs
             Companion.Maintain(me, false);
             Companion.SaveBag(me);
             string list = string.Join(", ", changes);
-            st.Remember(P("villagepleb_armory_took", list));
-            Talk.Say(me, P("villagepleb_armory_found", list));
-            VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(me)} took better gear from the chest at {chest.transform.position:F0}: {Words.English(list)}");
+            st.Remember(P(own ? "villagepleb_armory_took_own" : "villagepleb_armory_took", list));
+            Talk.Say(me, P(own ? "villagepleb_armory_found_own" : "villagepleb_armory_found", list));
+            VillagePlebsPlugin.Instance?.Note($"{Companion.NameOf(me)} took better gear from {(own ? "its" : "the")} chest at {chest.transform.position:F0}: {Words.English(list)}");
             return list;
         }
 
@@ -112,11 +119,10 @@ namespace VillagePlebs
         public static string CatchUp(BrainState st, Vector3 center, float radius)
         {
             Humanoid me = st.Body;
-            if (!Allowed(me)) return null;
             var all = new List<string>();
             for (int round = 0; round < 10; round++)
             {
-                Container chest = Best(me, Work.YourChests(me, center, radius)).Values.FirstOrDefault();
+                Container chest = Best(me, Sources(me, center, radius, null, Allowed(me))).Values.FirstOrDefault();
                 string got = chest != null ? TakeFrom(st, chest) : null;
                 if (got == null) break;
                 all.Add(got);

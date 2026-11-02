@@ -1161,7 +1161,7 @@ namespace VillagePlebs
             {
                 st.NextArmoryLook = Time.time + 300f;
                 Container better = Armory.Find(me, center, radius, c => !Skipped(st, c));
-                if (better != null) { st.Remember(P("villagepleb_work_to_armory")); return New(Kind.Armory, better, Job.None); }
+                if (better != null) { st.Remember(P(Armory.Own(me, better) ? "villagepleb_work_to_own_armory" : "villagepleb_work_to_armory")); return New(Kind.Armory, better, Job.None); }
             }
 
             if (Time.time >= st.NextFireLook)
