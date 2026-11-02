@@ -1006,8 +1006,18 @@ namespace VillagePlebs
             return true;
         }
 
+        // Wedged twice in the same place on the way to its job: it leaves the job, as when it cannot get there.
+        internal static void Wedged(BrainState st)
+        {
+            Task t = st.Task;
+            if (t?.Target == null) return;
+            if (t.Kind == Kind.Plant) { Farming.Bad(st, t.Pos); st.Task = null; return; }
+            Skip(st, t.Target, P("villagepleb_work_skip_cant_reach"));
+        }
+
         private static void Skip(BrainState st, Component target, string why, float minutes = 10f)
         {
+            if (target != null && why != null) Activity.Log(st.Body, $"gave up on the {Hoverable(target)} at {target.transform.position:F0}, from {st.Body.transform.position:F0}");
             if (target != null) st.Skipped[target.gameObject.GetInstanceID()] = Time.time + minutes * 60f;
             if (why != null && target != null) st.Remember(P("villagepleb_work_gave_up_on", HoverName(target), why));
             st.Task = null;

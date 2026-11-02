@@ -162,6 +162,12 @@ namespace VillagePlebs
         public float NextPlant, NextToolLook, NextMissionCheck, GoingHomeUntil, HomeBest = float.MaxValue, HomeBestAt;
         public float PerchedSince = -1f, NextPerchLook, NextFullPath, WedgedSince = -1f;
         public Vector3 WedgedAt;
+        // Where it last meant to walk to, and where and on what it was last wedged (it gives up on a job it keeps wedging on).
+        public Vector3 MoveGoal, LastWedge;
+        public Component WedgeTarget;
+        public int Wedges;
+        // Its own way-finding found no way within the near box for this place: it looks further round next time.
+        public bool PathWide;
         public bool NoFullPath;
         public Vector3 FullPathTo;
         public Vector3? PerchDown;
@@ -225,6 +231,7 @@ namespace VillagePlebs
             Vector3 pos = c.transform.position;
             Humanoid h = c as Humanoid;
             BrainState st = h != null ? Get(h) : null;
+            if (st != null) st.MoveGoal = point;
             // No whole way there: a way through a door (open or shut) comes first, before the game's way to the nearest it can get.
             bool partial = false;
             if (st != null && Utils.DistanceXZ(point, pos) > 3f)
@@ -495,12 +502,21 @@ namespace VillagePlebs
                 else if (Time.time - st.WedgedSince > 6f)
                 {
                     st.WedgedSince = -1f;
+                    Component on = st.Task?.Target;
+                    bool again = on != null && ReferenceEquals(on, st.WedgeTarget) && Vector3.Distance(st.WedgedAt, st.LastWedge) < 1.5f;
+                    st.Wedges = again ? st.Wedges + 1 : 1;
+                    st.WedgeTarget = on;
+                    st.LastWedge = st.WedgedAt;
+                    string heading = $"heading for {st.MoveGoal:F0} ({st.Status})";
                     if (Steer.FreeSpot(me) is Vector3 free)
                     {
                         me.transform.position = free;
                         if (me.GetComponent<Rigidbody>() is Rigidbody rb) { rb.position = free; rb.linearVelocity = Vector3.zero; }
-                        Activity.Log(me, $"was wedged at {st.WedgedAt:F0}: moved to {free:F0}");
+                        Activity.Log(me, $"was wedged at {st.WedgedAt:F0} {heading}: moved to {free:F0}");
                     }
+                    else Activity.Log(me, $"was wedged at {st.WedgedAt:F0} {heading}: no free spot near");
+                    // Wedged in the same place twice on the way to the same job: the way it takes runs into a wall, so it leaves the job.
+                    if (st.Wedges >= 2) { st.Wedges = 0; st.WedgeTarget = null; Work.Wedged(st); }
                 }
             }
             else st.WedgedSince = -1f;

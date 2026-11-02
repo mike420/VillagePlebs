@@ -8,7 +8,7 @@ namespace VillagePlebs
     internal static class Steer
     {
         private class Hazard { public Collider Col; public Vector3 Center; public float Radius; }
-        private class State { public float NextScan, NextJump, NextMoveCheck, Side, SideUntil, PressedSince = -1f; public Vector3 LastPos; public readonly List<Hazard> Near = new List<Hazard>(); }
+        private class State { public float NextScan, NextJump, NextMoveCheck, Side, SideUntil, NextNote, PressedSince = -1f; public Vector3 LastPos; public readonly List<Hazard> Near = new List<Hazard>(); }
 
         private static readonly Dictionary<Humanoid, State> States = Cleanup.Track(new Dictionary<Humanoid, State>());
         private static readonly AccessTools.FieldRef<Aoe, Character> Owner = AccessTools.FieldRefAccess<Aoe, Character>("m_owner");
@@ -114,6 +114,20 @@ namespace VillagePlebs
                 }
             me.SetMoveDir(Vector3.zero);
             if (!st.InCombat) Brain.Status(st, Words.P("villagepleb_steer_status_safe_way"));
+            if (Time.time >= s.NextNote) { s.NextNote = Time.time + 10f; Activity.Log(me, $"no safe way on from {pos:F0} heading {dir:F1}: {Blockers(s, pos, dir)}"); }
+        }
+
+        // What turns it back every way it could go: the hurting things near (by name and how far) and any drop straight ahead.
+        private static string Blockers(State s, Vector3 pos, Vector3 dir)
+        {
+            var parts = new List<string>();
+            foreach (Hazard h in s.Near.Take(4))
+            {
+                string name = h.Col != null ? Utils.GetPrefabName(h.Col.transform.root.gameObject) + "/" + h.Col.name : "hit area";
+                parts.Add($"{name} {Vector3.Distance(Closest(h, pos + Vector3.up * 0.9f), pos + Vector3.up * 0.9f):0.0} m off");
+            }
+            if (Drop(pos, pos + dir * 1.2f)) parts.Add("a drop of over 3.5 m ahead");
+            return parts.Count > 0 ? string.Join(", ", parts) : "nothing found (ground or water?)";
         }
 
         private static void Go(Humanoid me, BrainState st, Vector3 d)

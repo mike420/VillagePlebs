@@ -7,8 +7,8 @@ namespace VillagePlebs
 {
     internal static class Wayfinding
     {
-        private const float Cell = 0.75f, Step = 0.8f, Margin = 10f, MaxRange = 90f;
-        private const int MaxNodes = 15000;
+        private const float Cell = 0.75f, Step = 0.8f, Margin = 10f, WideMargin = 35f, MaxRange = 90f;
+        private const int MaxNodes = 15000, WideNodes = 40000;
         private static readonly int Ground = LayerMask.GetMask("Default", "static_solid", "terrain", "piece", "vehicle");
         private static readonly int Solid = LayerMask.GetMask("Default", "static_solid", "piece", "vehicle");
         private static readonly Collider[] Hits = new Collider[16];
@@ -21,14 +21,19 @@ namespace VillagePlebs
             {
                 if (Time.time < st.NextPathTry) return st.Path != null && Walk(st, me, run);
                 st.NextPathTry = Time.time + 1.5f;
-                st.Path = Find(me, pos, to, 12f);
+                bool same = st.PathTo.HasValue && Utils.DistanceXZ(st.PathTo.Value, to) < 2f;
+                if (!same) st.PathWide = false;
+                bool wide = st.PathWide;
+                st.Path = Find(me, pos, to, 12f, wide ? WideMargin : Margin);
+                // None within the near box (the way in may run out round a wall to a gate past it): it looks further round, next try.
+                if (st.Path == null && !TimedOut && !wide) { st.PathWide = true; st.NextPathTry = Time.time + 0.3f; }
                 if (st.Path == null && TimedOut) st.NextPathTry = Time.time + 0.3f;
                 st.PathTo = to;
                 st.PathIndex = 0;
                 st.PathUntil = Time.time + 20f;
                 st.PathProgressAt = Time.time; st.PathBest = float.MaxValue;
                 if (st.Path == null) return false;
-                Activity.Log(me, $"found its own way to {to:F0} ({st.Path.Count} steps; the game's way-finding has none here)");
+                Activity.Log(me, $"found its own way to {to:F0} ({st.Path.Count} steps{(wide ? ", looking wide" : "")}; the game's way-finding has none here)");
             }
             return Walk(st, me, run);
         }
@@ -76,6 +81,7 @@ namespace VillagePlebs
             if (Reach.TryGetValue(key, out var r) && Time.time < r.until) return r.ok;
             if (Reach.Count > 500) Reach.Clear();
             List<Vector3> way = Find(me, p, to);
+            if (way == null && !TimedOut) way = Find(me, p, to, 6f, WideMargin);
             if (way == null && TimedOut) return true;
             Reach[key] = (way != null, Time.time + (way != null ? 15f : 60f));
             return way != null;
@@ -87,17 +93,18 @@ namespace VillagePlebs
 
         private static readonly Comparer<(float f, int n, Vector2Int k)> Order = Comparer<(float f, int n, Vector2Int k)>.Create((a, b) => a.f != b.f ? a.f.CompareTo(b.f) : a.n.CompareTo(b.n));
 
-        public static List<Vector3> Find(Humanoid me, Vector3 from, Vector3 to, float budgetMs = 4f)
+        public static List<Vector3> Find(Humanoid me, Vector3 from, Vector3 to, float budgetMs = 4f, float margin = Margin)
         {
             TimedOut = false;
+            int maxNodes = margin > Margin ? WideNodes : MaxNodes;
             if (Utils.DistanceXZ(from, to) > MaxRange) return null;
             if (_frame != Time.frameCount) { _frame = Time.frameCount; _frameMs = 0f; }
             if (_frameMs >= 14f) { TimedOut = true; return null; }
             var watch = System.Diagnostics.Stopwatch.StartNew();
-            Vector2 min = new Vector2(Mathf.Min(from.x, to.x) - Margin, Mathf.Min(from.z, to.z) - Margin);
+            Vector2 min = new Vector2(Mathf.Min(from.x, to.x) - margin, Mathf.Min(from.z, to.z) - margin);
             Vector2Int Key(Vector3 p) => new Vector2Int(Mathf.RoundToInt((p.x - min.x) / Cell), Mathf.RoundToInt((p.z - min.y) / Cell));
             Vector3 At(Vector2Int k, float y) => new Vector3(min.x + k.x * Cell, y, min.y + k.y * Cell);
-            int w = Mathf.CeilToInt((Mathf.Abs(from.x - to.x) + Margin * 2f) / Cell), h = Mathf.CeilToInt((Mathf.Abs(from.z - to.z) + Margin * 2f) / Cell);
+            int w = Mathf.CeilToInt((Mathf.Abs(from.x - to.x) + margin * 2f) / Cell), h = Mathf.CeilToInt((Mathf.Abs(from.z - to.z) + margin * 2f) / Cell);
 
             Vector2Int start = Key(from), goal = Key(to);
             var height = new Dictionary<Vector2Int, float> { [start] = from.y };
@@ -109,7 +116,7 @@ namespace VillagePlebs
             Vector2Int[] dirs = { new Vector2Int(1, 0), new Vector2Int(-1, 0), new Vector2Int(0, 1), new Vector2Int(0, -1), new Vector2Int(1, 1), new Vector2Int(1, -1), new Vector2Int(-1, 1), new Vector2Int(-1, -1) };
             int expanded = 0;
             Vector2Int? reached = null;
-            while (open.Count > 0 && expanded++ < MaxNodes)
+            while (open.Count > 0 && expanded++ < maxNodes)
             {
                 if ((expanded & 63) == 0 && watch.Elapsed.TotalMilliseconds > budgetMs) { TimedOut = true; break; }
                 var cur = open.Min;
