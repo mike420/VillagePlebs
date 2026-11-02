@@ -8,7 +8,6 @@ The player-facing description, features and settings are in [VillagePlebs/Packag
 
   * [BepInExPack Valheim](https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/)
   * [Jötunn](https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/)
-  * Optional: Body Replacer by Magic Mike, for more looks
 
 ## Building
 
