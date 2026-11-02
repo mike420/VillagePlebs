@@ -11,6 +11,7 @@ namespace VillagePlebs
     internal static class CatchUp
     {
         public const string LastKey = "vp_lastsim";
+        private static readonly System.Reflection.FieldInfo HitAreas = AccessTools.Field(typeof(MineRock5), "m_hitAreas");
         private const float MinAway = 120f, MaxAway = 3f * 1800f;
 
         private static readonly Dictionary<Heightmap.Biome, string[]> Creatures = new Dictionary<Heightmap.Biome, string[]>
@@ -217,7 +218,7 @@ namespace VillagePlebs
                         Remove(tree.gameObject); felled++;
                         break;
                     case MineRock5 rock5 when pick != null && pick.m_shared.m_toolTier >= rock5.m_minToolTier && (jobs & (Work.IsOre(rock5.m_dropItems) ? Job.Ore : Job.Stone)) != 0:
-                        int areas = (AccessTools.Field(typeof(MineRock5), "m_hitAreas").GetValue(rock5) as IList)?.Count ?? 4;
+                        int areas = (HitAreas.GetValue(rock5) as IList)?.Count ?? 4;
                         if (!Chop(me, pick, rock5.m_health * areas, ref budget)) break;
                         EpicMmo.Worked(me, rock5, EpicMmo.Work.Mining, _hits);
                         for (int i = 0; i < areas; i++) AddTable(got, rock5.m_dropItems);

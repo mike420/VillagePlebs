@@ -214,6 +214,8 @@ namespace VillagePlebs
                 st.NextWorkLook = Time.time + 1.5f;
                 st.Task = Choose(st, jobs, center, radius);
                 if (st.Task == null) st.WorkTool = null;
+                // Nothing to do: each look scans out to 130-150 m, every tree, rock and wall in it, so an idle one looks less often.
+                if (st.Task == null && st.Duty == null && st.Farm == null) st.NextWorkLook = Time.time + 5f;
                 if (st.Task == null && st.Duty != null && st.WorkNote != null)
                 {
                     if (Duties.Rest(me, st.Duty) == 1) st.Remember(P("villagepleb_work_duty_nothing", Low(Duties.Label(st.Duty.Duty))));
@@ -611,7 +613,7 @@ namespace VillagePlebs
             if (stuck || tooLong || (dist > 3f && Time.time - gained > (t.Trip || t.Ordered ? 120f : 20f)))
             {
                 if (t.Kind == Kind.Mend)
-                    foreach (Collider col in Physics.OverlapSphere(t.Target.transform.position, 6f, LayerMask.GetMask("piece", "piece_nonsolid")))
+                    foreach (Collider col in Physics.OverlapSphere(t.Target.transform.position, 6f, PieceLayers))
                         if (col.GetComponentInParent<WearNTear>() is WearNTear near && near != t.Target) st.Skipped[near.gameObject.GetInstanceID()] = Time.time + 600f;
                 Activity.Log(me, $"{(stuck ? "stood still 8 s" : tooLong ? "ran out of time" : "got no nearer in 20 s")} on its way, {dist:0} m off, moving by {(string.IsNullOrEmpty(st.MoveMode) ? "nothing" : st.MoveMode)}");
                 if (t.Kind == Kind.Plant) { Farming.Bad(st, t.Pos); st.Task = null; return; }
@@ -1420,11 +1422,12 @@ namespace VillagePlebs
         // left no tree or rock it would touch.
         private const float BaseReach = 32f;
         private static readonly Collider[] _areaHits = new Collider[64];
+        private static readonly int AreaLayer = LayerMask.GetMask("character_trigger");
 
         // The base area covering a spot, within BaseReach of its middle.
         private static EffectArea BaseArea(Vector3 at)
         {
-            int n = Physics.OverlapSphereNonAlloc(at, 0f, _areaHits, LayerMask.GetMask("character_trigger"), QueryTriggerInteraction.Collide);
+            int n = Physics.OverlapSphereNonAlloc(at, 0f, _areaHits, AreaLayer, QueryTriggerInteraction.Collide);
             for (int i = 0; i < n; i++)
             {
                 EffectArea area = _areaHits[i].GetComponent<EffectArea>();
@@ -1451,8 +1454,17 @@ namespace VillagePlebs
         // A building of a player's within 10 m: its solid parts only, since a piece's trigger (a big area of effect) is no wall.
         private static bool NearBuildings(Vector3 at) => Building(at) != null;
 
-        private static Collider Building(Vector3 at) =>
-            Physics.OverlapSphere(at, 10f, LayerMask.GetMask("piece", "piece_nonsolid"), QueryTriggerInteraction.Ignore).FirstOrDefault(col => col.GetComponentInParent<Piece>() is Piece p && p.IsPlacedByPlayer());
+        private static readonly int PieceLayers = LayerMask.GetMask("piece", "piece_nonsolid");
+        private static Collider[] _pieceHits = new Collider[256];
+
+        private static Collider Building(Vector3 at)
+        {
+            int n;
+            while ((n = Physics.OverlapSphereNonAlloc(at, 10f, _pieceHits, PieceLayers, QueryTriggerInteraction.Ignore)) == _pieceHits.Length) _pieceHits = new Collider[_pieceHits.Length * 2];
+            for (int i = 0; i < n; i++)
+                if (_pieceHits[i].GetComponentInParent<Piece>() is Piece p && p.IsPlacedByPlayer()) return _pieceHits[i];
+            return null;
+        }
 
         // What makes a spot count as in a base, for the log: the base area that covers it, or the building near it.
         private static string BaseWhy(Vector3 at)

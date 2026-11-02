@@ -218,12 +218,27 @@ namespace VillagePlebs
             return off.magnitude <= h.Radius ? p : h.Center + off.normalized * h.Radius;
         }
 
+        private static Collider[] _scanHits = new Collider[256];
+        private static readonly HashSet<Aoe> _scanSeen = new HashSet<Aoe>();
+        private static readonly Collider[] _safeHits = new Collider[64];
+
+        // Every collider in a sphere, into a shared buffer grown as needed (in a base, a 7 m sphere holds hundreds).
+        private static int Overlap(Vector3 at, float radius, ref Collider[] hits)
+        {
+            int n;
+            while ((n = Physics.OverlapSphereNonAlloc(at, radius, hits, ~0, QueryTriggerInteraction.Collide)) == hits.Length) hits = new Collider[hits.Length * 2];
+            return n;
+        }
+
         private static void Scan(Humanoid me, State s, Vector3 pos)
         {
             s.Near.Clear();
-            var seen = new HashSet<Aoe>();
-            foreach (Collider col in Physics.OverlapSphere(pos + Vector3.up, 7f, ~0, QueryTriggerInteraction.Collide))
+            _scanSeen.Clear();
+            HashSet<Aoe> seen = _scanSeen;
+            int n = Overlap(pos + Vector3.up, 7f, ref _scanHits);
+            for (int i = 0; i < n; i++)
             {
+                Collider col = _scanHits[i];
                 Aoe aoe = col.GetComponent<Aoe>() ?? col.GetComponentInParent<Aoe>();
                 if (aoe == null || !seen.Add(aoe) || !Dangerous(aoe, me)) continue;
                 Collider own = aoe.m_useCollider != null ? (Collider)aoe.m_useCollider : aoe.GetComponent<Collider>();
@@ -255,11 +270,24 @@ namespace VillagePlebs
 
         public static bool Safe(Vector3 feet, Humanoid me)
         {
-            foreach (Collider col in Physics.OverlapSphere(feet + Vector3.up * 0.9f, 1f, ~0, QueryTriggerInteraction.Collide))
+            int n = Physics.OverlapSphereNonAlloc(feet + Vector3.up * 0.9f, 1f, _safeHits, ~0, QueryTriggerInteraction.Collide);
+            for (int i = 0; i < n; i++)
             {
+                Collider col = _safeHits[i];
                 Aoe aoe = col.GetComponent<Aoe>() ?? col.GetComponentInParent<Aoe>();
                 if (aoe != null && Dangerous(aoe, me)) return false;
             }
+            return true;
+        }
+
+        // Safe by the hazards its last scan found (within 7 m of it, 0.3 s old at most), with no physics query: as Safe, a 1 m
+        // sphere at its middle clear of them. For spots near it only, as its next few metres.
+        public static bool SafeNear(Humanoid me, Vector3 feet)
+        {
+            if (me == null || !States.TryGetValue(me, out State s)) return Safe(feet, me);
+            Vector3 mid = feet + Vector3.up * 0.9f;
+            foreach (Hazard h in s.Near)
+                if ((Closest(h, mid) - mid).sqrMagnitude <= 1f) return false;
             return true;
         }
 

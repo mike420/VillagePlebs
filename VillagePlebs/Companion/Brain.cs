@@ -377,7 +377,7 @@ namespace VillagePlebs
             if (len < 0.01f) return true;
             float check = Mathf.Min(len, 6f);
             for (float t = 0.5f; t < check + 0.25f; t += 0.5f)
-                if (!Steer.Safe(Vector3.Lerp(from, to, Mathf.Min(check, t) / len), h)) return false;
+                if (!Steer.SafeNear(h, Vector3.Lerp(from, to, Mathf.Min(check, t) / len))) return false;
             return true;
         }
 
