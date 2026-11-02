@@ -105,6 +105,10 @@ namespace VillagePlebs
         public Character StallOn;
         public float StallSince, StallHealth;
         public readonly Dictionary<Character, float> LeaveAlone = new Dictionary<Character, float>();
+        // Time spent unable to see (bow) or reach (melee) a foe without getting any nearer, kept across fights; and foes given up on
+        // from a spot (a neck in the water past the wall), left be while it stays near that spot.
+        public readonly Dictionary<Character, (float blocked, float best)> Chase = new Dictionary<Character, (float, float)>();
+        public readonly Dictionary<Character, (float until, Vector3 from)> OutOfReach = new Dictionary<Character, (float, Vector3)>();
         public float BlockUntil;
         public float NextBanterLook;
         public bool SaidNight;
@@ -762,6 +766,7 @@ namespace VillagePlebs
                 string kind = Utils.GetPrefabName(c.gameObject);
                 if (kind == "Deer" || kind == "Hare") continue;
                 float toMe = Vector3.Distance(c.transform.position, me.transform.position);
+                if (st.OutOfReach.TryGetValue(c, out var gave) && Time.time < gave.until && Utils.DistanceXZ(me.transform.position, gave.from) < 10f && toMe > 4f) continue;
                 float toMaster = master != null ? Vector3.Distance(c.transform.position, master.transform.position) : float.MaxValue;
                 float limit = style == Style.Defensive ? range * 0.6f : range;
                 Character theirs = TargetOf(c);
@@ -1038,6 +1043,7 @@ namespace VillagePlebs
             float reach = ranged ? 30f : Mathf.Max(1.2f, (weapon?.m_shared.m_attack?.m_attackRange ?? 1.5f) * 0.9f);
             float dist = Vector3.Distance(target.transform.position, me.transform.position) - target.GetRadius();
             Vector3 aim = target.GetCenterPoint();
+            if (OutOfReach(st, target, ranged, dist, reach, dt)) return;
 
             if (Time.time < st.EvadeUntil)
             {
@@ -1163,6 +1169,35 @@ namespace VillagePlebs
                 if (combo) Journal.Count(me, "combo blows");
             }
             if (ranged) DrawTime(me) = 0f;
+        }
+
+        // A foe it can't shoot at (out of sight) or get to (out of reach) and gets no nearer to over 8 s, all its fights with it
+        // together: given up on from here, with its kind close by. It went for the neck past the wall every time it came near,
+        // walked at the wall, and the fight ended as the neck swam off, too soon each time for the 20 s rule.
+        private static bool OutOfReach(BrainState st, Character target, bool ranged, float dist, float reach, float dt)
+        {
+            Humanoid me = st.Body;
+            if (st.Chase.Count > 64) foreach (Character gone in st.Chase.Keys.Where(k => k == null || k.IsDead()).ToList()) st.Chase.Remove(gone);
+            bool blocked = ranged ? !st.Ai.CanSeeTarget(target) : dist > reach;
+            if (target.IsBoss() || !blocked || TargetOf(target) == me && dist < 4f) { st.Chase[target] = (0f, dist); return false; }
+            if (!st.Chase.TryGetValue(target, out var c)) c = (0f, dist);
+            if (dist < c.best - 1f) c = (0f, dist); else c.blocked += dt;
+            st.Chase[target] = c;
+            if (c.blocked < 8f) return false;
+            Vector3 here = me.transform.position;
+            string kind = Utils.GetPrefabName(target.gameObject);
+            foreach (Character like in Character.GetAllCharacters().Where(o => o != null && (o == target || Utils.GetPrefabName(o.gameObject) == kind && Vector3.Distance(o.transform.position, target.transform.position) < 15f)))
+            {
+                st.OutOfReach[like] = (Time.time + 120f, here);
+                st.Chase.Remove(like);
+                st.Enemies.Remove(like);
+            }
+            foreach (Character gone in st.OutOfReach.Keys.Where(k => k == null).ToList()) st.OutOfReach.Remove(gone);
+            foreach (Character gone in st.Chase.Keys.Where(k => k == null).ToList()) st.Chase.Remove(gone);
+            Activity.Log(me, $"could not {(ranged ? "get a shot at" : "get to")} the {Localization.instance.Localize(target.m_name).ToLowerInvariant()} at {target.transform.position:F0} from {here:F0} and got no nearer in 8 s: leaves it be from here");
+            if (st.Task != null && st.Task.Target == target) st.Task = null;
+            if (st.StallOn == target) st.StallOn = null;
+            return true;
         }
 
         private static void Guarded(BrainState st, Character threat, Vector3 to, bool run, float dt)
