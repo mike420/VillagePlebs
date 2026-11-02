@@ -170,6 +170,7 @@ namespace VillagePlebs
         public Vector3 MoveGoal, LastWedge;
         public Component WedgeTarget;
         public ItemDrop LootTarget;
+        public bool OffDuty;
         // A point on the way to somewhere far it has no whole way to, walked to first; and how it last moved, for the log.
         public Vector3 Stone, StoneFor;
         public float StoneUntil;

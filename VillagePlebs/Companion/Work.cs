@@ -171,7 +171,9 @@ namespace VillagePlebs
             Job jobs = JobsOf(me);
             st.OnDuties = Duties.Configured(me);
             st.Duty = Duties.Active(me);
-            if (st.OnDuties)
+            // Its duties all done and no mission to work on: it does its other jobs (sent home, it used to stand about instead).
+            st.OffDuty = st.OnDuties && st.Duty == null && Goals.JobsFor(Aim(st), out _) == Job.None;
+            if (st.OnDuties && !st.OffDuty)
             {
                 jobs = st.Duty != null ? st.Duty.Jobs : Job.None;
                 if (st.Hungry) jobs |= Job.Forage | Job.Hunt | Job.Cook;
@@ -181,7 +183,7 @@ namespace VillagePlebs
                 jobs &= ~Unequipped(me, jobs);
                 if (jobs == Job.None) jobs = AutoJobs(me);
             }
-            st.Ticked = st.OnDuties ? Job.None : JobsOf(me) & ~Unequipped(me, JobsOf(me));
+            st.Ticked = st.OnDuties && !st.OffDuty ? Job.None : JobsOf(me) & ~Unequipped(me, JobsOf(me));
             Vector3 center = Center(me);
             float radius = RadiusOf(me);
             if (Time.time < st.GoingHomeUntil)
@@ -1148,7 +1150,7 @@ namespace VillagePlebs
                 }
             }
 
-            Job lacking = st.OnDuties ? Job.None : Unequipped(me, JobsOf(me));
+            Job lacking = st.OnDuties && !st.OffDuty ? Job.None : Unequipped(me, JobsOf(me));
             if (lacking != Job.None && Time.time >= st.NextToolLook)
             {
                 st.NextToolLook = Time.time + 60f;

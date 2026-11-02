@@ -210,7 +210,7 @@
   "villagepleb_menu_today_took": "今天：吃了{0}顿，拿了你{1}份食物（每天最多{2}份）。",
   "villagepleb_menu_most_a_day": "每天最多从你这里拿",
   "villagepleb_menu_n_food": "{0}份食物",
-  "villagepleb_menu_other_jobs": "其他工作（有职责开启时不使用）",
+  "villagepleb_menu_other_jobs": "其他工作（职责完成、又没有任务时才做）",
   "villagepleb_menu_jobs": "工作（可选）",
   "villagepleb_menu_jobs_auto": "未开启任何工作：自行决定，采集目标所需且工具允许的东西。当前：{0}。",
   "villagepleb_menu_jobs_auto_nothing": "未开启任何工作：自行决定，采集目标所需且工具允许的东西。当前：无（没有工具，食物也够）。",

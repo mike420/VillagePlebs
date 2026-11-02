@@ -210,7 +210,7 @@
   "villagepleb_menu_today_took": "Hoje: comeu {0} refeições, pegou {1} da sua comida (até {2} por dia).",
   "villagepleb_menu_most_a_day": "Máximo que pega da sua por dia",
   "villagepleb_menu_n_food": "{0} de comida",
-  "villagepleb_menu_other_jobs": "Outros trabalhos (não usados enquanto há uma tarefa ligada)",
+  "villagepleb_menu_other_jobs": "Outros trabalhos (quando as tarefas estão feitas e não há missão)",
   "villagepleb_menu_jobs": "Trabalhos (opcional)",
   "villagepleb_menu_jobs_auto": "Nada ligado: decide sozinho, coletando o que o objetivo pede e o que as ferramentas permitem. Agora: {0}.",
   "villagepleb_menu_jobs_auto_nothing": "Nada ligado: decide sozinho, coletando o que o objetivo pede e o que as ferramentas permitem. Agora: nada (sem ferramentas e com comida suficiente).",

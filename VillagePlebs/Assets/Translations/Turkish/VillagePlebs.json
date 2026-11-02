@@ -210,7 +210,7 @@
   "villagepleb_menu_today_took": "Bugün: {0} öğün yedi, senin yiyeceğinden {1} tane aldı (günde en çok {2}).",
   "villagepleb_menu_most_a_day": "Seninkinden günde en çok alacağı",
   "villagepleb_menu_n_food": "{0} yiyecek",
-  "villagepleb_menu_other_jobs": "Diğer uğraşlar (bir ev işi açıkken kullanılmaz)",
+  "villagepleb_menu_other_jobs": "Diğer uğraşlar (ev işleri bitince ve görevi yokken)",
   "villagepleb_menu_jobs": "Uğraşlar (isteğe bağlı)",
   "villagepleb_menu_jobs_auto": "Hiçbiri açık değil: kendisi karar verir, hedefinin gerektirdiğini ve aletlerinin izin verdiğini toplar. Şu an: {0}.",
   "villagepleb_menu_jobs_auto_nothing": "Hiçbiri açık değil: kendisi karar verir, hedefinin gerektirdiğini ve aletlerinin izin verdiğini toplar. Şu an: hiçbir şey (aleti yok ve yeterince yiyeceği var).",

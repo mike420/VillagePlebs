@@ -210,7 +210,7 @@
   "villagepleb_menu_today_took": "Heute: {0} Mahlzeiten gegessen, {1} von deinem Essen genommen (höchstens {2} am Tag).",
   "villagepleb_menu_most_a_day": "Höchstens von deinem Essen pro Tag",
   "villagepleb_menu_n_food": "{0} Essen",
-  "villagepleb_menu_other_jobs": "Andere Arbeiten (nicht genutzt, solange eine Pflicht an ist)",
+  "villagepleb_menu_other_jobs": "Andere Arbeiten (wenn seine Pflichten erledigt sind und er keine Mission hat)",
   "villagepleb_menu_jobs": "Arbeiten (optional)",
   "villagepleb_menu_jobs_auto": "Nichts eingeschaltet: Er entscheidet selbst und sammelt, was sein Ziel braucht und seine Werkzeuge erlauben. Gerade: {0}.",
   "villagepleb_menu_jobs_auto_nothing": "Nichts eingeschaltet: Er entscheidet selbst und sammelt, was sein Ziel braucht und seine Werkzeuge erlauben. Gerade: nichts (keine Werkzeuge und genug Essen).",

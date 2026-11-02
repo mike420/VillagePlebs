@@ -164,7 +164,9 @@ namespace VillagePlebs
 
             Stage = "gathering";
             Job jobs = Work.JobsOf(me);
-            if (Duties.Configured(me)) jobs = Duties.OpenJobs(me) | (goalJobs & ~(Job.Loot | Job.Hunt));
+            Job dutyJobs = Duties.Configured(me) ? Duties.OpenJobs(me) : Job.None;
+            // Duties all done and no mission to work on: its other jobs, as at home.
+            if (Duties.Configured(me) && (dutyJobs != Job.None || goalJobs != Job.None)) jobs = dutyJobs | (goalJobs & ~(Job.Loot | Job.Hunt));
             else if (jobs == Job.None) jobs = Work.AutoJobs(me) | (goalJobs & ~(Job.Loot | Job.Hunt));
             ItemDrop.ItemData axe = Work.Axe(me), pick = Work.Pickaxe(me);
             var seen = new HashSet<GameObject>();

@@ -210,7 +210,7 @@
   "villagepleb_menu_today_took": "Dzisiaj: zjedzone posiłki: {0}, wzięte z twojego jedzenia: {1} (najwyżej {2} dziennie).",
   "villagepleb_menu_most_a_day": "Najwięcej twojego jedzenia dziennie",
   "villagepleb_menu_n_food": "{0} szt. jedzenia",
-  "villagepleb_menu_other_jobs": "Inne prace (nieużywane, gdy włączony jest obowiązek)",
+  "villagepleb_menu_other_jobs": "Inne prace (gdy obowiązki są wykonane i nie ma misji)",
   "villagepleb_menu_jobs": "Prace (opcjonalnie)",
   "villagepleb_menu_jobs_auto": "Nic nie jest włączone: decyduje sam, zbierając to, czego potrzebuje jego cel i na co pozwalają jego narzędzia. Teraz: {0}.",
   "villagepleb_menu_jobs_auto_nothing": "Nic nie jest włączone: decyduje sam, zbierając to, czego potrzebuje jego cel i na co pozwalają jego narzędzia. Teraz: nic (brak narzędzi, a jedzenia wystarczy).",

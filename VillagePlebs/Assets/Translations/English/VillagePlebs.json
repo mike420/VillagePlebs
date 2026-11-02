@@ -210,7 +210,7 @@
   "villagepleb_menu_today_took": "Today: ate {0} meals, took {1} of your food (up to {2} a day).",
   "villagepleb_menu_most_a_day": "Most it takes from yours a day",
   "villagepleb_menu_n_food": "{0} food",
-  "villagepleb_menu_other_jobs": "Other jobs (not used while a duty is on)",
+  "villagepleb_menu_other_jobs": "Other jobs (once its duties are done and it has no mission)",
   "villagepleb_menu_jobs": "Jobs (optional)",
   "villagepleb_menu_jobs_auto": "Nothing switched on: it decides for itself, gathering what its goal needs and what its tools allow. Right now: {0}.",
   "villagepleb_menu_jobs_auto_nothing": "Nothing switched on: it decides for itself, gathering what its goal needs and what its tools allow. Right now: nothing (no tools, and enough food).",

@@ -210,7 +210,7 @@
   "villagepleb_menu_today_took": "Aujourd'hui : {0} repas mangés, {1} de votre nourriture pris (jusqu'à {2} par jour).",
   "villagepleb_menu_most_a_day": "Maximum pris chez vous par jour",
   "villagepleb_menu_n_food": "{0} aliments",
-  "villagepleb_menu_other_jobs": "Autres tâches (inutilisées tant qu'un devoir est actif)",
+  "villagepleb_menu_other_jobs": "Autres tâches (une fois ses devoirs faits, s'il n'a pas de mission)",
   "villagepleb_menu_jobs": "Tâches (facultatif)",
   "villagepleb_menu_jobs_auto": "Rien d'activé : il décide seul, et récolte ce dont son objectif a besoin et ce que ses outils permettent. En ce moment : {0}.",
   "villagepleb_menu_jobs_auto_nothing": "Rien d'activé : il décide seul, et récolte ce dont son objectif a besoin et ce que ses outils permettent. En ce moment : rien (pas d'outils, et assez de nourriture).",
