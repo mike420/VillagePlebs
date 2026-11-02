@@ -29,7 +29,6 @@ Thank you for your support, and happy gaming! ⚔️  ...... (A Paypal account i
 
   * <a href="https://thunderstore.io/c/valheim/p/denikson/BepInExPack_Valheim/">BepInExPack Valheim</a>
   * <a href="https://thunderstore.io/c/valheim/p/ValheimModding/Jotunn/">Jötunn</a>
-  * Optional: Body Replacer by Magic Mike, for more looks.
 
 <br>
 

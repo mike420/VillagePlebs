@@ -9,7 +9,7 @@ namespace VillagePlebs
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
     [BepInDependency("com.jotunn.jotunn", BepInDependency.DependencyFlags.HardDependency)]
     [BepInDependency("MagicMike.BodyReplacer", BepInDependency.DependencyFlags.SoftDependency)]
-    [NetworkCompatibility(CompatibilityLevel.EveryoneMustHaveMod, VersionStrictness.Minor)]
+    [NetworkCompatibility(CompatibilityLevel.EveryoneMustHaveMod, VersionStrictness.Major)]
     public partial class VillagePlebsPlugin : BaseUnityPlugin
     {
         public const string PluginGUID = "MagicMike.VillagePlebs";
