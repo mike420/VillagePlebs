@@ -1,6 +1,15 @@
 [size=6][b]VillagePlebs[/b][/size]
 
-Create multiple viking companions, follower NPCs who play like a player: they come on your adventures, fight beside you, live their own lives at home, and get better as they go.
+Viking companions who play the game the way you do. Summon one, or several, and they come on your adventures: through portals, into crypts and caves, onto your ship. They fight beside you with timed parries, dodge rolls, flanking and bows, and tell you when a place is too dangerous for their gear.
+
+Send them home and they get on with their own lives. They take a bed and a chest, chop, mine, farm, fish, hunt and smelt, cook their own meals, keep the fires burning, repair your base, and work their way up to better gear at your stations. While you're away, they catch up on all of it.
+
+[list]
+[*][b]Plays like a player:[/b] food, stamina, carry weight, weather, rest, and skills that rise as they use them.
+[*][b]Takes orders your way:[/b] point at something and press [b]H[/b], use the command wheel, or let it read what you're doing and pitch in.
+[*][b]Gets better as it goes:[/b] it sets itself missions to make and upgrade its gear, and keeps a journal of its life.
+[*][b]Up to you how many:[/b] one free companion by default, more to buy from the traders, all set by the server.
+[/list]
 
 
 [size=5][b]Donations[/b][/size]
@@ -39,7 +48,7 @@ Thank you for your support, and happy gaming! ...... (A Paypal account is NOT re
 [*][b]Go shopping:[/b] the Go shopping errand (once you have found Haldor, Hildir or the Bog Witch) lists what the traders you have found sell. Tick what you want and press Buy now: it pays from the coins in its bag, is gone for 15 minutes, and comes back with the goods (what does not fit in its bag is set down at its feet).
 [*][b]Needs like a player:[/b] food, stamina, skills that rise, carry weight, weather and rest.
 [*][b]Gear slots of its own[/b] (swords, knives, polearms, spears, a spare weapon, shield, bow and arrows, axe, pickaxe, hammer, cultivator, fishing rod and bait, armour, belt and food): give and take its gear and bag from its menu (Inventory). It puts its tools away when it is done with them.
-[*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status (and journal), stats, missions, orders, home, inventory, looks and your plebs.
+[*][b]A journal[/b] of its life, small talk that fits the moment, and a menu with its status (and journal), stats, missions, orders, home, inventory, looks and your plebs. The Status tab ends with its activity log: what it has been doing and why, line by line, with a button to open the log file for a bug report.
 [*][b]EpicMMO System:[/b] it earns experience and levels from what it kills and gathers.
 [*][b]StarLevelSystem:[/b] it leaves companions alone, as it does players: no copies, no star levels or modifiers, and it never deletes one.
 [*][b]Body Replacer (optional):[/b] with Magic Mike's Body Replacer installed, its looks menu also offers that mod's Einherjar bodies, its added hairstyles, beards and tattoos.

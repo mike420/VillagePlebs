@@ -1,6 +1,6 @@
 # VillagePlebs
 
-A Valheim mod: create multiple viking companions, follower NPCs who play like a player. They come on your adventures, fight beside you, live their own lives at home, and get better as they go.
+A Valheim mod: viking companions who play like a player. They follow you through portals, crypts and onto your ship, fight with parries, dodges and bows, and at home farm, fish, smelt, cook and craft their own better gear while you are away.
 
 The player-facing description, features and settings are in [VillagePlebs/Package/README.md](VillagePlebs/Package/README.md), which is also the Thunderstore page.
 
