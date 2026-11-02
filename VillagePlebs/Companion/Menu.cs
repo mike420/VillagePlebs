@@ -24,7 +24,7 @@ namespace VillagePlebs
         internal static float MenuClosedAt = -1f;
         private Humanoid _shown;
         private Tab _tab = Tab.Status;
-        private bool _renaming, _focusField, _menuWarned;
+        private bool _renaming, _focusField, _menuWarned, _logAll;
         private Action _pending;
         private string _nameField = "", _note = "";
         private long _forgetArmed;
@@ -750,6 +750,24 @@ namespace VillagePlebs
             EndCard();
 
             DrawJournal(c);
+            DrawLog(c, here);
+        }
+
+        // Its activity log as it is written (the same lines as activity.log, this session): the key events, or everything but the
+        // 30 s vitals. Kept by the game that runs it, so another player's menu says where to look.
+        private void DrawLog(Humanoid c, bool here)
+        {
+            BeginCard();
+            HeadingRow(T("villagepleb_menu_log"), (T("villagepleb_menu_log_key"), !_logAll, () => _logAll = false), (T("villagepleb_menu_log_all"), _logAll, () => _logAll = true),
+                       (T("villagepleb_menu_log_open"), false, () => Application.OpenURL("file:///" + Activity.FilePath.Replace('\\', '/'))));
+            bool all = _logAll;
+            LiveText(() =>
+            {
+                var lines = Activity.RecentOf(c, !all, 40);
+                if (lines.Count == 0) return Tint(T(here ? "villagepleb_menu_log_empty" : "villagepleb_menu_log_elsewhere"), GameUi.Dim);
+                return string.Join("\n", lines.Select(l => Tint(l.At, GameUi.Dim) + "<pos=78><indent=78><noparse>" + l.Text + "</noparse></indent>"));
+            }, GameUi.Text, 15f, 0f, 2f);
+            EndCard();
         }
 
         private void OrderButtons(Humanoid c)
