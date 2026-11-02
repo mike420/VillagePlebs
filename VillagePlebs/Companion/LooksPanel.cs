@@ -38,6 +38,7 @@ namespace VillagePlebs
         private RectTransform _lookContent;
         private RawImage _previewImg;
         private Button _maleBtn, _femaleBtn, _hairReset;
+        private Toggle _hideIris;
         private TMP_Text _hairName, _beardName, _einherjarHairName, _einherjarBeardName;
         private TMP_Text[] _tattooDesigns = Array.Empty<TMP_Text>(), _tattooInks = Array.Empty<TMP_Text>();
         private Slider _skinSlider, _hairToneSlider, _hairShadeSlider;
@@ -146,7 +147,9 @@ namespace VillagePlebs
             EinherjarSlider(Section(einherjar, T("villagepleb_looks_eye_rich"), "EyeRich"), "EyeSaturation", 0f, 1f);
             EinherjarSlider(Section(einherjar, T("villagepleb_looks_eye_shade"), "EyeShade"), "EyeValue", 0f, 1f);
             EinherjarSlider(Section(einherjar, T("villagepleb_looks_eye_glow"), "EyeGlow"), "Glow", 0f, 3f);
-            EinherjarSlider(Section(einherjar, T("villagepleb_looks_iris"), "IrisSize"), "IrisSize", 0.5f, 1.2f);
+            Transform iris = Section(einherjar, T("villagepleb_looks_iris"), "IrisSize");
+            EinherjarSlider(iris, "IrisSize", 0.5f, 1.2f);
+            if (BodyReplacerLook.HasHideIris) BuildHideIris(iris);
             _bodyShapeGroup = Stack(Widgets.Child(einherjar, "BodyShape"), SectionGap, new RectOffset(0, 0, 0, 0));
             EinherjarSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_bust"), "Bust"), "BreastSize", -100f, 100f);
             EinherjarSlider(Section(_bodyShapeGroup.transform, T("villagepleb_looks_hips"), "Hips"), "ButtSize", -100f, 100f);
@@ -154,6 +157,17 @@ namespace VillagePlebs
             MakeSlider(_muscleSection.transform, (Current.BrMuscle >= 0f ? Current.BrMuscle : BodyReplacerLook.MuscleDefault(Current.Model)) / 100f,
                 v => { Current.BrMuscle = v * 100f; ApplyToClone(); });
             if (BodyReplacerLook.HasTattoos) BuildTattoos(einherjar);
+        }
+
+        // A tick under the iris size: the eyes drawn with BodyReplacer's plain default texture
+        private void BuildHideIris(Transform section)
+        {
+            const float tick = 22f;
+            GameObject row = Widgets.Child(section, "HideIris");
+            Height(row, tick);
+            _hideIris = GameUi.Check(row.transform, Vector2.zero, tick, Current.BrHideIris, on => { Current.BrHideIris = on; ApplyToClone(); });
+            TMP_Text label = Widgets.Label(row.transform, T("villagepleb_looks_hide_iris"), 16f, Theme.Text, TextAlignmentOptions.MidlineLeft);
+            Widgets.Place(label.gameObject, Vector2.zero, Vector2.one, new Vector2(tick + 8f, 0f), Vector2.zero);
         }
 
         private void BuildTattoos(Transform einherjar)
@@ -422,7 +436,7 @@ namespace VillagePlebs
 
         private static bool Same(Looks.Look a, Looks.Look b) =>
             a.Model == b.Model && a.Hair == b.Hair && a.Beard == b.Beard && Mathf.Approximately(a.Skin, b.Skin) && Mathf.Approximately(a.HairTone, b.HairTone)
-            && Mathf.Approximately(a.HairShade, b.HairShade) && (a.BrLook ?? "") == (b.BrLook ?? "") && Mathf.Approximately(a.BrMuscle, b.BrMuscle) && (a.BrTattoos ?? "") == (b.BrTattoos ?? "") && a.BrBeard == b.BrBeard && (a.BrHair ?? "") == (b.BrHair ?? "");
+            && Mathf.Approximately(a.HairShade, b.HairShade) && (a.BrLook ?? "") == (b.BrLook ?? "") && Mathf.Approximately(a.BrMuscle, b.BrMuscle) && (a.BrTattoos ?? "") == (b.BrTattoos ?? "") && a.BrBeard == b.BrBeard && (a.BrHair ?? "") == (b.BrHair ?? "") && a.BrHideIris == b.BrHideIris;
 
         // Head and shoulders of the preview body, from the front, in the preview's studio light: the companion's portrait.
         public Texture2D Snapshot(int size = 160)
@@ -578,6 +592,7 @@ namespace VillagePlebs
             BodyReplacerLook.ApplyTattoos(_clone, Current.BrTattoos);
             BodyReplacerLook.ApplyBeard(_clone, Current.BrBeard);
             BodyReplacerLook.ApplyCustomHair(_clone, Current.BrHair);
+            BodyReplacerLook.ApplyHideIris(_clone, Current.BrHideIris);
             CurrentModelIndex?.SetValue(vis, -1);
             vis.SetModel(Current.Model);
             vis.SetHairItem(Current.Hair);
@@ -637,6 +652,7 @@ namespace VillagePlebs
             look.BrTattoos = Current.BrTattoos;
             look.BrBeard = Current.BrBeard;
             look.BrHair = Current.BrHair;
+            look.BrHideIris = Current.BrHideIris;
             Current = look;
             Refresh();
             ApplyToClone();
@@ -656,6 +672,7 @@ namespace VillagePlebs
             if (_hairName != null) _hairName.text = Words.Show(Looks.StyleName(Current.Hair, Looks.Hairs()));
             if (_beardName != null) _beardName.text = Words.Show(Looks.StyleName(Current.Beard, Looks.Beards()));
             _skinSlider?.SetValueWithoutNotify(Current.Skin);
+            _hideIris?.SetIsOnWithoutNotify(Current.BrHideIris);
             _hairToneSlider?.SetValueWithoutNotify(Current.HairTone);
             _hairShadeSlider?.SetValueWithoutNotify(Current.HairShade);
             if (_einherjarHairName != null)

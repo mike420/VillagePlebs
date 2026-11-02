@@ -10,7 +10,7 @@ namespace VillagePlebs
     {
         private const string SkinT = "vp_skin_t", HairT = "vp_hair_t", HairL = "vp_hair_l";
         public const string BrLookKey = "vp_brlook", BrMuscleKey = "vp_brmuscle";
-        public const string BrTattooKey = "vp_brtattoos", BrBeardKey = "vp_brbeard", BrHairKey = "vp_brhair";
+        public const string BrTattooKey = "vp_brtattoos", BrBeardKey = "vp_brbeard", BrHairKey = "vp_brhair", BrHideIrisKey = "vp_brhideiris";
 
         private static readonly Color Skin0 = new Color(1f, 1f, 1f), Skin1 = new Color(0.32f, 0.23f, 0.17f);
         private static readonly Color Hair0 = new Color(1f, 0.86f, 0.55f), Hair1 = new Color(0.45f, 0.24f, 0.11f);
@@ -40,8 +40,9 @@ namespace VillagePlebs
         public static string BrTattoos(Component c) => Companion.Zdo(c)?.GetString(BrTattooKey, "") ?? "";
         public static int BrBeard(Component c) => Companion.Zdo(c)?.GetInt(BrBeardKey, 0) ?? 0;
         public static string BrHair(Component c) => Companion.Zdo(c)?.GetString(BrHairKey, "") ?? "";
+        public static bool BrHideIris(Component c) => Companion.Zdo(c)?.GetBool(BrHideIrisKey, false) ?? false;
 
-        public static void SetBrLook(Humanoid c, string look, float muscle, string tattoos, int beard, string hair)
+        public static void SetBrLook(Humanoid c, string look, float muscle, string tattoos, int beard, string hair, bool hideIris)
         {
             ZDO z = Companion.Zdo(c);
             z.Set(BrLookKey, look ?? "");
@@ -49,13 +50,15 @@ namespace VillagePlebs
             z.Set(BrTattooKey, tattoos ?? "");
             z.Set(BrBeardKey, beard);
             z.Set(BrHairKey, hair ?? "");
+            z.Set(BrHideIrisKey, hideIris);
             BodyReplacerLook.Apply(c.gameObject, look, muscle);
             BodyReplacerLook.ApplyTattoos(c.gameObject, tattoos);
             BodyReplacerLook.ApplyBeard(c.gameObject, beard);
             BodyReplacerLook.ApplyCustomHair(c.gameObject, hair);
+            BodyReplacerLook.ApplyHideIris(c.gameObject, hideIris);
         }
 
-        public static bool HasBrLook(string look, string tattoos, int beard, string hair) => !string.IsNullOrEmpty(look) || !string.IsNullOrEmpty(tattoos) || beard > 0 || !string.IsNullOrEmpty(hair);
+        public static bool HasBrLook(string look, string tattoos, int beard, string hair, bool hideIris) => !string.IsNullOrEmpty(look) || !string.IsNullOrEmpty(tattoos) || beard > 0 || !string.IsNullOrEmpty(hair) || hideIris;
 
         public static string StyleName(int hash, List<ItemDrop> styles)
         {
@@ -164,10 +167,11 @@ namespace VillagePlebs
             public string BrTattoos;
             public int BrBeard;
             public string BrHair;
+            public bool BrHideIris;
         }
 
         public static Look Of(Component c) =>
-            new Look { Model = Model(c), Hair = Hair(c), Beard = Beard(c), Skin = SkinTone(c), HairTone = HairTone(c), HairShade = HairShade(c), BrLook = BrLook(c), BrMuscle = BrMuscle(c), BrTattoos = BrTattoos(c), BrBeard = BrBeard(c), BrHair = BrHair(c) };
+            new Look { Model = Model(c), Hair = Hair(c), Beard = Beard(c), Skin = SkinTone(c), HairTone = HairTone(c), HairShade = HairShade(c), BrLook = BrLook(c), BrMuscle = BrMuscle(c), BrTattoos = BrTattoos(c), BrBeard = BrBeard(c), BrHair = BrHair(c), BrHideIris = BrHideIris(c) };
 
         public static Look Random()
         {
@@ -199,7 +203,7 @@ namespace VillagePlebs
             SetHairColor(c, l.HairTone, l.HairShade);
             SetHair(c, l.Hair);
             SetBeard(c, l.Model == 0 ? l.Beard : 0);
-            if (HasBrLook(l.BrLook, l.BrTattoos, l.BrBeard, l.BrHair)) SetBrLook(c, l.BrLook, l.BrMuscle, l.BrTattoos, l.BrBeard, l.BrHair);
+            if (HasBrLook(l.BrLook, l.BrTattoos, l.BrBeard, l.BrHair, l.BrHideIris)) SetBrLook(c, l.BrLook, l.BrMuscle, l.BrTattoos, l.BrBeard, l.BrHair, l.BrHideIris);
             if (!fresh) SetModel(c, l.Model);
         }
 

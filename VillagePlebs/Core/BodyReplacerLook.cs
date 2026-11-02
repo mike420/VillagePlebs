@@ -35,6 +35,7 @@ namespace VillagePlebs
         private static Action<GameObject, string> _applyCustomHair;
         private static Func<int, string, string, string> _shownCustomHair;
         private static string _customHairNone = "";
+        private static Action<GameObject, bool> _applyHideIris;
 
         public static bool Available { get { Find(); return _applyLook != null; } }
 
@@ -68,7 +69,7 @@ namespace VillagePlebs
                 _visualType = assembly.GetType("BodyReplacer.EinherjarVisual");
                 FindNewer(api);
                 VillagePlebsPlugin.Instance?.Note("BodyReplacer found: companions can be given its hairstyles and colours"
-                    + (HasCustomHairApi ? ", its new hairstyles" : "") + (HasTattoos ? ", tattoos" : "") + (HasBeardApi ? ", beards" : ""));
+                    + (HasCustomHairApi ? ", its new hairstyles" : "") + (HasTattoos ? ", tattoos" : "") + (HasBeardApi ? ", beards" : "") + (HasHideIris ? ", hidden irises" : ""));
             }
             catch (Exception e)
             {
@@ -93,6 +94,7 @@ namespace VillagePlebs
             _customHairNames = TryBind<Func<int, string[]>>(api, "CustomHairNames");
             _applyCustomHair = TryBind<Action<GameObject, string>>(api, "ApplyCustomHair");
             _shownCustomHair = TryBind<Func<int, string, string, string>>(api, "ShownCustomHair");
+            _applyHideIris = TryBind<Action<GameObject, bool>>(api, "ApplyHideIris");
             _customHairNone = api.GetField("CustomHairNone", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as string ?? "";
         }
 
@@ -167,6 +169,11 @@ namespace VillagePlebs
         public static string CustomHairNone { get { Find(); return _customHairNone; } }
 
         public static string ShownCustomHair(int model, string look, string hair) => _shownCustomHair != null ? _shownCustomHair(model, look ?? "", hair ?? "") : hair ?? "";
+
+        // Hide Iris: the eyes drawn with BodyReplacer's plain default eye texture (BodyReplacer versions with the toggle)
+        public static bool HasHideIris { get { Find(); return _applyHideIris != null; } }
+
+        public static void ApplyHideIris(GameObject character, bool hide) { if (HasHideIris) _applyHideIris(character, hide); }
 
         public static bool Drawn(GameObject character)
         {
