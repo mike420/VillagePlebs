@@ -134,6 +134,12 @@ namespace VillagePlebs
             return me.GetInventory().CountItems(name) + chests.Sum(c => c != null ? c.GetInventory().CountItems(name) : 0);
         }
 
+        // One at this level or better already in its bag or its chests: a mission for it would be done the moment it was set (the
+        // mission counts its chests too). With a bronze buckler in its chest it set itself "make a bronze buckler", found it done,
+        // and set it again, every second.
+        private static bool Owned(Humanoid me, List<Container> chests, string name, int quality) =>
+            me.GetInventory().GetAllItems().Concat(chests.Where(c => c != null).SelectMany(c => c.GetInventory().GetAllItems())).Any(i => i.m_shared.m_name == name && i.m_quality >= quality);
+
         public static Goal Pick(Humanoid me, Vector3 center, float radius, BrainState st = null)
         {
             Learn();
@@ -149,6 +155,7 @@ namespace VillagePlebs
                 Recipe r = ObjectDB.instance.GetRecipe(item);
                 if (r == null || r.m_craftingStation == null || Upgrades.SkipItem(item, item.m_dropPrefab != null ? item.m_dropPrefab.name : null)) continue;
                 int next = item.m_quality + 1;
+                if (Owned(me, chests, item.m_shared.m_name, next)) continue;
                 CraftingStation at = stations.FirstOrDefault(s => s.m_name == r.m_craftingStation.m_name && s.GetLevel() >= r.GetRequiredStationLevel(next));
                 if (at == null) continue;
                 var g = new Goal { Item = item, Station = at, What = P("villagepleb_goals_upgrade_what", Low(item.m_shared.m_name), next) };
@@ -158,6 +165,7 @@ namespace VillagePlebs
             {
                 if (r == null || !r.m_enabled || r.m_item == null || !Upgrades.Allowed(me, r) || !Upgrades.WorthMaking(me, r.m_item.m_itemData)) continue;
                 if (r.m_item.m_itemData.m_shared.m_itemType == ItemDrop.ItemData.ItemType.Ammo) continue;
+                if (Owned(me, chests, r.m_item.m_itemData.m_shared.m_name, 1)) continue;
                 CraftingStation at = r.m_craftingStation == null ? null : stations.FirstOrDefault(s => s.m_name == r.m_craftingStation.m_name && s.GetLevel() >= Mathf.Max(1, r.m_minStationLevel));
                 if (at == null && r.m_craftingStation != null) continue;
                 var g = new Goal { Recipe = r, Station = at, What = P("villagepleb_goals_make_what", Low(r.m_item.m_itemData.m_shared.m_name)) };
