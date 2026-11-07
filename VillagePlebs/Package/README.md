@@ -109,9 +109,12 @@ For Nexus downloads you will need to install manually.
   * <a href="https://thunderstore.io/c/valheim/p/MagicMike/CorewoodAdditions/">Corewood Additions</a>
   * <a href="https://thunderstore.io/c/valheim/p/MagicMike/MyDirtyHoe/">My Dirty Hoe</a>
   * <a href="https://thunderstore.io/c/valheim/p/MagicMike/ChestPreview/">Chest Preview</a>
-  * <a href="https://thunderstore.io/c/valheim/p/MagicMike/YabbaDabbaDoo/">Yabba-Dabba-Doo</a>
-  * <a href="https://thunderstore.io/c/valheim/p/MagicMike/BetterCraftMenu/">Better Craft Menu</a>
-  * <a href="https://thunderstore.io/c/valheim/p/MagicMike/BetterBuildMenu/">Better Build Menu</a>
+  * <a href="https://thunderstore.io/c/valheim/p/MagicMike/YabbaDabbaDoo/">YabbaDabbaDoo</a>
+  * <a href="https://thunderstore.io/c/valheim/p/MagicMike/BetterBuildMenu/">BetterBuildMenu</a>
+  * <a href="https://thunderstore.io/c/valheim/p/MagicMike/BetterCraftMenu/">BetterCraftMenu</a>
+  * <a href="https://thunderstore.io/c/valheim/p/MagicMike/ExtraInventorySlots/">ExtraInventorySlots</a>
+  * <a href="https://thunderstore.io/c/valheim/p/MagicMike/VillagePlebs/">VillagePlebs</a>
+  * <a href="https://thunderstore.io/c/valheim/p/MagicMike/BodyReplacer/">BodyReplacer</a>
 
 <br>
 
