@@ -27,6 +27,7 @@ namespace VillagePlebs
         public int BrBeard;
         public string BrHair = "";
         public bool BrHideIris;
+        public string BrUnderwear = "";
         public string Skills = "";
         public long MmoXp;
         public string Kept = "";
@@ -103,7 +104,7 @@ namespace VillagePlebs
                 Potions = z.GetBool(Keys.Potions, true), Protect = z.GetBool(Keys.Protect, true), UseJev = z.GetBool(Keys.UseJev, true),
                 Model = z.GetInt(ZDOVars.s_modelIndex, 0), Skin = z.GetVec3(ZDOVars.s_skinColor, Vector3.one), HairColor = z.GetVec3(ZDOVars.s_hairColor, Vector3.one),
                 Hair = z.GetInt(ZDOVars.s_hairItem, 0), Beard = z.GetInt(ZDOVars.s_beardItem, 0),
-                SkinT = Looks.SkinTone(c), HairT = Looks.HairTone(c), HairL = Looks.HairShade(c), BrLook = Looks.BrLook(c), BrMuscle = Looks.BrMuscle(c), BrTattoos = Looks.BrTattoos(c), BrBeard = Looks.BrBeard(c), BrHair = Looks.BrHair(c), BrHideIris = Looks.BrHideIris(c), Skills = Skill.Text(c), MmoXp = EpicMmo.Xp(c),
+                SkinT = Looks.SkinTone(c), HairT = Looks.HairTone(c), HairL = Looks.HairShade(c), BrLook = Looks.BrLook(c), BrMuscle = Looks.BrMuscle(c), BrTattoos = Looks.BrTattoos(c), BrBeard = Looks.BrBeard(c), BrHair = Looks.BrHair(c), BrHideIris = Looks.BrHideIris(c), BrUnderwear = Looks.BrUnderwear(c), Skills = Skill.Text(c), MmoXp = EpicMmo.Xp(c),
                 HasBed = z.GetBool(Keys.HasBed, false), Bed = z.GetVec3(Keys.BedPos, Vector3.zero), LastSeen = c.transform.position,
                 HasGrave = z.GetBool(Grave.HasKey, false), DiedPos = z.GetVec3(Grave.PosKey, Vector3.zero), Loot = z.GetBool(VillagePlebs.Loot.Key, true), Kept = z.GetString(Companion.KeptKey, ""), JournalText = book.JournalText, TallyText = book.TallyText, Since = z.GetInt(Journal.SinceKey, -1), Pantry = z.GetBool(Work.PantryKey, false), HomeSet = z.GetBool(Work.HomeSetKey, false), HomeSpot = z.GetVec3(Work.HomeSpotKey, Vector3.zero), MissionText = book.Missions, DutiesText = z.GetString(Duties.Key, ""), Frugal = z.GetBool(Food.FrugalKey, true), Ration = z.GetInt(Work.RationKey, 12), DutyDest = z.GetInt(Duties.DestKey, 0), Stow = z.GetBool(Work.StowKey, true), AutoHome = z.GetBool(Following.AutoHomeKey, true), Chatty = z.GetBool(Talk.ChattyKey, true), Armory = z.GetBool(VillagePlebs.Armory.Key, true), PickList = z.GetInt(VillagePlebs.Loot.ListKey, (int)VillagePlebs.Loot.Default),
             };
@@ -130,7 +131,7 @@ namespace VillagePlebs
             z.Set("vp_skin_t", SkinT); z.Set("vp_hair_t", HairT); z.Set("vp_hair_l", HairL);
             Looks.SetHair(c, Hair);
             Looks.SetBeard(c, Beard);
-            if (Looks.HasBrLook(BrLook, BrTattoos, BrBeard, BrHair, BrHideIris)) Looks.SetBrLook(c, BrLook, BrMuscle, BrTattoos, BrBeard, BrHair, BrHideIris);
+            if (Looks.HasBrLook(BrLook, BrTattoos, BrBeard, BrHair, BrHideIris, BrUnderwear)) Looks.SetBrLook(c, BrLook, BrMuscle, BrTattoos, BrBeard, BrHair, BrHideIris, BrUnderwear);
         }
 
         private static JArray V(Vector3 v) => new JArray(Math.Round(v.x, 3), Math.Round(v.y, 3), Math.Round(v.z, 3));
@@ -142,7 +143,7 @@ namespace VillagePlebs
             ["order"] = Order, ["style"] = Style, ["retreat"] = Retreat, ["kills"] = Kills, ["jobs"] = Jobs, ["radius"] = Radius,
             ["potions"] = Potions, ["protect"] = Protect, ["jev"] = UseJev,
             ["model"] = Model, ["skin"] = V(Skin), ["haircolor"] = V(HairColor), ["hair"] = Hair, ["beard"] = Beard,
-            ["skint"] = SkinT, ["hairt"] = HairT, ["hairl"] = HairL, ["brlook"] = BrLook ?? "", ["brmuscle"] = BrMuscle, ["brtattoos"] = BrTattoos ?? "", ["brbeard"] = BrBeard, ["brhair"] = BrHair ?? "", ["brhideiris"] = BrHideIris, ["skills"] = Skills ?? "", ["mmoxp"] = MmoXp.ToString(CultureInfo.InvariantCulture),
+            ["skint"] = SkinT, ["hairt"] = HairT, ["hairl"] = HairL, ["brlook"] = BrLook ?? "", ["brmuscle"] = BrMuscle, ["brtattoos"] = BrTattoos ?? "", ["brbeard"] = BrBeard, ["brhair"] = BrHair ?? "", ["brhideiris"] = BrHideIris, ["brunderwear"] = BrUnderwear ?? "", ["skills"] = Skills ?? "", ["mmoxp"] = MmoXp.ToString(CultureInfo.InvariantCulture),
             ["hasbed"] = HasBed, ["bed"] = V(Bed), ["seen"] = V(LastSeen),
             ["dead"] = Dead, ["diedat"] = DiedAt, ["diedpos"] = V(DiedPos), ["grave"] = HasGrave, ["loot"] = Loot, ["pick"] = PickList, ["pantry"] = Pantry, ["homeset"] = HomeSet, ["homespot"] = V(HomeSpot), ["missions"] = MissionText ?? "", ["duties"] = DutiesText ?? "", ["frugal"] = Frugal, ["ration"] = Ration, ["dutydest"] = DutyDest, ["stow"] = Stow, ["autohome"] = AutoHome, ["kept"] = Kept ?? "", ["journal"] = JournalText ?? "", ["tally"] = TallyText ?? "", ["since"] = Since, ["chatty"] = Chatty, ["armory"] = Armory,
         };
@@ -155,7 +156,7 @@ namespace VillagePlebs
             Jobs = (int?)o["jobs"] ?? 0, Radius = (int?)o["radius"] ?? 30,
             Potions = (bool?)o["potions"] ?? true, Protect = (bool?)o["protect"] ?? true, UseJev = (bool?)o["jev"] ?? true,
             Model = (int?)o["model"] ?? 0, Skin = V(o["skin"]), HairColor = V(o["haircolor"]), Hair = (int?)o["hair"] ?? 0, Beard = (int?)o["beard"] ?? 0,
-            SkinT = (float?)o["skint"] ?? 0.3f, HairT = (float?)o["hairt"] ?? 0.5f, HairL = (float?)o["hairl"] ?? 0.8f, BrLook = (string)o["brlook"] ?? "", BrMuscle = (float?)o["brmuscle"] ?? -1f, BrTattoos = (string)o["brtattoos"] ?? "", BrBeard = (int?)o["brbeard"] ?? 0, BrHair = (string)o["brhair"] ?? "", BrHideIris = (bool?)o["brhideiris"] ?? false, Skills = (string)o["skills"] ?? "",
+            SkinT = (float?)o["skint"] ?? 0.3f, HairT = (float?)o["hairt"] ?? 0.5f, HairL = (float?)o["hairl"] ?? 0.8f, BrLook = (string)o["brlook"] ?? "", BrMuscle = (float?)o["brmuscle"] ?? -1f, BrTattoos = (string)o["brtattoos"] ?? "", BrBeard = (int?)o["brbeard"] ?? 0, BrHair = (string)o["brhair"] ?? "", BrHideIris = (bool?)o["brhideiris"] ?? false, BrUnderwear = (string)o["brunderwear"] ?? "", Skills = (string)o["skills"] ?? "",
             MmoXp = long.TryParse((string)o["mmoxp"] ?? "0", NumberStyles.Integer, CultureInfo.InvariantCulture, out long xp) ? xp : 0L,
             HasBed = (bool?)o["hasbed"] ?? false, Bed = V(o["bed"]), LastSeen = V(o["seen"]),
             Dead = (bool?)o["dead"] ?? false, DiedAt = (double?)o["diedat"] ?? 0, DiedPos = V(o["diedpos"]),

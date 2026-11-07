@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Reflection;
 using BepInEx.Bootstrap;
 using UnityEngine;
@@ -36,6 +37,8 @@ namespace VillagePlebs
         private static Func<int, string, string, string> _shownCustomHair;
         private static string _customHairNone = "";
         private static Action<GameObject, bool> _applyHideIris;
+        private static Action<GameObject, string> _applyUnderwear;
+        private static Func<string> _underwearDefault;
 
         public static bool Available { get { Find(); return _applyLook != null; } }
 
@@ -69,7 +72,7 @@ namespace VillagePlebs
                 _visualType = assembly.GetType("BodyReplacer.EinherjarVisual");
                 FindNewer(api);
                 VillagePlebsPlugin.Instance?.Note("BodyReplacer found: companions can be given its hairstyles and colours"
-                    + (HasCustomHairApi ? ", its new hairstyles" : "") + (HasTattoos ? ", tattoos" : "") + (HasBeardApi ? ", beards" : "") + (HasHideIris ? ", hidden irises" : ""));
+                    + (HasCustomHairApi ? ", its new hairstyles" : "") + (HasTattoos ? ", tattoos" : "") + (HasBeardApi ? ", beards" : "") + (HasHideIris ? ", hidden irises" : "") + (HasUnderwear ? ", underwear colours" : ""));
             }
             catch (Exception e)
             {
@@ -95,6 +98,8 @@ namespace VillagePlebs
             _applyCustomHair = TryBind<Action<GameObject, string>>(api, "ApplyCustomHair");
             _shownCustomHair = TryBind<Func<int, string, string, string>>(api, "ShownCustomHair");
             _applyHideIris = TryBind<Action<GameObject, bool>>(api, "ApplyHideIris");
+            _applyUnderwear = TryBind<Action<GameObject, string>>(api, "ApplyUnderwear");
+            _underwearDefault = TryBind<Func<string>>(api, "UnderwearDefault");
             _customHairNone = api.GetField("CustomHairNone", BindingFlags.Public | BindingFlags.Static)?.GetValue(null) as string ?? "";
         }
 
@@ -174,6 +179,39 @@ namespace VillagePlebs
         public static bool HasHideIris { get { Find(); return _applyHideIris != null; } }
 
         public static void ApplyHideIris(GameObject character, bool hide) { if (HasHideIris) _applyHideIris(character, hide); }
+
+        // Underwear colour: "hue|saturation|brightness", dyed over the underwear's own shading; empty or the starting values keep its own texture (BodyReplacer versions with the sliders)
+        public static bool HasUnderwear { get { Find(); return _applyUnderwear != null && _underwearDefault != null; } }
+
+        public static void ApplyUnderwear(GameObject character, string colour) { if (HasUnderwear) _applyUnderwear(character, colour ?? ""); }
+
+        // The colour's hue (0), saturation (1) or brightness (2); the starting value when it has none
+        public static float UnderwearPart(string colour, int part) => UnderwearParts(colour)[Mathf.Clamp(part, 0, 2)];
+
+        // The colour with one part changed; empty when that brings it back to the starting values
+        public static string SetUnderwearPart(string colour, int part, float value)
+        {
+            float[] parts = UnderwearParts(colour);
+            parts[Mathf.Clamp(part, 0, 2)] = Mathf.Clamp01(value);
+            float[] start = UnderwearParts("");
+            if (Mathf.Approximately(parts[0], start[0]) && Mathf.Approximately(parts[1], start[1]) && Mathf.Approximately(parts[2], start[2])) return "";
+            return string.Join("|", Array.ConvertAll(parts, p => p.ToString("R", CultureInfo.InvariantCulture)));
+        }
+
+        private static float[] UnderwearParts(string colour) => ParseUnderwear(colour) ?? ParseUnderwear(HasUnderwear ? _underwearDefault() : "") ?? new[] { 0f, 0f, 0.17f };
+
+        private static float[] ParseUnderwear(string colour)
+        {
+            string[] text = (colour ?? "").Split('|');
+            if (text.Length != 3) return null;
+            float[] parts = new float[3];
+            for (int i = 0; i < 3; i++)
+            {
+                if (!float.TryParse(text[i], NumberStyles.Float, CultureInfo.InvariantCulture, out parts[i]) || float.IsNaN(parts[i]) || float.IsInfinity(parts[i])) return null;
+                parts[i] = Mathf.Clamp01(parts[i]);
+            }
+            return parts;
+        }
 
         public static bool Drawn(GameObject character)
         {

@@ -65,6 +65,7 @@ namespace VillagePlebs
             if (string.IsNullOrEmpty(Current.BrLook)) Current.BrLook = BodyReplacerLook.DefaultLook();
             if (Current.BrTattoos == null) Current.BrTattoos = "";
             if (Current.BrHair == null) Current.BrHair = "";
+            if (Current.BrUnderwear == null) Current.BrUnderwear = "";
         }
 
         public void Build(RectTransform area, string about, bool mine, Action apply)
@@ -156,8 +157,20 @@ namespace VillagePlebs
             _muscleSection = Section(einherjar, T("villagepleb_looks_muscle"), "Muscle").gameObject;
             MakeSlider(_muscleSection.transform, (Current.BrMuscle >= 0f ? Current.BrMuscle : BodyReplacerLook.MuscleDefault(Current.Model)) / 100f,
                 v => { Current.BrMuscle = v * 100f; ApplyToClone(); });
+            if (BodyReplacerLook.HasUnderwear) BuildUnderwear(einherjar);
             if (BodyReplacerLook.HasTattoos) BuildTattoos(einherjar);
         }
+
+        // Underwear colour, as BodyReplacer's appearance panel has it: hue, saturation and brightness over the underwear's own shading
+        private void BuildUnderwear(Transform einherjar)
+        {
+            UnderwearSlider(Section(einherjar, T("villagepleb_looks_underwear"), "UnderwearColour"), 0);
+            UnderwearSlider(Section(einherjar, T("villagepleb_looks_underwear_rich"), "UnderwearRich"), 1);
+            UnderwearSlider(Section(einherjar, T("villagepleb_looks_underwear_shade"), "UnderwearShade"), 2);
+        }
+
+        private void UnderwearSlider(Transform section, int part) =>
+            MakeSlider(section, BodyReplacerLook.UnderwearPart(Current.BrUnderwear, part), v => { Current.BrUnderwear = BodyReplacerLook.SetUnderwearPart(Current.BrUnderwear, part, v); ApplyToClone(); });
 
         // A tick under the iris size: the eyes drawn with BodyReplacer's default texture, its iris coloured by the eye sliders above
         private void BuildHideIris(Transform section)
@@ -436,7 +449,7 @@ namespace VillagePlebs
 
         private static bool Same(Looks.Look a, Looks.Look b) =>
             a.Model == b.Model && a.Hair == b.Hair && a.Beard == b.Beard && Mathf.Approximately(a.Skin, b.Skin) && Mathf.Approximately(a.HairTone, b.HairTone)
-            && Mathf.Approximately(a.HairShade, b.HairShade) && (a.BrLook ?? "") == (b.BrLook ?? "") && Mathf.Approximately(a.BrMuscle, b.BrMuscle) && (a.BrTattoos ?? "") == (b.BrTattoos ?? "") && a.BrBeard == b.BrBeard && (a.BrHair ?? "") == (b.BrHair ?? "") && a.BrHideIris == b.BrHideIris;
+            && Mathf.Approximately(a.HairShade, b.HairShade) && (a.BrLook ?? "") == (b.BrLook ?? "") && Mathf.Approximately(a.BrMuscle, b.BrMuscle) && (a.BrTattoos ?? "") == (b.BrTattoos ?? "") && a.BrBeard == b.BrBeard && (a.BrHair ?? "") == (b.BrHair ?? "") && a.BrHideIris == b.BrHideIris && (a.BrUnderwear ?? "") == (b.BrUnderwear ?? "");
 
         // Head and shoulders of the preview body, from the front, in the preview's studio light: the companion's portrait.
         public Texture2D Snapshot(int size = 160)
@@ -593,6 +606,7 @@ namespace VillagePlebs
             BodyReplacerLook.ApplyBeard(_clone, Current.BrBeard);
             BodyReplacerLook.ApplyCustomHair(_clone, Current.BrHair);
             BodyReplacerLook.ApplyHideIris(_clone, Current.BrHideIris);
+            BodyReplacerLook.ApplyUnderwear(_clone, Current.BrUnderwear);
             CurrentModelIndex?.SetValue(vis, -1);
             vis.SetModel(Current.Model);
             vis.SetHairItem(Current.Hair);
@@ -653,6 +667,7 @@ namespace VillagePlebs
             look.BrBeard = Current.BrBeard;
             look.BrHair = Current.BrHair;
             look.BrHideIris = Current.BrHideIris;
+            look.BrUnderwear = Current.BrUnderwear;
             Current = look;
             Refresh();
             ApplyToClone();
