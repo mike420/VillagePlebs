@@ -8,13 +8,13 @@ namespace VillagePlebs
 {
     [BepInPlugin(PluginGUID, PluginName, PluginVersion)]
     [BepInDependency("com.jotunn.jotunn", BepInDependency.DependencyFlags.HardDependency)]
-    [BepInDependency("MagicMike.BodyReplacer", BepInDependency.DependencyFlags.SoftDependency)]
+    [BepInDependency("MagicMike.EinherjarBodies", BepInDependency.DependencyFlags.SoftDependency)]
     [NetworkCompatibility(CompatibilityLevel.EveryoneMustHaveMod, VersionStrictness.Major)]
     public partial class VillagePlebsPlugin : BaseUnityPlugin
     {
         public const string PluginGUID = "MagicMike.VillagePlebs";
         public const string PluginName = "VillagePlebs";
-        public const string PluginVersion = "1.0.0";
+        public const string PluginVersion = "1.0.1";
         public const string PluginAuthor = "MagicMike";
         public const string PluginLink = "https://discord.gg/mnr36G6J4x";
 
