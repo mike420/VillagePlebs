@@ -7,6 +7,22 @@
 </thead>
 <tbody>
   <tr>
+    <td>1.0.3</td>
+    <td>
+    <ul>
+      <li>Fixed underwear not showing!</li>
+    </ul>
+    </td>
+  </tr>
+  <tr>
+    <td>1.0.2</td>
+    <td>
+    <ul>
+      <li>Added compatibility with EinherjarBodies.</li>
+    </ul>
+    </td>
+  </tr>
+  <tr>
     <td>1.0.1</td>
     <td>
     <ul>
