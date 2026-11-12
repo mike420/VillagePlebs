@@ -441,12 +441,15 @@ namespace VillagePlebs
             finally { ZNetView.m_forceDisableInit = false; }
             Rigidbody body = _clone.GetComponent<Rigidbody>();
             if (body != null) UnityEngine.Object.Destroy(body);
-            foreach (MonoBehaviour b in _clone.GetComponentsInChildren<MonoBehaviour>(true)) if (!(b is VisEquipment)) b.enabled = false;
+            foreach (MonoBehaviour b in _clone.GetComponentsInChildren<MonoBehaviour>(true)) if (!(b is VisEquipment) && !IsUnderwear(b)) b.enabled = false;
             foreach (Renderer r in _clone.GetComponentsInChildren<Renderer>(true)) r.enabled = true;
             foreach (Animator anim in _clone.GetComponentsInChildren<Animator>()) StandStill(anim);
             _cloneModel = Current.Model;
             return true;
         }
+
+        // Einherjar Bodies draws its underwear from its own component's LateUpdate, so the preview must leave that one running
+        private static bool IsUnderwear(MonoBehaviour b) => b.GetType().FullName == "EinherjarBodies.Underwear";
 
         private Vector3 EyeCentre()
         {
