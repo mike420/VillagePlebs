@@ -603,7 +603,7 @@ namespace VillagePlebs
                         TMP_Text t = GameUi.Label(_window, shownName, new Vector2(px, -12f), new Vector2(cw, 34f), 26f, GameUi.Warm, GameUi.Norse, TextAlignmentOptions.Center);
                         t.fontStyle = FontStyles.Bold;
                         t.textWrappingMode = TextWrappingModes.NoWrap;
-                        t.overflowMode = TextOverflowModes.Ellipsis;
+                        t.SetEllipsisOverflow();
                     }
                     Humanoid target = there;
                     if (sailing || shopping)
@@ -1547,7 +1547,7 @@ namespace VillagePlebs
         {
             TMP_Text t = GameUi.Label(parent, "", new Vector2(x, -y), new Vector2(w, size * 1.8f), size, color, null, align);
             t.textWrappingMode = TextWrappingModes.NoWrap;
-            t.overflowMode = TextOverflowModes.Ellipsis;
+            t.SetEllipsisOverflow();
             return t;
         }
 

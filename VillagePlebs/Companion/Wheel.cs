@@ -375,7 +375,7 @@ namespace VillagePlebs
                 chip.Initial.text = name.Length > 0 ? name.Substring(0, 1).ToUpperInvariant() : "?";
                 chip.Name = Text(chip.Body, 18f, Bright, new Vector2(ChipW - 8f, 24f), new Vector2(0f, -ChipH * 0.5f + 32f));
                 chip.Name.text = name;
-                chip.Name.overflowMode = TextOverflowModes.Ellipsis;
+                chip.Name.SetEllipsisOverflow();
                 chip.Note = Text(chip.Body, 13f, Ink, new Vector2(ChipW - 8f, 18f), new Vector2(0f, -ChipH * 0.5f + 12f));
                 Chips.Add(chip);
             }
