@@ -1,3 +1,5 @@
+![](https://imgup.uk/i/RlDzGrHb.png)
+
 # 🧔 VillagePlebs
 
 Viking companions who play the game the way you do. Summon one, or several, and they come on your adventures: through portals, into crypts and caves, onto your ship. They fight beside you with timed parries, dodge rolls, flanking and bows, and tell you when a place is too dangerous for their gear.
@@ -104,19 +106,22 @@ For Nexus downloads you will need to install manually.
 
 
 ## 💥 Plugins Created by Magic Mike:
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/AuroraBorealis">Aurora Borealis</a>
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/BetterBuildMenu">Better Build Menu</a>
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/BetterEquipSlots">Better Equip Slots</a>
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/CorewoodAdditions">Corewood Additions</a>
   * <a href="https://valheim.hexium.gg/mods/MagicMike/CoreWoodExtras">Corewood Extras</a>
   * <a href="https://valheim.hexium.gg/mods/MagicMike/CorewoodFortified">Corewood Fortified</a>
-  * <a href="https://valheim.hexium.gg/mods/MagicMike/CorewoodAdditions">Corewood Additions</a>
-  * <a href="https://valheim.hexium.gg/mods/MagicMike/MyDirtyHoe">My Dirty Hoe</a>
   * <a href="https://valheim.hexium.gg/mods/MagicMike/ChestPreview">Chest Preview</a>
-  * <a href="https://valheim.hexium.gg/mods/MagicMike/YabbaDabbaDoo">YabbaDabbaDoo</a>
-  * <a href="https://valheim.hexium.gg/mods/MagicMike/BetterBuildMenu">Better Build Menu</a>
-  * <a href="https://valheim.hexium.gg/mods/MagicMike/BetterCrafting">Better Crafting</a>
-  * <a href="https://valheim.hexium.gg/mods/MagicMike/BetterEquipSlots">Better Equip Slots</a>
-  * <a href="https://valheim.hexium.gg/mods/MagicMike/ExtraInventorySlots">Extra Inventory Slots</a>
-  * <a href="https://valheim.hexium.gg/mods/MagicMike/VillagePlebs">Village Plebs</a>
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/DestroyIt">Destroy It</a>
   * <a href="https://valheim.hexium.gg/mods/MagicMike/EinherjarBodies">Einherjar Bodies</a>
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/ExtraInventorySlots">Extra Inventory Slots</a>
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/MyDirtyHoe">My Dirty Hoe</a>
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/ValheimSkies">Valheim Skies</a>
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/VanityWardrobe">Vanity Wardrobe</a>
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/VillagePlebs">Village Plebs</a>
+  * <a href="https://valheim.hexium.gg/mods/MagicMike/YabbaDabbaDoo">YabbaDabbaDoo</a>
 
 <br>
 
-## 💬 Comments/Suggestions/Help: <a href="https://www.nexusmods.com/profile/MagicMikeMods/mods?gameId=3667">Nexus</a>, <a href="https://discord.gg/mnr36G6J4x">Discord</a>.
+## 💬 Comments/Suggestions/Help: <a href="https://discord.gg/mnr36G6J4x">Discord</a>.

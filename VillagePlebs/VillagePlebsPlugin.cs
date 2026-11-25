@@ -14,7 +14,7 @@ namespace VillagePlebs
     {
         public const string PluginGUID = "MagicMike.VillagePlebs";
         public const string PluginName = "VillagePlebs";
-        public const string PluginVersion = "1.0.3";
+        public const string PluginVersion = "1.0.6";
         public const string PluginAuthor = "MagicMike";
         public const string PluginLink = "https://discord.gg/mnr36G6J4x";
 

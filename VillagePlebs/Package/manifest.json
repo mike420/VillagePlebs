@@ -1,7 +1,7 @@
 {
   "name": "VillagePlebs",
   "description": "Viking companions who play like a player. They follow you through portals, crypts and onto your ship, fight with parries, dodges and bows, and at home farm, fish, smelt, cook and craft their own better gear while you are away.",
-  "version_number": "1.0.3",
+  "version_number": "1.0.6",
   "website_url": "https://discord.gg/mnr36G6J4x",
   "dependencies": [
     "denikson-BepInExPack_Valheim-5.4.2360",
